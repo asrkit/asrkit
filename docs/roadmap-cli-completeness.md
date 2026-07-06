@@ -14,6 +14,8 @@
 | **0.4.2** | 配置持久化（B 组） | `asrkit config`：密钥/默认引擎/models 根目录 | 无 |
 | **0.5.0** | 工具→服务（C 组） | `asrkit serve`：OpenAI 兼容 HTTP 端点 | A(formats) + B(keystore) |
 
+> 注（收尾）：下表是**规划时**的分版本设想。实际落地时按 0.x 版本纪律（功能走 PATCH，MINOR 留给里程碑）**三组合并为单个 `0.4.1` 发布**——下文各组内的"版本动作"保留原始规划口径，实际以本注与 CHANGELOG 为准。
+
 顺序理由：C 的 `response_format` 复用 A 的 formats 模块，C 的免密钥调用复用 B 的 keystore。故 A、B 必须先落地。
 
 ---
@@ -207,10 +209,10 @@ c.audio.transcriptions.create(model="local/sensevoice", file=open("a.wav","rb"))
 
 ## 落地顺序清单
 
-- [x] **0.4.1 (A)** ✅：formats 模块 → CLI `--format/-o` → `list --json/--installed/--source` → `--language` → 修文档缺口 → `py.typed` → api 对称 → 测试 → tag `v0.4.1`
-- [x] **0.4.2 (B)** ✅：config 模块 → make_adapter 凭据链 → resolve 默认引擎 → `config` 子命令 + `engine default` → 安全(0600/打码) → 测试 → tag `v0.4.2`
-- [x] **0.5.0 (C)** ✅：serve extra → server 模块（复用 formats+keystore）→ `serve` 子命令 → 安全默认 → 测试 → README/docs → tag `v0.5.0`
+- [x] **A · 输出格式与 CLI** ✅：formats 模块 → CLI `--format/-o` → `list --json/--installed/--source` → `--language` → 修文档缺口 → `py.typed` → api 对称 → 测试
+- [x] **B · 配置持久化** ✅：config 模块 → make_adapter 凭据链 → resolve 默认引擎 → `config` 子命令 + `engine default` → 安全(0600/打码) → 测试
+- [x] **C · 本地服务** ✅：serve extra → server 模块（复用 formats+keystore）→ `serve` 子命令 → 安全默认 → 测试 → README/docs
 
-**三组全部完成。** 每组遵循 CHANGELOG 顶部的"发版三步"。破坏性变更：三组均**无**（纯增量，裸名默认引擎缺省不变，故向后兼容）。
+**三组全部完成，合并为单个补丁版 `v0.4.1` 发布**（0.x 纪律：功能走 PATCH，MINOR 留给里程碑；见 CHANGELOG 顶部）。破坏性变更：三组均**无**（纯增量，裸名默认引擎缺省不变，故向后兼容）。
 
 > 0.5.x 后续（已在 C 组非目标记录）：本地模型常驻缓存（LRU）、`stream=true` 流式、`asrkit ps`、`engine rm` 安全卸载。

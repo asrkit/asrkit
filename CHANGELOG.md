@@ -1,60 +1,50 @@
 # Changelog
 
-本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。0.x 阶段:破坏性变更只 bump MINOR(0.3→0.4),加功能/修 bug bump PATCH(0.4.0→0.4.1)。
+本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。**0.x 阶段的版本纪律**：
+- **PATCH（0.4.0→0.4.1）= 日常**：新功能、修 bug 都走这里。绝大多数发布都是 PATCH。
+- **MINOR（0.4→0.5）= 里程碑或破坏性变更**：慢、且有分量。参考 Ollama——两年才到 0.31。宁可在 0.4.x 里多磨几个补丁版，也不轻易动中间位数。
+- **1.0** 留到"项目宪法"（model string 寻址 / adapter 契约 / CLI 核心命令）真正稳定、愿为其背书时。
 
 > **发版三步**
 > 1. 改版本号 —— 只改 `src/asrkit/__init__.py` 的 `__version__`(单一版本源,pyproject 自动同步),并同步 `tests/test_smoke.py` 的断言。
 > 2. 记 CHANGELOG —— 在下方加一节 `## [X.Y.Z] - YYYY-MM-DD`,分 `### 新增 / 变更 / 修复` 三段;**破坏性变更要醒目标出**。
 > 3. 打 tag 并推 —— `git tag -a vX.Y.Z -m "…" && git push origin main --tags`(tag 与 PyPI 版本一一对应)。
 
-## [0.5.0] - 2026-07-06
-
-主题：**工具 → 服务**（C 组）。坐实 "Ollama + **LiteLLM**" 的服务那一半。
-
-### 新增
-- **`asrkit serve`** —— OpenAI 兼容的本地转写服务（可选 extra `pip install "asrkit[serve]"`）：
-  - `POST /v1/audio/transcriptions`（multipart：`file` / `model` / `language` / `response_format`），`response_format` 支持 `json`(默认) / `verbose_json` / `text` / `srt` / `vtt`（复用 0.4.1 formats 模块）。
-  - `GET /v1/models`（OpenAI list 结构）、`GET /health`。
-  - 任何 OpenAI 客户端改 `base_url` 即可调用 ASRKit 背后的全部端云模型；云端密钥走 0.4.2 keystore，无需每次传。
-- **透明原则贯穿**：上传文件按原始字节落临时文件，不解码/不重采样，请求结束清理。
-- **安全默认**：绑 `127.0.0.1`（仅本机）；`--host 0.0.0.0` 显式警告暴露到网络。
-- 懒加载：`asrkit.server` 顶层不 import fastapi/uvicorn，基础安装不受影响；缺 extra 时友好报错。
-
-### 已知局限（0.5.x 后续）
-- 本地模型每请求重新加载（无常驻缓存）；无 `stream=true` / 无鉴权（本机工具定位）。
-
-## [0.4.2] - 2026-07-06
-
-主题：**配置持久化**（B 组，见 `docs/roadmap-cli-completeness.md`）。让云端"像本地一样顺手"。
-
-### 新增
-- **`asrkit config`** —— 持久化配置（`~/.asrkit/config.json`，`$ASRKIT_CONFIG` 可覆盖）：
-  - `config set-key <vendor> <key>`（单密钥）/ `--app-key --access-key`（火山等双密钥）。
-  - `config set default-engine <name>` / `config set models-root <path>`。
-  - `config get-key <vendor>` / `config list`（**一律打码，仅末 4 位**）/ `config path`。
-- **凭据解析优先级**：显式 config > 环境变量 > **config.json keystore**（新兜底）。存一次，之后该 vendor 的模型自动带密钥。
-- **默认引擎可切**：`asrkit engine default <name>`（= `config set default-engine`）落地——裸名解析改读配置（缺省仍 `local`/sherpa，向后兼容）。
-- **models 根目录**可持久化：`config set models-root`（优先级：显式 > `ASRKIT_MODELS_ROOT` > config > 默认）。
-
-### 安全
-- 配置文件写入设权限 **0600**；密钥**明文存储**（同 ollama/aws-cli 惯例），首次 `set-key` 提示；不放心者继续用环境变量。
-
 ## [0.4.1] - 2026-07-06
 
-主题：**快速完善**（A 组，纯增量，见 `docs/roadmap-cli-completeness.md`）。
+主题：**完善——工具与服务**（对照 Ollama + LiteLLM，见 `docs/roadmap-cli-completeness.md` A/B/C 三组，合并为一个补丁版发布）。均为向后兼容增量。
 
-### 新增
+### 新增 · 输出格式与 CLI（A）
 - **输出格式** `--format {txt,json,srt,vtt}` + `-o/--output`（`run` 与 `transcribe` 均支持）：
   - `json` 输出全字段（含 segments/word_timestamps/metrics），脚本可解析。
   - `srt` / `vtt` 输出字幕（依赖模型返回 segments；无时间戳时诚实报错，不伪造）。
-  - 新模块 `asrkit.formats.render`（未来 `asrkit serve` 的 response_format 复用）。
+  - 新模块 `asrkit.formats.render`（`asrkit serve` 的 response_format 复用）。
 - **`asrkit list` 增强**：`--json`（机器可读）、`--installed`（只看已装本地）、`--source cloud|local`；人读输出加体积列。
 - **`--language`** 语言提示透传（`TranscribeOptions.lang_hint`），利于 Whisper 类模型。
 - **`py.typed`** 类型标记：下游 IDE/mypy 可获取类型提示。
 - **api 对称**：`asrkit.api.show()` / `remove()`，与 CLI 对齐。
 
+### 新增 · 配置持久化（B）
+- **`asrkit config`** —— 持久化配置（`~/.asrkit/config.json`，`$ASRKIT_CONFIG` 可覆盖）：
+  - `config set-key <vendor> <key>`（单密钥）/ `--app-key --access-key`（火山等双密钥）。
+  - `config set default-engine <name>` / `config set models-root <path>`。
+  - `config get-key <vendor>` / `config list`（**一律打码，仅末 4 位**）/ `config path`。
+- **凭据解析优先级**：显式 config > 环境变量 > **config.json keystore**（新兜底）。存一次，之后该 vendor 的模型自动带密钥。
+- **默认引擎可切**：`asrkit engine default <name>`（= `config set default-engine`）——裸名解析改读配置（缺省仍 `local`/sherpa，向后兼容）。
+- **models 根目录**可持久化：`config set models-root`（优先级：显式 > `ASRKIT_MODELS_ROOT` > config > 默认）。
+- 安全：配置文件权限 **0600**；密钥**明文存储**（同 ollama/aws-cli 惯例），首次 `set-key` 提示；不放心者继续用环境变量。
+
+### 新增 · 本地服务（C）
+- **`asrkit serve`** —— OpenAI 兼容的本地转写服务（可选 extra `pip install "asrkit[serve]"`）：
+  - `POST /v1/audio/transcriptions`（multipart：`file` / `model` / `language` / `response_format`），`response_format` 支持 `json`(默认) / `verbose_json` / `text` / `srt` / `vtt`。
+  - `GET /v1/models`（OpenAI list 结构）、`GET /health`。
+  - 任何 OpenAI 客户端改 `base_url` 即可调用 ASRKit 背后的全部端云模型；云端密钥走 keystore，无需每次传。
+- 透明原则：上传文件按原始字节落临时文件，不解码/不重采样，请求结束清理。
+- 安全默认：绑 `127.0.0.1`（仅本机）；`--host 0.0.0.0` 显式警告。懒加载：基础安装不受影响，缺 extra 时友好报错。
+- 已知局限（后续）：本地模型每请求重新加载（无常驻缓存）；无 `stream=true` / 无鉴权。
+
 ### 修复
-- 文档-代码缺口：`docs/engines-and-addressing.md` 中 `asrkit engine rm` / `engine default` 明确标为"路线"（未实现）；`default` 将随 0.4.2 `config` 落地。
+- 文档-代码缺口：`docs/engines-and-addressing.md` 中 `asrkit engine rm` 标为"路线"（未实现）。
 
 ## [0.4.0] - 2026-07-06
 
