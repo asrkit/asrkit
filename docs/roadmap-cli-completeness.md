@@ -207,8 +207,10 @@ c.audio.transcriptions.create(model="local/sensevoice", file=open("a.wav","rb"))
 
 ## 落地顺序清单
 
-- [ ] **0.4.1 (A)**：formats 模块 → CLI `--format/-o` → `list --json/--installed/--source` → `--language` → 修文档缺口 → `py.typed` →（可选 api 对称）→ 测试 → bump/CHANGELOG/tag
-- [ ] **0.4.2 (B)**：config 模块 → make_adapter 凭据链 → resolve 默认引擎 → `config` 子命令 + `engine default` → 安全(0600/打码) → 测试 → bump/CHANGELOG/tag
-- [ ] **0.5.0 (C)**：serve extra → server 模块（复用 formats+keystore）→ `serve` 子命令 → 安全默认 → 测试 → README/docs → bump/CHANGELOG/tag
+- [x] **0.4.1 (A)** ✅：formats 模块 → CLI `--format/-o` → `list --json/--installed/--source` → `--language` → 修文档缺口 → `py.typed` → api 对称 → 测试 → tag `v0.4.1`
+- [x] **0.4.2 (B)** ✅：config 模块 → make_adapter 凭据链 → resolve 默认引擎 → `config` 子命令 + `engine default` → 安全(0600/打码) → 测试 → tag `v0.4.2`
+- [x] **0.5.0 (C)** ✅：serve extra → server 模块（复用 formats+keystore）→ `serve` 子命令 → 安全默认 → 测试 → README/docs → tag `v0.5.0`
 
-每组遵循 CHANGELOG 顶部的"发版三步"。破坏性变更：三组均**无**（纯增量，裸名默认引擎缺省不变，故向后兼容）。
+**三组全部完成。** 每组遵循 CHANGELOG 顶部的"发版三步"。破坏性变更：三组均**无**（纯增量，裸名默认引擎缺省不变，故向后兼容）。
+
+> 0.5.x 后续（已在 C 组非目标记录）：本地模型常驻缓存（LRU）、`stream=true` 流式、`asrkit ps`、`engine rm` 安全卸载。
