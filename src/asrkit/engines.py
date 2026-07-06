@@ -11,6 +11,7 @@ import importlib.util
 ENGINES = {
     "sherpa-onnx":    ("sherpa_onnx", None),               # 基础安装自带
     "faster-whisper": ("faster_whisper", "faster-whisper"),
+    "transformers":   ("transformers", "transformers"),    # 接整个 HF ASR 生态（重,含 torch）
 }
 
 

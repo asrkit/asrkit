@@ -5,7 +5,9 @@
 ## [0.2.0] - 未发布
 
 ### 新增
-- **多引擎**：引擎作为可选组件。新增 **faster-whisper** 引擎（`pip install "asrkit[faster-whisper]"`），通过同一接口寻址 `faster-whisper/<model>`（如 `faster-whisper/large-v3`）；模型由 HuggingFace 自动下载缓存，且引擎自带长音频分块。
+- **多引擎**：引擎作为可选组件，通过同一接口 `引擎/模型` 寻址。新增两个引擎：
+  - **faster-whisper**（`pip install "asrkit[faster-whisper]"`）：`faster-whisper/<model>`（如 `faster-whisper/large-v3`）；HF 自动下载、自带长音频分块。
+  - **transformers**（`pip install "asrkit[transformers]"`，含 torch）：**开放寻址 `transformers/<任意 HF 模型 id>`**——接入整个 HuggingFace ASR 生态，含 LLM 架构 SOTA 模型（大模型建议 GPU）。
 - `asrkit engine list` / `asrkit engine install <name>` 管理引擎（install = `sys.executable -m pip` 装对应 extra，回显命令）。
 - **安装机制可插拔**：`is_installed` / `install` 下沉到各 adapter（sherpa 走 release tarball；faster-whisper 走 HF 缓存）。缺引擎时友好报错（带安装命令），不崩。
 

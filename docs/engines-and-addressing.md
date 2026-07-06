@@ -117,7 +117,7 @@ asrkit run  siliconflow/sensevoice a.wav --api-key <KEY>
 
 ## 七、现状 vs 路线，以及"不破坏"保证
 
-**现状（已实现，0.2.0）**：两个本地引擎——**sherpa-onnx（默认）** 与 **faster-whisper（可选 extra）**；寻址 `local/<model>` / `faster-whisper/<model>` + 裸名简写（落默认引擎）+ `:tag` 精度；云端 `provider/model`。`asrkit engine list/install` 管理引擎；`is_installed`/`install` 已下沉到各 adapter。
+**现状（已实现，0.2.0）**：三个本地引擎——**sherpa-onnx（默认）**、**faster-whisper（extra）**、**transformers（extra，含 torch）**；寻址 `local/<model>` / `faster-whisper/<model>` / **`transformers/<任意 HF id>`（开放寻址）** + 裸名简写（落默认引擎）+ `:tag` 精度；云端 `provider/model`。`asrkit engine list/install` 管理引擎；`is_installed`/`install` 已下沉到各 adapter。
 
 **路线（未实现，已留口子）**：更多引擎（whisper.cpp / transformers/vLLM）；entry-point 第三方引擎插件；`local/` 作"默认引擎"别名的进一步统一。
 
@@ -127,7 +127,7 @@ asrkit run  siliconflow/sensevoice a.wav --api-key <KEY>
 
 ## 八、引擎作为可选组件（0.2.0 起部分实现）
 
-> 状态：pip extras + `asrkit engine list/install` + 懒加载/友好报错 + 可插拔 install = **已实现**（faster-whisper 为首个）；entry-point 第三方插件 = 路线。
+> 状态：pip extras + `asrkit engine list/install` + 懒加载/友好报错 + 可插拔 install + 开放 provider = **已实现**（faster-whisper、transformers 为首批）；entry-point 第三方插件 = 路线。
 
 引擎不像模型是"下个权重文件"，它是**一个 Python 包**（含代码+二进制、有依赖树）。所以：
 

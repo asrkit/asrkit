@@ -21,6 +21,14 @@ def test_list_models():
     assert "faster-whisper/tiny" in ids   # 第二个引擎已注册（可选,懒加载）
 
 
+def test_transformers_open_provider():
+    # transformers 开放寻址：任意 HF id 都能解析
+    m = registry.resolve("transformers/openai/whisper-tiny")
+    assert m.provider == "transformers" and m.model == "openai/whisper-tiny"
+    m2 = registry.resolve("transformers/some-org/some-model")
+    assert m2.provider == "transformers" and m2.model == "some-org/some-model"
+
+
 def test_resolve_and_alias():
     assert registry.resolve("local/sensevoice").id == "local/sensevoice"
     # Ollama 式精度寻址

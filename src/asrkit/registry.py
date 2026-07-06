@@ -18,6 +18,7 @@ class ModelNotFoundError(Exception):
 _PROTOCOLS: Dict[str, Type[BaseAdapter]] = {}
 _MODELS: Dict[str, AdapterMeta] = {}
 _ALIASES: Dict[str, str] = {}   # 别名 -> 真实 id
+_OPEN: Dict[str, object] = {}   # 开放 provider 前缀 -> factory(model_str)->AdapterMeta（如 transformers/<任意 HF id>）
 
 
 def register_protocol(provider: str):
@@ -25,6 +26,11 @@ def register_protocol(provider: str):
         _PROTOCOLS[provider] = cls
         return cls
     return deco
+
+
+def register_open_provider(prefix: str, factory) -> None:
+    """开放 provider：`<prefix>/<任意串>` 动态合成 meta（如 transformers 接整个 HF hub）。"""
+    _OPEN[prefix] = factory
 
 
 def register_model(meta: AdapterMeta) -> None:
@@ -65,6 +71,11 @@ def resolve(model_id: str) -> AdapterMeta:
             return _MODELS[cand]
         if cand in _ALIASES:
             return _MODELS[_ALIASES[cand]]
+    else:
+        # 开放 provider：transformers/<任意 HF id> 动态合成
+        prefix, rest = model_id.split("/", 1)
+        if rest and prefix in _OPEN:
+            return _OPEN[prefix](rest)
     raise ModelNotFoundError(f"unknown model '{model_id}'. Run `asrkit list` to see all.")
 
 
@@ -98,6 +109,7 @@ def load_builtin() -> None:
         cloud_openai,
         local_faster_whisper,
         local_sherpa,
+        local_transformers,
         models_local,
     )
     _loaded = True
