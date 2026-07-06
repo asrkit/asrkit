@@ -6,15 +6,37 @@
 
 One interface to run and compare any speech-to-text model — local & cloud.
 
-> ⚠️ **占位发布。** 当前 `0.0.1` 仅用于锁定名称，ASRKit 正在积极开发中，**暂未提供实际功能**。
-> 首个可用版本请关注 [github.com/asrkit/asrkit](https://github.com/asrkit/asrkit)。
+ASRKit 是语音识别领域的 Ollama + LiteLLM：本地模型一条命令拉起来跑，云端 API 换个字符串就切换，端云共用同一套接口。
 
-## ASRKit 会是什么
+## 安装
 
-ASRKit 是语音识别领域的 Ollama + LiteLLM：
+```bash
+pip install "asrkit[local]"   # 端侧（sherpa-onnx，47 个模型）
+pip install "asrkit[cloud]"   # 云端 API
+pip install "asrkit[all]"     # 都要
+```
 
-- **本地模型，`pull` 即用** —— 一条命令跑开源 ASR 模型（SenseVoice、Paraformer、Zipformer、Whisper、Moonshine、Parakeet …），模型按需下载。
-- **云端 API，换个字符串即切** —— 用完全相同的接口调用云端 ASR（火山引擎、阿里百炼、OpenAI、Deepgram …），密钥自带。
-- **端云一套协议** —— 一份契约、一个 OpenAI 兼容端点，内置 `bench` 把端侧与云端放在同一把尺子上横评。
+## 快速开始
 
-Apache-2.0 开源。你的音频与密钥永不经过我们——ASRKit 完全跑在你自己的机器上。
+```bash
+asrkit list                                              # 看所有模型（✓=已安装）
+asrkit run local/sensevoice a.wav                        # 端侧：缺则自动下载 + 转写
+asrkit run siliconflow/sensevoice a.wav --api-key <KEY>  # 云端：换个字符串即切
+```
+
+Python：
+
+```python
+from asrkit import transcribe
+r = transcribe("local/sensevoice", "a.wav")
+print(r.text)
+```
+
+## 特点
+
+- **本地 47 个端侧模型**（SenseVoice / Paraformer / Whisper / Zipformer / Moonshine / Parakeet / FireRed / Qwen3-ASR …），`pull` 即用。
+- **云端 OpenAI 兼容接口**，密钥自带（更多厂商陆续接入）。
+- **透明层**：默认不改动你的音频、不改变模型原生行为；格式不符**诚实报错**，转换（`--convert`）与长音频分段（`--segment`）是 opt-in。
+- **隐私**：你的音频与密钥永不经过我们——ASRKit 完全跑在你自己的机器上。
+
+Apache-2.0。用法详见 [docs/usage.md](docs/usage.md)，扩展新引擎/模型见 [docs/adapter-spec.md](docs/adapter-spec.md)。

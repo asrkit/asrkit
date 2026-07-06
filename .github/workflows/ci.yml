@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      # 轻量：装云端 extras（numpy/soundfile/soxr/requests）+ pytest；不装 sherpa-onnx（端侧真机放 nightly/手动）
+      - run: pip install ".[cloud]" pytest
+      - run: pytest -q

@@ -6,16 +6,37 @@
 
 一套接口，跑遍端云所有语音识别。
 
-> ⚠️ **Placeholder release.** This `0.0.1` reserves the name while ASRKit is
-> under active development. It does not yet provide functionality.
-> Watch [github.com/asrkit/asrkit](https://github.com/asrkit/asrkit) for the first working release.
+ASRKit is the Ollama + LiteLLM for speech recognition: pull and run open-source ASR models locally with one command, call cloud ASR APIs by changing one string, all through the same interface.
 
-## What ASRKit will be
+## Install
 
-ASRKit is the Ollama + LiteLLM for speech recognition:
+```bash
+pip install "asrkit[local]"   # on-device (sherpa-onnx, 47 models)
+pip install "asrkit[cloud]"   # cloud APIs
+pip install "asrkit[all]"
+```
 
-- **Local models, `pull` and go** — run open-source ASR models (SenseVoice, Paraformer, Zipformer, Whisper, Moonshine, Parakeet …) with one command, models downloaded on demand.
-- **Cloud APIs, one string away** — call hosted ASR (Volcengine, DashScope, OpenAI, Deepgram …) through the exact same interface, bring your own key.
-- **One protocol across edge and cloud** — a single contract, an OpenAI-compatible endpoint, and a built-in `bench` to compare them all on the same ruler.
+## Quickstart
 
-Apache-2.0. Your audio and keys never pass through us — ASRKit runs on your machine.
+```bash
+asrkit list                                              # list all models (✓ = installed)
+asrkit run local/sensevoice a.wav                        # local: auto-download if missing, then transcribe
+asrkit run siliconflow/sensevoice a.wav --api-key <KEY>  # cloud: just change the string
+```
+
+Python:
+
+```python
+from asrkit import transcribe
+r = transcribe("local/sensevoice", "a.wav")
+print(r.text)
+```
+
+## Highlights
+
+- **47 on-device models** (SenseVoice / Paraformer / Whisper / Zipformer / Moonshine / Parakeet / FireRed / Qwen3-ASR …), pull-and-go.
+- **OpenAI-compatible cloud endpoint**, bring your own key (more providers landing).
+- **Transparent by design**: never touches your audio or changes the model's native behavior by default; honest errors on format mismatch; conversion (`--convert`) and long-audio segmentation (`--segment`) are opt-in.
+- **Privacy**: your audio and keys never pass through us — ASRKit runs on your machine.
+
+Apache-2.0. Usage: [docs/usage.md](docs/usage.md); write an adapter for a new engine/model: [docs/adapter-spec.md](docs/adapter-spec.md).
