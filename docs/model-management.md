@@ -38,10 +38,10 @@
 asrkit pull  model[:tag]          # ✅ 下载 + 解压 + 原子安装
 asrkit run   model[:tag] 音频     # ✅ = pull（若缺）+ transcribe，Ollama 式一步到位
 asrkit list                        # ✅ 列出全部（✓=已安装）
+asrkit show  model                 # ✅ 详情：架构/精度/许可证/语言（许可证数据待核实填充）
 asrkit transcribe 音频 -m model    # ✅ 只转写（不自动下载）
 # —— 以下为路线项，尚未实现 ——
 asrkit list --available            # 🔜 仅列可拉的
-asrkit show  model                 # 🔜 详情：架构/精度/体积/许可证/语言
 asrkit rm    model[:tag]           # 🔜 删除
 ```
 

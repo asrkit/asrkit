@@ -62,6 +62,9 @@ def main(argv: Optional[list] = None) -> int:
 
     sub.add_parser("list", help="列出模型（✓=已安装）")
 
+    sh = sub.add_parser("show", help="显示模型详情")
+    sh.add_argument("model")
+
     pp = sub.add_parser("pull", help="下载一个本地模型")
     pp.add_argument("model")
 
@@ -87,6 +90,31 @@ def main(argv: Optional[list] = None) -> int:
                 mark = "✓" if store.is_installed(m) else " "
                 flag = "💻"
             print(f"{mark} {flag} {m.id:26s} {m.name}")
+        return 0
+
+    if a.cmd == "show":
+        from . import registry
+        try:
+            m = registry.resolve(a.model)
+        except Exception as e:
+            print(f"[错误] {e}", file=sys.stderr)
+            return 1
+        print(f"id:       {m.id}")
+        print(f"名称:     {m.name}")
+        print(f"来源:     {m.source}  (provider={m.provider}, vendor={m.vendor})")
+        print(f"语言:     {', '.join(m.langs)}")
+        print(f"模式:     {', '.join(m.modes)}")
+        if m.source == "local":
+            print(f"架构:     {m.config_type}")
+            print(f"精度:     {m.tag or '—'}  (base={m.base or m.id.split('/')[-1]})")
+            print(f"已安装:   {'是' if store.is_installed(m) else '否'}")
+            print(f"下载:     {m.download_url}")
+        else:
+            print(f"model:    {m.model}")
+            print(f"base_url: {m.default_base_url}")
+        print(f"许可证:   {m.license or '未标注（见官方来源）'}")
+        if m.pricing:
+            print(f"价格:     {m.pricing}")
         return 0
 
     if a.cmd == "pull":
