@@ -14,9 +14,14 @@ from ..registry import register_model, register_protocol
 from ..types import AdapterMeta, AudioInput, BaseAdapter, TranscribeOptions, TranscribeResult
 
 _KEY = {"api_key": {"type": "secret", "required": True, "label": "DashScope API Key"}}
+_MAX_UPLOAD_BYTES = 200 * 1024 * 1024   # base64 内联上传，防超大文件内存尖峰
 
 
 def _data_uri(path: str) -> str:
+    sz = os.path.getsize(path)
+    if sz > _MAX_UPLOAD_BYTES:
+        raise ValueError(f"audio is {sz >> 20}MB, over the {_MAX_UPLOAD_BYTES >> 20}MB "
+                         f"inline-upload limit; segment the file first")
     ext = os.path.splitext(path)[1].lower()
     mime = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".m4a": "audio/mp4",
             ".flac": "audio/flac", ".ogg": "audio/ogg"}.get(ext, "audio/wav")

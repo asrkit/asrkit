@@ -29,8 +29,11 @@ def load() -> dict:
 
 
 def save(cfg: dict) -> str:
+    # 注：无文件锁，采用"后写者胜"（本地单用户工具，并发 set-key 概率极低）。
     p = path()
-    os.makedirs(os.path.dirname(p), exist_ok=True)
+    d = os.path.dirname(p)
+    if d:                       # ASRKIT_CONFIG 为裸文件名时 dirname="" ，跳过 makedirs
+        os.makedirs(d, exist_ok=True)
     # 先写临时文件再 rename，且收紧权限（0600）
     tmp = p + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:

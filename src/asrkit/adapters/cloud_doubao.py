@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import base64
+import os
 import time
 
 from ..registry import register_model, register_protocol
@@ -36,6 +37,11 @@ class Doubao(BaseAdapter):
                     text="", error="missing credentials (api_key, or app_key + access_key) for vendor=doubao")
             import requests
             base = c.get("base_url") or self.meta.default_base_url
+            sz = os.path.getsize(audio.original_path)
+            if sz > 200 * 1024 * 1024:      # base64 内联,防超大文件内存尖峰
+                return TranscribeResult(
+                    text="", error=f"audio is {sz >> 20}MB, over the 200MB inline-upload "
+                    "limit; segment the file first")
             with open(audio.original_path, "rb") as f:
                 b64 = base64.b64encode(f.read()).decode()
 

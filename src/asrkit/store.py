@@ -37,7 +37,13 @@ def model_dir(meta: AdapterMeta, config: dict | None = None) -> str:
     if config and config.get("model_dir"):
         return config["model_dir"]
     folder = meta.id.split("/", 1)[-1]
-    return os.path.join(models_root(config), folder)
+    root = models_root(config)
+    d = os.path.join(root, folder)
+    # 防御纵深：拒绝 id 里的路径穿越（如 local/../../x），否则 rm/symlink 会越界操作
+    rroot = os.path.realpath(root)
+    if os.path.realpath(d) != rroot and not os.path.realpath(d).startswith(rroot + os.sep):
+        raise ValueError(f"model id '{meta.id}' escapes the models root; refusing")
+    return d
 
 
 def _install_files_ok(meta: AdapterMeta, d: str) -> bool:

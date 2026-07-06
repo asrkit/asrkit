@@ -158,8 +158,10 @@ def _load_plugins() -> None:
     for ep in eps:
         try:
             ep.load()
-        except Exception:
-            pass
+        except Exception as e:                       # 坏插件不连坐，但要出声（否则静默隐身难排查）
+            import warnings
+            warnings.warn(f"asrkit: failed to load plugin '{getattr(ep, 'name', ep)}': "
+                          f"{type(e).__name__}: {e}")
 
 
 def _load_user_models() -> None:

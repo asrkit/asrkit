@@ -9,7 +9,7 @@ from asrkit import audio, registry, store
 
 
 def test_version():
-    assert asrkit.__version__ == "0.5.0"
+    assert asrkit.__version__ == "0.5.1"
 
 
 def test_list_models():
@@ -82,6 +82,29 @@ def test_resolve_and_alias():
 def test_unknown_model_raises():
     with pytest.raises(registry.ModelNotFoundError):
         registry.resolve("local/does-not-exist")
+
+
+def test_model_dir_rejects_path_traversal(tmp_path, monkeypatch):
+    # 0.5.1 加固：model id 里的路径穿越必须被拒(否则 rm/symlink 越界)
+    from asrkit.types import AdapterMeta
+    monkeypatch.setenv("ASRKIT_MODELS_ROOT", str(tmp_path))
+    evil = AdapterMeta(id="local/../../evil", provider="sherpa-onnx", vendor="local",
+                       name="evil", source="local", modes=["batch"], langs=[])
+    with pytest.raises(ValueError):
+        store.model_dir(evil)
+    # 正常 id 不受影响
+    ok = AdapterMeta(id="local/good", provider="sherpa-onnx", vendor="local",
+                     name="good", source="local", modes=["batch"], langs=[])
+    assert store.model_dir(ok).endswith("good")
+
+
+def test_usermodels_bare_filename_no_crash(tmp_path, monkeypatch):
+    # 0.5.1：ASRKIT_MODELS_JSON 为裸文件名时 add() 不应 makedirs("") 崩
+    from asrkit import usermodels
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ASRKIT_MODELS_JSON", "models.json")
+    usermodels.add({"id": "local/x", "config_type": "senseVoice", "langs": ["zh"]})
+    assert any(e["id"] == "local/x" for e in usermodels.load())
 
 
 def test_safe_extract_rejects_traversal(tmp_path):

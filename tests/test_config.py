@@ -31,6 +31,14 @@ def test_file_perms_0600(cfg_path):
     assert mode == 0o600
 
 
+def test_bare_filename_config_no_crash(tmp_path, monkeypatch):
+    # 0.5.1：ASRKIT_CONFIG 为裸文件名时 save() 不应 makedirs("") 崩
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ASRKIT_CONFIG", "cfg.json")
+    config.set_creds("dashscope", api_key="k")
+    assert config.get_creds("dashscope")["api_key"] == "k"
+
+
 def test_mask():
     assert config.mask("sk-abcd1234") == "…1234"
     assert config.mask("ab") == "…"

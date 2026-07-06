@@ -286,7 +286,12 @@ def main(argv: Optional[list] = None) -> int:
         print(f"✓ registered {mid} → {p}")
         if a.model_dir:
             folder = mid.split("/", 1)[-1]
-            dest = os.path.join(store.models_root(), folder)
+            root = store.models_root()
+            dest = os.path.join(root, folder)
+            rroot = os.path.realpath(root)
+            if os.path.realpath(dest) != rroot and not os.path.realpath(dest).startswith(rroot + os.sep):
+                print(f"[error] model id '{mid}' escapes the models root; refusing", file=sys.stderr)
+                return 1
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             if os.path.lexists(dest):
                 print(f"  note: {dest} already exists — left as is")
@@ -362,7 +367,6 @@ def main(argv: Optional[list] = None) -> int:
                 print(f"{k}: {config.mask(v)}")
             return 0
         if a.ccmd == "set":
-            key = "engine" if a.name == "default-engine" else "models_root"
             if a.name == "default-engine":
                 config.set_default("engine", a.value)
             else:

@@ -10,6 +10,22 @@
 > 2. 记 CHANGELOG —— 在下方加一节 `## [X.Y.Z] - YYYY-MM-DD`,分 `### 新增 / 变更 / 修复` 三段;**破坏性变更要醒目标出**。
 > 3. 打 tag 并推 —— `git tag -a vX.Y.Z -m "…" && git push origin main --tags`(tag 与 PyPI 版本一一对应)。
 
+## [0.5.1] - 2026-07-07
+
+主题：**加固**（一轮 fresh-eyes 代码评审后的缺陷修复,纯修复、无破坏性）。
+
+### 修复
+- **`serve` 不再卡死** —— 同步推理改用 `run_in_threadpool`,推理期间事件循环不再阻塞(此前推理时连 `/health` 都挂);并**按 model id 缓存已加载 adapter**,本地模型不再每请求重载。
+- **`serve` 资源/信息安全** —— 上传临时文件的 fd 在 `finally` 兜底关闭(防 fd 泄漏);500 响应只回通用信息、细节记服务端(不再泄露文件路径/库版本)。
+- **原子写 `~/.asrkit/models.json`**（`usermodels.add`）—— 改 tmp + `os.replace`,中途失败不再截断/损坏、丢失自定义模型。
+- **路径穿越防御** —— `store.model_dir` 与 `add-model` 拒绝含 `../` 逃逸 models 根目录的 model id(防越界 `rm`/symlink)。
+- **裸文件名不崩** —— `ASRKIT_CONFIG` / `ASRKIT_MODELS_JSON` 为裸文件名时 `makedirs("")` 不再抛错。
+- **插件加载出声** —— 坏的第三方引擎插件从静默吞异常改为 `warnings.warn`(带插件名),便于排查。
+- **云端大文件守卫** —— base64 内联上传(DashScope/豆包)超 200MB 时友好报错,防内存尖峰。
+
+### 变更
+- **whisper.cpp 遵循透明原则** —— 之前硬编码自动重采样,现改为遵循 `opts.convert`(默认格式不符即诚实报错,与其它 adapter 一致)。**行为变更**:非 16k 单声道输入需加 `--convert`。
+
 ## [0.5.0] - 2026-07-06
 
 主题：**接口内核极简化——引擎/模型/云端全可插拔**。定位钉死：ASRKit 是个**接口**，base 只有接口 + 云端。

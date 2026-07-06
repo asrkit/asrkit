@@ -42,9 +42,10 @@ class WhisperCpp(BaseAdapter):
             return TranscribeResult(text="", error=_INSTALL_HINT)
         try:
             from pywhispercpp.model import Model
-            # whisper.cpp 需要 16k 单声道，用我们的解码器备好（引擎必需的输入格式）
+            # whisper.cpp 需 16k 单声道；遵循透明原则：默认格式不符即诚实报错，
+            # 需自动重采样请传 --convert / opts.convert=True（与其它 adapter 一致）。
             try:
-                samples, _ = load_samples(audio.original_path, 16000, 1, convert=True)
+                samples, _ = load_samples(audio.original_path, 16000, 1, convert=opts.convert)
             except AudioFormatError as e:
                 return TranscribeResult(text="", error=str(e))
 
