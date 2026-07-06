@@ -112,5 +112,6 @@ transcribe("siliconflow/sensevoice", "a.wav", config={"api_key": "<KEY>"})
 - **云端**：OpenAI 兼容协议已接（OpenAI / 硅基流动等）。Deepgram / DashScope / 火山豆包 /
   ElevenLabs 陆续接入。
 - **扩展**：非 sherpa-onnx 的引擎/模型，照 `docs/adapter-spec.md` 写一个 adapter 即可接入（见该文档）。
+- **许可证**：各模型许可证以其**官方来源**为准（ASRKit 只做接口、不分发权重）；**商用前请自行核对**，`asrkit show <model>` 指向来源。
 
 一句话：`asrkit run 模型 音频` 一步到位；换模型只换字符串。

@@ -40,3 +40,5 @@ print(r.text)
 - **隐私**：你的音频与密钥永不经过我们——ASRKit 完全跑在你自己的机器上。
 
 Apache-2.0。用法详见 [docs/usage.md](docs/usage.md)，扩展新引擎/模型见 [docs/adapter-spec.md](docs/adapter-spec.md)。
+
+> 各模型的许可证以其**官方来源**为准（ASRKit 只做接口、不分发权重，`pull` 从官方 release 下载）；**商用前请自行核对**。`asrkit show <model>` 会指向来源。

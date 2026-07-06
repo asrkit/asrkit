@@ -40,3 +40,5 @@ print(r.text)
 - **Privacy**: your audio and keys never pass through us — ASRKit runs on your machine.
 
 Apache-2.0. Usage: [docs/usage.md](docs/usage.md); write an adapter for a new engine/model: [docs/adapter-spec.md](docs/adapter-spec.md).
+
+> Each model's license is defined by its own **upstream** (ASRKit is an interface and does not distribute weights; `pull` downloads from official releases); **verify before commercial use**. `asrkit show <model>` points you to the source.

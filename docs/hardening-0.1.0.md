@@ -101,9 +101,9 @@ pytest：`import` / `list_models` / `resolve("local/sensevoice")` / alias `resol
 ### H-16 [P1] model-management.md 对齐 · `TODO`（Codex 上调 P1：文档一致性阻断）
 存储布局如实写**平铺** `models/<folder>`（tag 仅寻址别名）；env key 实现后同步；未实现动词（`show`/`rm`/`list --available`）标"路线项"。
 
-### H-17 [P1] 模型许可证标注 · `TODO`（需核实的数据，暂不臆造）
-`AdapterMeta.license` 字段已就绪，但 47 个模型的 `license` 全为 None。
-**决策**：**不臆造许可证**——错误的许可证信息比没有更糟（例：Meta Omnilingual 可能是非商用，标成 Apache 会坑用户，反而毁掉"标许可证"这个信任卖点）。需一次**逐模型核实**（对官方仓库/HF 卡）后再填，配套 `asrkit show <model>` 展示。列为发布前独立数据任务。
+### H-17 模型许可证标注 · `WONTDO`（已决定：以官方为准，不逐个标注）
+**决策（项目主人拍板）**：asrkit 是接口/管道、**不分发权重**（`pull` 从官方 release 下载）→ 无分发责任；逐模型标注是便利而非义务，且需联网核实、填错有害。故**不做逐模型许可证数据**。
+**替代**：`asrkit show` 显示"未标注（见官方来源）"；README/usage 已加总声明——商用前用户自行核对官方。`AdapterMeta.license` 字段保留（将来若有确凿官方数据可选填）。
 
 ### H-18 [P2] config_schema / is_configured 通电 · `TODO`
 `api.transcribe` 调用前 `if not adapter.is_configured(): return 友好 error`。
@@ -143,14 +143,14 @@ pytest：`import` / `list_models` / `resolve("local/sensevoice")` / alias `resol
 - [x] H-05 环境变量 key `<VENDOR>_API_KEY`
 - [x] H-09 sherpa ≥1.13.3 · H-10 README 重写 · H-11 分类器 Beta · H-12 extras 摊平
 - [x] H-13 冒烟测试 8/8 过 + CI 配置 · H-16 文档一致 · H-18 is_configured 通电
-- [ ] **H-17 许可证标注 —— 需按模型逐一核实的数据（不臆造，见该条）**
+- [x] H-17 许可证 —— 已决定不逐个标注，以官方为准（show + README/usage 总声明）
 
 **构建/安装验证（Codex）**
 - [x] `python -m build` + `twine check dist/*` 通过
 - [x] 全新 venv 装 wheel（零 extras）后 `asrkit list` 正常
 - [x] CLI 拼错模型名无 traceback
 
-> 进度：**代码/打包/文档全部完成并验证；仅剩 H-14（凭据，手动）与 H-17（许可证数据，需核实）两项非代码项。**
+> 进度：**代码/打包/文档全部完成并验证；H-17 已决定不做（以官方为准）；仅剩 H-14（凭据，你手动）一项。**
 
 **mock 测试清单（Codex）**
 - [ ] 云端上传 hash == 原始文件
