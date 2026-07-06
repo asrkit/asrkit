@@ -14,12 +14,12 @@
 **规格（统一原则）**：
 - **内核**：把原始音频（`original_path` / 字节）原样交给 adapter，自身零处理。
 - **云端 adapter**：原始文件**字节级原样上传**，连解码都不做。
-- **本地 adapter**：引擎物理上只吃特定格式（sherpa = 16k 单声道 float32）。adapter **内部**做"喂给该引擎所必需的解码"——**与你直接用该模型时做的完全一致**。这是引擎硬性入口要求，不是 ASRKit 加工；除此之外不做任何事。
+- **本地 adapter**：默认**也不转换**。读原始文件采样点，做**格式守卫**：若采样率/声道/格式 ≠ 引擎要求（sherpa = 16k 单声道）→ 返回**清晰 error**（诚实告知"实际 44100Hz 立体声，要求 16000Hz 单声道，请自行转换或加 `--convert`"），**绝不静默出乱码**。用户显式 `--convert` / `opts.convert=True` 才做解码+重采样+混单声道。
 - **增强**（VAD/降噪/切段/长音频分块）：全部 opt-in，默认关。
 - **输出**：原样返回，不加/改标点、大小写、ITN——除非模型自带或用户显式开启（注意：现 `use_itn=True` 需改为跟随模型默认/可配置，见 H-07）。
 **验收（Codex：改为可测，不用"逐字一致"）**：
 - 云端：mock `requests.post`，断言上传文件的 sha256 == 原始文件 sha256（未被预处理）。
-- 本地：mock recognizer，断言收到的 `samples/sample_rate` 来自标准解码路径。
+- 本地守卫：喂 44.1k/立体声 → 默认返回明确 error（含实际 vs 要求）；`convert=True` → 正常转写。
 - 少量真机 golden 仅做 smoke。
 **措辞收窄（Codex）**：不承诺"与官方示例字节级等价"（本地解码/重采样本就存在），只承诺"内核不加工 + 本地仅做引擎必需转换 + 转换规则公开"。
 
@@ -28,7 +28,7 @@
 **规格**：
 - `load_audio()` 移出内核路径；`AudioInput` = `original_path`（+ 可选原始字节）；`samples` 惰性、默认 `None`。
 - **云端 adapter 必须走 `samples=None`**：不得 import/调用 `soundfile`/`soxr`/解码——直接上传 `original_path`。
-- 本地 adapter 需要 PCM 时，自行调共享工具 `audio.decode_for_model(path, target_sr)`（内核不调）。
+- 本地 adapter：调 `audio.load_samples(path, required_sr, required_ch, convert=opts.convert)`（内核不调）。默认 `convert=False`：格式/采样率/声道不符即返回**清晰 error**，不静默出乱码；`convert=True` 才解码+重采样+混单声道。新增 `TranscribeOptions.convert`（默认 False）+ CLI `--convert`。
 - 云端遇厂商不支持的格式/大小/时长：返回友好错误，或用户显式 `opts.preprocess_for_cloud=True` 才转码——**绝不偷偷转码**。
 **涉及**：`types.py`、`audio.py`、`api.py`、`adapters/cloud_openai.py`、`adapters/local_sherpa.py`。
 **验收**：`import` 云端 adapter 不触发 soundfile；云端上传 hash == 原始；本地仍能转写；不支持格式给明确错误。

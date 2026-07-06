@@ -15,7 +15,7 @@
 0. **透明层优先（最高原则）：内核对音频零处理。** 用户输入什么，内核就原样递给 adapter——**不解码、不重采样、不混声道、不增强（VAD/降噪/音量/切段）、不对输出做后处理**。用 asrkit 跑某模型 == 直接用该模型。所有增强均 **opt-in（默认关）**。ASRKit 只做"统一接口 + 快速换模型"这一层。
 1. **音频交给 adapter，只做各引擎所必需的（此外什么都不做）。**
    - **云端 adapter**：原始文件**字节级原样上传**，**连解码都不做**（`samples=None`）——云端自行处理各种格式，我们预处理反而削弱它。
-   - **本地 adapter**：引擎物理上只吃特定格式（sherpa = 16k 单声道 float32）。adapter **内部**做喂给该引擎所必需的解码——**与你直接用该模型时一致**，是引擎硬性入口要求，非 ASRKit 加工。除此不做任何事。
+   - **本地 adapter**：默认**也不转换**。读原始采样点并做**格式守卫**：采样率/声道/格式 ≠ 引擎要求（sherpa = 16k 单声道）→ 返回**清晰 error**（诚实告知实际 vs 要求），绝不静默出乱码；用户 `opts.convert=True` 才解码+重采样+混单声道。
    - **长音频**：默认不切段（尊重原生）；超模型已知窗口（如 whisper 30s）时**绝不静默截断**——填 `TranscribeResult.warnings`，提示可开 opt-in 分段。透明 ≠ 静默丢数据。
 2. **能力声明消化端云不齐。** adapter 通过 `meta.capabilities` 声明能力，引擎据此路由与降级。
 3. **字段宁少勿多。** 加字段容易、改字段是灾难。可选能力走可选字段。
@@ -84,6 +84,8 @@ class TranscribeOptions:
     enable_punctuation: bool = True
     enable_itn: bool = True
     word_timestamps: bool = False
+    convert: bool = False                 # opt-in:自动解码/重采样/混单声道适配本地引擎;默认关(不符则报错)
+    segment: bool = False                 # opt-in:长音频 VAD 分段拼接;默认关(超窗仅警告)
     # 冻结后新增开关一律给默认值，保证旧 adapter 不破
 ```
 
@@ -221,7 +223,8 @@ install_files = ["*encoder*.onnx", "*decoder*.onnx", "<tokenizer_dir>/"]
 | 职责 | 平台/引擎 | Adapter |
 |---|---|---|
 | 音频：内核零处理、原样透传 | ✅ | — |
-| 本地引擎必需的解码/重采样（= 直接用模型时的） | ❌ | ✅（adapter 内部） |
+| 本地格式守卫（不符即诚实报错，默认不转） | ❌ | ✅（adapter 内部） |
+| 本地解码/重采样/混单声道（opt-in `convert`，默认关） | ❌ | ✅（用户开启时） |
 | 云端音频：字节级原样上传（不解码，samples=None） | — | ✅ 上传 original_path |
 | 音频增强（VAD/降噪/切段）——**默认关，opt-in** | ✅（用户开启时） | ❌ |
 | 端到端计时兜底 | ✅ | 可补 metrics |
