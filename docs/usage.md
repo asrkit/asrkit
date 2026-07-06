@@ -95,6 +95,19 @@ transcribe("siliconflow/sensevoice", "a.wav", config={"api_key": "<KEY>"})
 
 > 项目灵魂：端侧 `local/sensevoice` 与云端 `siliconflow/sensevoice`，**同一个接口，只换字符串**。
 
+### 密钥存一次（免每次 --api-key）
+
+```bash
+asrkit config set-key dashscope <KEY>                       # 单密钥厂商
+asrkit config set-key doubao --app-key <A> --access-key <B> # 火山等双密钥
+asrkit config list                                          # 查看（打码）
+asrkit transcribe a.wav -m dashscope/qwen3-asr-flash        # 自动带上密钥
+```
+
+凭据解析优先级：**显式 `--api-key` > 环境变量 `<VENDOR>_API_KEY` > `asrkit config` 存的 keystore**。
+密钥明文存 `~/.asrkit/config.json`（权限 0600）；不放心就只用环境变量。
+另可 `asrkit config set default-engine <name>`（裸名落到该引擎）、`set models-root <path>`。
+
 ---
 
 ## 四、返回字段（TranscribeResult）

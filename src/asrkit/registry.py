@@ -58,19 +58,35 @@ def _rebuild_aliases() -> None:
         _ALIASES.setdefault(basekey, default.id)       # 不覆盖真实 id
 
 
+def _default_prefix() -> str:
+    """裸名解析用的默认引擎前缀。缺省 'local'（sherpa）；config 的 default-engine 可改。
+    引擎名 sherpa-onnx/local 归一到寻址前缀 'local'，其余引擎前缀 = 引擎名。"""
+    try:
+        from . import config as _config
+        eng = _config.get_default("engine")
+    except Exception:
+        eng = None
+    if not eng or eng in ("sherpa-onnx", "local"):
+        return "local"
+    return eng
+
+
 def resolve(model_id: str) -> AdapterMeta:
     load_builtin()
     if model_id in _MODELS:
         return _MODELS[model_id]
     if model_id in _ALIASES:
         return _MODELS[_ALIASES[model_id]]
-    # 裸名简写：不带 '/' 时当本地简名，自动补 local/（含精度别名 name:tag）
+    # 裸名简写：不带 '/' 时补默认引擎前缀（缺省 local；可由 config 的 default-engine 改）。
     if "/" not in model_id:
-        cand = "local/" + model_id
+        prefix = _default_prefix()
+        cand = f"{prefix}/{model_id}"
         if cand in _MODELS:
             return _MODELS[cand]
         if cand in _ALIASES:
             return _MODELS[_ALIASES[cand]]
+        if prefix in _OPEN:                    # 默认引擎为开放 provider（如 transformers）
+            return _OPEN[prefix](model_id)
     else:
         # 开放 provider：transformers/<任意 HF id> 动态合成
         prefix, rest = model_id.split("/", 1)
@@ -85,17 +101,22 @@ def make_adapter(model_id: str, config: Optional[dict] = None) -> BaseAdapter:
     if cls is None:
         raise ModelNotFoundError(f"model '{model_id}': no adapter for provider '{meta.provider}'.")
     config = dict(config or {})
-    # H-05：云端凭据环境变量兜底（显式 config 优先）。<VENDOR>_API_KEY，
-    # 以及双密钥厂商（如火山 doubao）的 <VENDOR>_APP_KEY / <VENDOR>_ACCESS_KEY。
+    # H-05：云端凭据解析优先级 —— 显式 config > 环境变量 > config.json keystore。
+    # 环境变量 <VENDOR>_API_KEY / _APP_KEY / _ACCESS_KEY；keystore 见 config.get_creds。
     if meta.source == "cloud" and meta.vendor:
+        from . import config as _config
         vp = meta.vendor.upper()
+        stored = _config.get_creds(meta.vendor)
         for cfg_key, env_suffix in (("api_key", "API_KEY"),
                                     ("app_key", "APP_KEY"),
                                     ("access_key", "ACCESS_KEY")):
-            if not config.get(cfg_key):
-                env = os.environ.get(f"{vp}_{env_suffix}")
-                if env:
-                    config[cfg_key] = env
+            if config.get(cfg_key):
+                continue
+            env = os.environ.get(f"{vp}_{env_suffix}")
+            if env:
+                config[cfg_key] = env
+            elif stored.get(cfg_key):
+                config[cfg_key] = stored[cfg_key]
     return cls(meta, config)
 
 

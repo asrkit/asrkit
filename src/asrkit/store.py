@@ -17,9 +17,20 @@ from .types import AdapterMeta
 
 
 def models_root(config: dict | None = None) -> str:
+    # 优先级：显式 config > 环境变量 > config.json 设置 > 默认 ~/.asrkit/models
     if config and config.get("models_root"):
         return config["models_root"]
-    return os.environ.get("ASRKIT_MODELS_ROOT") or os.path.expanduser("~/.asrkit/models")
+    env = os.environ.get("ASRKIT_MODELS_ROOT")
+    if env:
+        return env
+    try:
+        from . import config as _config
+        stored = _config.get_setting("models_root")
+        if stored:
+            return stored
+    except Exception:
+        pass
+    return os.path.expanduser("~/.asrkit/models")
 
 
 def model_dir(meta: AdapterMeta, config: dict | None = None) -> str:

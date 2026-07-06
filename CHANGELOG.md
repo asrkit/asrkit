@@ -7,6 +7,22 @@
 > 2. 记 CHANGELOG —— 在下方加一节 `## [X.Y.Z] - YYYY-MM-DD`,分 `### 新增 / 变更 / 修复` 三段;**破坏性变更要醒目标出**。
 > 3. 打 tag 并推 —— `git tag -a vX.Y.Z -m "…" && git push origin main --tags`(tag 与 PyPI 版本一一对应)。
 
+## [0.4.2] - 2026-07-06
+
+主题：**配置持久化**（B 组，见 `docs/roadmap-cli-completeness.md`）。让云端"像本地一样顺手"。
+
+### 新增
+- **`asrkit config`** —— 持久化配置（`~/.asrkit/config.json`，`$ASRKIT_CONFIG` 可覆盖）：
+  - `config set-key <vendor> <key>`（单密钥）/ `--app-key --access-key`（火山等双密钥）。
+  - `config set default-engine <name>` / `config set models-root <path>`。
+  - `config get-key <vendor>` / `config list`（**一律打码，仅末 4 位**）/ `config path`。
+- **凭据解析优先级**：显式 config > 环境变量 > **config.json keystore**（新兜底）。存一次，之后该 vendor 的模型自动带密钥。
+- **默认引擎可切**：`asrkit engine default <name>`（= `config set default-engine`）落地——裸名解析改读配置（缺省仍 `local`/sherpa，向后兼容）。
+- **models 根目录**可持久化：`config set models-root`（优先级：显式 > `ASRKIT_MODELS_ROOT` > config > 默认）。
+
+### 安全
+- 配置文件写入设权限 **0600**；密钥**明文存储**（同 ollama/aws-cli 惯例），首次 `set-key` 提示；不放心者继续用环境变量。
+
 ## [0.4.1] - 2026-07-06
 
 主题：**快速完善**（A 组，纯增量，见 `docs/roadmap-cli-completeness.md`）。

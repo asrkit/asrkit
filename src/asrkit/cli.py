@@ -109,6 +109,23 @@ def main(argv: Optional[list] = None) -> int:
     esub.add_parser("list", help="list engines and install status")
     ei = esub.add_parser("install", help="install an optional engine via pip")
     ei.add_argument("name")
+    ed = esub.add_parser("default", help="set the default engine (bare names resolve to it)")
+    ed.add_argument("name")
+
+    cp = sub.add_parser("config", help="persistent config: keys, default engine, models root")
+    csub = cp.add_subparsers(dest="ccmd")
+    ck = csub.add_parser("set-key", help="store credentials for a vendor")
+    ck.add_argument("vendor")
+    ck.add_argument("key", nargs="?", default=None, help="API key (single-key vendors)")
+    ck.add_argument("--app-key", default=None, help="app key (dual-key vendors, e.g. doubao)")
+    ck.add_argument("--access-key", default=None, help="access key (dual-key vendors)")
+    cg = csub.add_parser("get-key", help="show stored credentials for a vendor (masked)")
+    cg.add_argument("vendor")
+    cs = csub.add_parser("set", help="set a value (default-engine | models-root)")
+    cs.add_argument("name", choices=("default-engine", "models-root"))
+    cs.add_argument("value")
+    csub.add_parser("list", help="show all config (keys masked)")
+    csub.add_parser("path", help="print the config file location")
 
     am = sub.add_parser("add-model", help="register a custom (sherpa) model — no file editing")
     am.add_argument("id")
@@ -298,7 +315,58 @@ def main(argv: Optional[list] = None) -> int:
             cmd = [sys.executable, "-m", "pip", "install", f"asrkit[{extra}]"]
             print("running:", " ".join(cmd))
             return subprocess.call(cmd)
+        if a.ecmd == "default":
+            from . import config
+            if a.name not in engines.ENGINES:
+                print(f"[error] unknown engine '{a.name}' (see: asrkit engine list)", file=sys.stderr)
+                return 1
+            config.set_default("engine", a.name)
+            print(f"✓ default engine → {a.name} (bare model names now resolve to it)")
+            return 0
         ep.print_help()
+        return 0
+
+    if a.cmd == "config":
+        from . import config
+        if a.ccmd == "set-key":
+            if not (a.key or a.app_key or a.access_key):
+                print("[error] provide a key, or --app-key/--access-key", file=sys.stderr)
+                return 1
+            config.set_creds(a.vendor, api_key=a.key, app_key=a.app_key, access_key=a.access_key)
+            print(f"✓ stored credentials for '{a.vendor}' → {config.path()}", file=sys.stderr)
+            print("  note: keys are stored in plaintext (file perms 0600). "
+                  "Prefer env vars if you'd rather not persist them.", file=sys.stderr)
+            return 0
+        if a.ccmd == "get-key":
+            creds = config.get_creds(a.vendor)
+            if not creds:
+                print(f"(no stored credentials for '{a.vendor}')")
+                return 0
+            for k, v in creds.items():
+                print(f"{k}: {config.mask(v)}")
+            return 0
+        if a.ccmd == "set":
+            key = "engine" if a.name == "default-engine" else "models_root"
+            if a.name == "default-engine":
+                config.set_default("engine", a.value)
+            else:
+                config.set_setting("models_root", a.value)
+            print(f"✓ {a.name} → {a.value}")
+            return 0
+        if a.ccmd == "list":
+            cfg = config.load()
+            print(f"path: {config.path()}")
+            print("keys:")
+            for vendor, creds in (cfg.get("keys") or {}).items():
+                masked = ", ".join(f"{k}={config.mask(v)}" for k, v in creds.items())
+                print(f"  {vendor}: {masked}")
+            print(f"defaults: {cfg.get('defaults') or {}}")
+            print(f"settings: {cfg.get('settings') or {}}")
+            return 0
+        if a.ccmd == "path":
+            print(config.path())
+            return 0
+        cp.print_help()
         return 0
 
     p.print_help()
