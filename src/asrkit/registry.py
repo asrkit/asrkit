@@ -58,6 +58,13 @@ def resolve(model_id: str) -> AdapterMeta:
         return _MODELS[model_id]
     if model_id in _ALIASES:
         return _MODELS[_ALIASES[model_id]]
+    # 裸名简写：不带 '/' 时当本地简名，自动补 local/（含精度别名 name:tag）
+    if "/" not in model_id:
+        cand = "local/" + model_id
+        if cand in _MODELS:
+            return _MODELS[cand]
+        if cand in _ALIASES:
+            return _MODELS[_ALIASES[cand]]
     raise ModelNotFoundError(f"未注册的模型 '{model_id}'。用 `asrkit list` 查看全部。")
 
 

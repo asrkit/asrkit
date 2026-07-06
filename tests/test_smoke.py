@@ -25,6 +25,9 @@ def test_resolve_and_alias():
     # Ollama 式精度寻址
     assert registry.resolve("local/sensevoice:fp32").id == "local/sensevoice-fp32"
     assert registry.resolve("local/sensevoice:int8").id == "local/sensevoice"
+    # 裸名简写（省略 local/）
+    assert registry.resolve("sensevoice").id == "local/sensevoice"
+    assert registry.resolve("sensevoice:fp32").id == "local/sensevoice-fp32"
 
 
 def test_unknown_model_raises():
