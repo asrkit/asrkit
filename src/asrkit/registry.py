@@ -94,5 +94,10 @@ def load_builtin() -> None:
     global _loaded
     if _loaded:
         return
-    from .adapters import cloud_openai, local_sherpa, models_local  # noqa: F401
+    from .adapters import (  # noqa: F401
+        cloud_openai,
+        local_faster_whisper,
+        local_sherpa,
+        models_local,
+    )
     _loaded = True

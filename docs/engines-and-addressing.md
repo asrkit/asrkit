@@ -117,15 +117,17 @@ asrkit run  siliconflow/sensevoice a.wav --api-key <KEY>
 
 ## 七、现状 vs 路线，以及"不破坏"保证
 
-**现状（已实现）**：单本地引擎 sherpa-onnx；寻址 `local/<model>` + 裸名简写 + `:tag` 精度；云端 `provider/model`。
+**现状（已实现，0.2.0）**：两个本地引擎——**sherpa-onnx（默认）** 与 **faster-whisper（可选 extra）**；寻址 `local/<model>` / `faster-whisper/<model>` + 裸名简写（落默认引擎）+ `:tag` 精度；云端 `provider/model`。`asrkit engine list/install` 管理引擎；`is_installed`/`install` 已下沉到各 adapter。
 
-**路线（未实现，已留口子）**：多本地引擎，用引擎名作命名空间；`local/` 退化为"默认引擎"的友好别名。
+**路线（未实现，已留口子）**：更多引擎（whisper.cpp / transformers/vLLM）；entry-point 第三方引擎插件；`local/` 作"默认引擎"别名的进一步统一。
 
 **不破坏保证**：因为命名空间从第一天就是正式名、裸名只是"默认引擎"的简写——将来新增引擎时，新引擎用自己的前缀，**所有既有写法（裸名 / `local/x` / 云端）含义不变、永不失效**。这就是我们保留命名空间的回报。
 
 ---
 
-## 八、引擎作为可选组件（路线）
+## 八、引擎作为可选组件（0.2.0 起部分实现）
+
+> 状态：pip extras + `asrkit engine list/install` + 懒加载/友好报错 + 可插拔 install = **已实现**（faster-whisper 为首个）；entry-point 第三方插件 = 路线。
 
 引擎不像模型是"下个权重文件"，它是**一个 Python 包**（含代码+二进制、有依赖树）。所以：
 

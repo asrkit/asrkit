@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "asrkit"
-version = "0.1.2"
+version = "0.2.0"
 description = "One interface to run and compare any speech-to-text model — local & cloud."
 readme = "README.en.md"
 requires-python = ">=3.9"
@@ -36,7 +36,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# 兼容旧命令（0.1.0 曾用 asrkit[all]/[local]/[cloud]）；基础安装已含全部，这些为空别名。
+# 可选引擎（默认只带 sherpa-onnx；其余按需装，见 docs/engines-and-addressing.md §八）
+faster-whisper = ["faster-whisper"]
+engines = ["faster-whisper"]
+# 兼容旧命令（0.1.x 曾用 asrkit[all]/[local]/[cloud]）；基础安装已含核心，这些为空别名。
 all = []
 local = []
 cloud = []

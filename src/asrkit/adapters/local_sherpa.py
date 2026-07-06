@@ -163,6 +163,12 @@ class SherpaLocal(BaseAdapter):
         super().__init__(meta, config)
         self._rec = None
 
+    def is_installed(self):
+        return store.is_installed(self.meta, self.config)
+
+    def install(self, log=print):
+        return store.pull(self.meta, self.config, log=log)
+
     def transcribe(self, audio: AudioInput, opts: TranscribeOptions) -> TranscribeResult:
         streaming = "streaming" in self.meta.modes
         prefer = self.meta.tag or "int8"

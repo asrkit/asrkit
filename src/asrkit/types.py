@@ -97,6 +97,14 @@ class BaseAdapter:
     def is_configured(self) -> bool:
         return True
 
+    def is_installed(self) -> bool:
+        """本地引擎覆盖：模型/引擎是否就绪。云端/自管理默认 True。"""
+        return True
+
+    def install(self, log=print) -> str:
+        """本地引擎覆盖：下载/安装模型或引擎，返回位置。默认无需安装。"""
+        raise ValueError(f"{self.meta.id} needs no install")
+
     def transcribe(self, audio: AudioInput, opts: TranscribeOptions) -> TranscribeResult:
         raise NotImplementedError
 

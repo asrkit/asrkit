@@ -74,6 +74,12 @@ def main(argv: Optional[list] = None) -> int:
     rmp = sub.add_parser("rm", help="remove a downloaded local model")
     rmp.add_argument("model")
 
+    ep = sub.add_parser("engine", help="manage ASR engines (backends)")
+    esub = ep.add_subparsers(dest="ecmd")
+    esub.add_parser("list", help="list engines and install status")
+    ei = esub.add_parser("install", help="install an optional engine via pip")
+    ei.add_argument("name")
+
     rp = sub.add_parser("run", help="download if missing, then transcribe (Ollama-style)")
     rp.add_argument("model")
     rp.add_argument("audio")
@@ -86,14 +92,20 @@ def main(argv: Optional[list] = None) -> int:
     _add_transcribe_flags(tp)
 
     a = p.parse_args(argv)
-    from . import api, store
+    from . import api, registry, store
+
+    def _installed(m) -> bool:
+        try:
+            return registry.make_adapter(m.id).is_installed()
+        except Exception:
+            return False
 
     if a.cmd == "list":
         for m in api.list_models():
             if m.source == "cloud":
                 mark, flag = " ", "☁️ "
             else:
-                mark = "✓" if store.is_installed(m) else " "
+                mark = "✓" if _installed(m) else " "
                 flag = "💻"
             print(f"{mark} {flag} {m.id:26s} {m.name}")
         return 0
@@ -113,7 +125,7 @@ def main(argv: Optional[list] = None) -> int:
         if m.source == "local":
             print(f"arch:     {m.config_type}")
             print(f"precision:{m.tag or '—'}  (base={m.base or m.id.split('/')[-1]})")
-            print(f"installed:{'yes' if store.is_installed(m) else 'no'}")
+            print(f"installed:{'yes' if _installed(m) else 'no'}")
             print(f"download: {m.download_url}")
         else:
             print(f"model:    {m.model}")
@@ -159,6 +171,27 @@ def main(argv: Optional[list] = None) -> int:
         except Exception as e:
             print(f"[error] {e}", file=sys.stderr)
             return 1
+
+    if a.cmd == "engine":
+        from . import engines
+        if a.ecmd == "list":
+            for name, (mod, extra) in engines.ENGINES.items():
+                inst = engines.is_installed(name)
+                where = "built-in" if extra is None else f"extra: asrkit[{extra}]"
+                status = "installed" if inst else "not installed"
+                print(f"{'✓' if inst else ' '} {name:16s} {status:14s} {where}")
+            return 0
+        if a.ecmd == "install":
+            import subprocess
+            extra = engines.extra_of(a.name)
+            if extra is None:
+                print(f"[error] unknown or built-in engine '{a.name}'", file=sys.stderr)
+                return 1
+            cmd = [sys.executable, "-m", "pip", "install", f"asrkit[{extra}]"]
+            print("running:", " ".join(cmd))
+            return subprocess.call(cmd)
+        ep.print_help()
+        return 0
 
     p.print_help()
     return 0

@@ -9,7 +9,7 @@ from asrkit import audio, registry, store
 
 
 def test_version():
-    assert asrkit.__version__ == "0.1.2"
+    assert asrkit.__version__ == "0.2.0"
 
 
 def test_list_models():
@@ -18,6 +18,7 @@ def test_list_models():
     assert len(metas) >= 47
     assert "local/sensevoice" in ids
     assert "siliconflow/sensevoice" in ids
+    assert "faster-whisper/tiny" in ids   # 第二个引擎已注册（可选,懒加载）
 
 
 def test_resolve_and_alias():

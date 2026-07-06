@@ -1,22 +1,14 @@
-"""高层 API：transcribe / pull / run / list_models。"""
+"""High-level API: transcribe / pull / run / list_models."""
 from __future__ import annotations
 
 from typing import List, Optional, Union
 
-from . import registry, store
+from . import registry
 from .types import AdapterMeta, AudioInput, TranscribeOptions, TranscribeResult
 
 
-def transcribe(
-    model: str,
-    audio: Union[str, AudioInput],
-    *,
-    config: Optional[dict] = None,
-    opts: Optional[TranscribeOptions] = None,
-) -> TranscribeResult:
-    """换个 model 字符串即切换端/云模型。"""
-    adapter = registry.make_adapter(model, config or {})
-    if not adapter.is_configured():   # H-18：缺配置（如云端无 key）先给友好错误
+def _run_adapter(adapter, model, audio, opts):
+    if not adapter.is_configured():
         return TranscribeResult(
             text="", error=f"{model} is not configured (missing API key?). See docs/usage.md")
     if isinstance(audio, str):
@@ -24,27 +16,22 @@ def transcribe(
     return adapter.transcribe(audio, opts or TranscribeOptions())
 
 
-def pull(model: str, *, config: Optional[dict] = None, log=print) -> str:
-    """下载并安装一个本地模型（Ollama 式）。返回模型目录。"""
-    meta = registry.resolve(model)
-    if meta.source != "local":
-        raise ValueError(f"{model} is a cloud model; no download needed (just set the API key).")
-    return store.pull(meta, config or {}, log=log)
+def transcribe(model, audio, *, config=None, opts=None):
+    """换个 model 字符串即切换端/云模型。"""
+    return _run_adapter(registry.make_adapter(model, config or {}), model, audio, opts)
 
 
-def run(
-    model: str,
-    audio: Union[str, AudioInput],
-    *,
-    config: Optional[dict] = None,
-    opts: Optional[TranscribeOptions] = None,
-    log=print,
-) -> TranscribeResult:
-    """Ollama 式一步到位：本地模型缺失则先下载，再转写。"""
-    meta = registry.resolve(model)
-    if meta.source == "local" and not store.is_installed(meta, config or {}):
-        pull(model, config=config, log=log)
-    return transcribe(model, audio, config=config, opts=opts)
+def pull(model, *, config=None, log=print):
+    """安装一个模型/引擎（本地下载权重或引擎；云端无需）。返回位置。"""
+    return registry.make_adapter(model, config or {}).install(log=log)
+
+
+def run(model, audio, *, config=None, opts=None, log=print):
+    """Ollama 式一步到位：本地缺失则先安装，再转写（同一 adapter 实例）。"""
+    adapter = registry.make_adapter(model, config or {})
+    if not adapter.is_installed():
+        adapter.install(log=log)
+    return _run_adapter(adapter, model, audio, opts)
 
 
 def list_models() -> List[AdapterMeta]:

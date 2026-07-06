@@ -2,7 +2,17 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [0.1.2] - 未发布
+## [0.2.0] - 未发布
+
+### 新增
+- **多引擎**：引擎作为可选组件。新增 **faster-whisper** 引擎（`pip install "asrkit[faster-whisper]"`），通过同一接口寻址 `faster-whisper/<model>`（如 `faster-whisper/large-v3`）；模型由 HuggingFace 自动下载缓存，且引擎自带长音频分块。
+- `asrkit engine list` / `asrkit engine install <name>` 管理引擎（install = `sys.executable -m pip` 装对应 extra，回显命令）。
+- **安装机制可插拔**：`is_installed` / `install` 下沉到各 adapter（sherpa 走 release tarball；faster-whisper 走 HF 缓存）。缺引擎时友好报错（带安装命令），不崩。
+
+### 说明
+- 默认仍只带 sherpa-onnx；其它引擎按需装。entry-point 第三方引擎插件为后续路线。
+
+## [0.1.2] - 2026-07-06
 
 ### 新增
 - `asrkit --version` / `-V` 显示版本。
