@@ -133,18 +133,10 @@ def _load_plugins() -> None:
 
 
 def _load_user_models() -> None:
-    """加载用户自定义模型：$ASRKIT_MODELS_JSON 或 ~/.asrkit/models.json（sherpa 等本地引擎，任意补充）。"""
-    import json
-    import os
-    path = os.environ.get("ASRKIT_MODELS_JSON") or os.path.expanduser("~/.asrkit/models.json")
-    if not os.path.isfile(path):
-        return
-    try:
-        entries = json.load(open(path, encoding="utf-8"))
-    except Exception:
-        return
+    """加载用户自定义模型（~/.asrkit/models.json；sherpa 等本地引擎，任意补充）。"""
+    from . import usermodels
     metas = []
-    for e in (entries if isinstance(entries, list) else []):
+    for e in usermodels.load():
         try:
             metas.append(AdapterMeta(
                 id=e["id"],

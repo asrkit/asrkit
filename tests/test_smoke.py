@@ -9,7 +9,7 @@ from asrkit import audio, registry, store
 
 
 def test_version():
-    assert asrkit.__version__ == "0.3.0"
+    assert asrkit.__version__ == "0.3.1"
 
 
 def test_list_models():
@@ -33,6 +33,17 @@ def test_user_models(tmp_path, monkeypatch):
     registry.load_builtin()
     m = registry.resolve("local/mytest")
     assert m.id == "local/mytest" and m.config_type == "senseVoice" and m.provider == "sherpa-onnx"
+
+
+def test_add_model(tmp_path, monkeypatch):
+    # asrkit add-model 写的注册表能被读回并解析
+    from asrkit import usermodels
+    monkeypatch.setenv("ASRKIT_MODELS_JSON", str(tmp_path / "models.json"))
+    usermodels.add({"id": "local/added", "config_type": "senseVoice", "langs": ["zh"]})
+    assert any(e["id"] == "local/added" for e in usermodels.load())
+    registry._loaded = False
+    registry.load_builtin()
+    assert registry.resolve("local/added").config_type == "senseVoice"
 
 
 def test_transformers_open_provider():

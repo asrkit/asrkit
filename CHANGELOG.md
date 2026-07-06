@@ -2,7 +2,14 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [0.3.0] - 未发布
+## [0.3.1] - 未发布
+
+### 新增
+- **`asrkit add-model`** —— 一条命令注册自定义 sherpa 模型（写入 `~/.asrkit/models.json`），无需手动编辑文件：
+  - 知道地址：`asrkit add-model local/my-model --url <tarball> --arch senseVoice --langs zh,en` → `asrkit pull`。
+  - 已有文件：加 `--model-dir <dir>` 软链到位、立即"已安装"（免下载）。
+
+## [0.3.0] - 2026-07-06
 
 主题：**全开放** —— 引擎开放 + 模型开放。
 

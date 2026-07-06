@@ -80,6 +80,19 @@ def main(argv: Optional[list] = None) -> int:
     ei = esub.add_parser("install", help="install an optional engine via pip")
     ei.add_argument("name")
 
+    am = sub.add_parser("add-model", help="register a custom (sherpa) model — no file editing")
+    am.add_argument("id")
+    am.add_argument("--url", default=None, help="download URL (.tar.bz2)")
+    am.add_argument("--arch", required=True,
+                    help="config_type / architecture (e.g. senseVoice, whisper, offlineTransducer)")
+    am.add_argument("--langs", default="", help="comma-separated, e.g. zh,en")
+    am.add_argument("--name", default=None)
+    am.add_argument("--provider", default="sherpa-onnx")
+    am.add_argument("--streaming", action="store_true")
+    am.add_argument("--sha256", default=None)
+    am.add_argument("--model-dir", default=None,
+                    help="use already-downloaded files (symlinked into place)")
+
     rp = sub.add_parser("run", help="download if missing, then transcribe (Ollama-style)")
     rp.add_argument("model")
     rp.add_argument("audio")
@@ -171,6 +184,40 @@ def main(argv: Optional[list] = None) -> int:
         except Exception as e:
             print(f"[error] {e}", file=sys.stderr)
             return 1
+
+    if a.cmd == "add-model":
+        import os
+        from . import store, usermodels
+        mid = a.id if "/" in a.id else "local/" + a.id
+        entry = {"id": mid, "config_type": a.arch, "provider": a.provider}
+        if a.url:
+            entry["download_url"] = a.url
+        if a.langs:
+            entry["langs"] = [x.strip() for x in a.langs.split(",") if x.strip()]
+        if a.name:
+            entry["name"] = a.name
+        if a.streaming:
+            entry["streaming"] = True
+        if a.sha256:
+            entry["sha256"] = a.sha256
+        p = usermodels.add(entry)
+        print(f"✓ registered {mid} → {p}")
+        if a.model_dir:
+            folder = mid.split("/", 1)[-1]
+            dest = os.path.join(store.models_root(), folder)
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            if os.path.lexists(dest):
+                print(f"  note: {dest} already exists — left as is")
+            else:
+                try:
+                    os.symlink(os.path.abspath(a.model_dir), dest)
+                    print(f"  linked local files → {dest} (installed)")
+                except OSError as e:
+                    print(f"  [warn] could not link ({e}); copy your files into {dest} manually")
+        elif a.url:
+            print(f"  next: asrkit pull {mid}")
+        print(f"  then: asrkit run {mid} <audio>")
+        return 0
 
     if a.cmd == "engine":
         from . import engines

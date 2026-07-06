@@ -112,7 +112,7 @@ transcribe("siliconflow/sensevoice", "a.wav", config={"api_key": "<KEY>"})
 - **云端**：OpenAI 兼容协议已接（OpenAI / 硅基流动等）。Deepgram / DashScope / 火山豆包 /
   ElevenLabs 陆续接入。
 - **多引擎**：默认 sherpa-onnx；可选装 faster-whisper（`faster-whisper/<model>`）、whisper.cpp（`whispercpp/<model>`）、transformers（**`transformers/<任意 HF 模型 id>`**，接整个 HuggingFace ASR 生态）。`asrkit engine list` / `install <name>` 管理引擎。
-- **全开放扩展**：加自定义 sherpa 模型（`~/.asrkit/models.json`）、写第三方引擎插件（`pip install asrkit-<engine>` 自动接入）——实操见 `docs/engines-and-addressing.md §九`。
+- **全开放扩展**：加自定义 sherpa 模型（`asrkit add-model <id> --url <tarball> --arch <type>`，或已有文件加 `--model-dir`）、写第三方引擎插件（`pip install asrkit-<engine>` 自动接入）——实操见 `docs/engines-and-addressing.md §九`。
 - **扩展**：非内置的引擎/模型，照 `docs/adapter-spec.md` 写一个 adapter 即可接入（见该文档与 `engines-and-addressing.md`）。
 - **许可证**：各模型许可证以其**官方来源**为准（ASRKit 只做接口、不分发权重）；**商用前请自行核对**，`asrkit show <model>` 指向来源。
 

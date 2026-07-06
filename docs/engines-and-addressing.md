@@ -189,7 +189,15 @@ asrkit run faster-whisper/whisper-small a.wav
 
 ### 加一个自定义 sherpa 模型（模型开放）
 
-不在内置 47 表里的 sherpa 模型，写进 `~/.asrkit/models.json`（或 `$ASRKIT_MODELS_JSON`）即可：
+**最简单：一条命令**（无需编辑文件）：
+```bash
+asrkit add-model local/my-model --url https://…/model.tar.bz2 --arch senseVoice --langs zh,en
+asrkit pull local/my-model && asrkit run local/my-model a.wav
+# 已有模型文件时：加 --model-dir /path 软链到位，免下载、立即可用
+asrkit add-model local/my-model --arch senseVoice --model-dir /path/to/files
+```
+
+或**手动**写进 `~/.asrkit/models.json`（或 `$ASRKIT_MODELS_JSON`）：
 
 ```json
 [
