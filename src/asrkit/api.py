@@ -16,6 +16,9 @@ def transcribe(
 ) -> TranscribeResult:
     """换个 model 字符串即切换端/云模型。"""
     adapter = registry.make_adapter(model, config or {})
+    if not adapter.is_configured():   # H-18：缺配置（如云端无 key）先给友好错误
+        return TranscribeResult(
+            text="", error=f"{model} 未配置（缺 API Key？）。see docs/usage.md")
     if isinstance(audio, str):
         audio = AudioInput(original_path=audio)   # 内核零处理：不解码，adapter 各取所需
     return adapter.transcribe(audio, opts or TranscribeOptions())

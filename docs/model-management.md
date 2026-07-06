@@ -27,7 +27,7 @@
 ## 二、本地存储（Ollama 式）
 
 - 根目录：`~/.asrkit/models/`（可用 `$ASRKIT_MODELS_ROOT` 覆盖）。
-- **v0.x**：一变体一目录 —— `models/<model>/<tag>/`（如 `models/sensevoice/int8/`）。同一模型多精度共存不打架。
+- **v0.x（实现现状）**：**平铺** `models/<folder>/`，folder = 模型 id 去掉 `local/`（如 `models/sensevoice/`、`models/sensevoice-fp32/`）。`tag` 只是**寻址别名**（`sensevoice:fp32` → 目录 `sensevoice-fp32`），**不是子目录**。安装为原子操作（`.partial` + rename）。
 - **未来**（记着，不急做）：抄 Ollama 的 **manifest + 内容寻址 blob 去重** —— int8/fp32 共享的 `tokens.txt` 只存一份。ASR 的 onnx 文件大，去重有价值，但 v0.x 不做。
 
 ---
@@ -35,12 +35,14 @@
 ## 三、CLI 动词（对齐 Ollama）
 
 ```bash
-asrkit pull  model[:tag]          # 下载（+解压+按精度就位）
-asrkit run   model[:tag] 音频     # = pull（若缺）+ transcribe，Ollama 式一步到位
-asrkit list                        # 已安装的
-asrkit list --available            # 索引里可拉的全部
-asrkit show  model                 # 详情：架构/各精度/体积/许可证/语言
-asrkit rm    model[:tag]           # 删除（可选，后补）
+asrkit pull  model[:tag]          # ✅ 下载 + 解压 + 原子安装
+asrkit run   model[:tag] 音频     # ✅ = pull（若缺）+ transcribe，Ollama 式一步到位
+asrkit list                        # ✅ 列出全部（✓=已安装）
+asrkit transcribe 音频 -m model    # ✅ 只转写（不自动下载）
+# —— 以下为路线项，尚未实现 ——
+asrkit list --available            # 🔜 仅列可拉的
+asrkit show  model                 # 🔜 详情：架构/精度/体积/许可证/语言
+asrkit rm    model[:tag]           # 🔜 删除
 ```
 
 `transcribe` 保留（编程/明确语义）；`run` 是 Ollama 式的傻瓜入口。
@@ -71,7 +73,7 @@ sensevoice:
 
 ## 五、云端约定（LiteLLM 式）
 
-- **key 解析顺序**：显式 `config["api_key"]` > 环境变量（按 vendor，如 `SILICONFLOW_API_KEY` / `DASHSCOPE_API_KEY`）> 配置文件。
+- **key 解析顺序**（✅ 已实现 env 兜底）：显式 `config["api_key"]` > 环境变量 `<VENDOR>_API_KEY`（如 `SILICONFLOW_API_KEY`）。配置文件为路线项。
 - **`provider/model` 路由**：已实现（协议 adapter 按 provider 分派）。
 - **密钥按 vendor 共享**：同厂商多模型共用一个 key（已在契约体现）。
 - **后期（阶段 4，抄 LiteLLM Router）**：兜底（端侧失败切云端）、重试、超时、多 key 轮换。现在不做。
