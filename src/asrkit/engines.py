@@ -1,15 +1,15 @@
 """Known engines and how to install them (for `asrkit engine`).
 
-Engines are Python packages (not weight files). sherpa-onnx ships with the base
-install; others are optional pip extras. See docs/engines-and-addressing.md §八.
+Engines are Python packages (not weight files). ALL engines are optional pip extras —
+the base install carries only the interface + cloud (HTTP). See docs/engines-and-addressing.md §八.
 """
 from __future__ import annotations
 
 import importlib.util
 
-# name -> (python module to probe for availability, pip extra or None if built-in)
+# name -> (python module to probe for availability, pip extra)
 ENGINES = {
-    "sherpa-onnx":    ("sherpa_onnx", None),               # 基础安装自带
+    "sherpa-onnx":    ("sherpa_onnx", "local"),            # 默认端侧引擎（47 模型）
     "faster-whisper": ("faster_whisper", "faster-whisper"),
     "transformers":   ("transformers", "transformers"),    # 接整个 HF ASR 生态（重,含 torch）
     "whispercpp":     ("pywhispercpp", "whispercpp"),      # whisper.cpp,超轻量（无 torch/onnx）

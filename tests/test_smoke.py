@@ -9,7 +9,7 @@ from asrkit import audio, registry, store
 
 
 def test_version():
-    assert asrkit.__version__ == "0.4.1"
+    assert asrkit.__version__ == "0.5.0"
 
 
 def test_list_models():
@@ -102,6 +102,22 @@ def test_sha256_mismatch_rejected(tmp_path):
     with pytest.raises(ValueError):
         store._verify_sha256(str(f), "0" * 64, log=lambda *a: None)
     store._verify_sha256(str(f), "", log=lambda *a: None)  # 空 sha 跳过，不抛
+
+
+def test_sherpa_missing_engine_friendly_error(monkeypatch):
+    # base 极简化后：sherpa 引擎未装时应友好报错(带安装命令)，不抛 ImportError
+    from asrkit.adapters import local_sherpa
+    from asrkit.types import AudioInput, TranscribeOptions
+    monkeypatch.setattr(local_sherpa, "_available", lambda: False)
+    a = registry.make_adapter("local/sensevoice")
+    r = a.transcribe(AudioInput(original_path="/nope.wav"), TranscribeOptions())
+    assert r.text == "" and "asrkit[local]" in (r.error or "")
+
+
+def test_cloud_only_needs_no_engine():
+    # 云端模型解析/构造不依赖任何本地引擎（接口层 + requests 即可）
+    a = registry.make_adapter("dashscope/qwen3-asr-flash", {"api_key": "x"})
+    assert a.is_configured()
 
 
 def test_env_key_injection(monkeypatch):

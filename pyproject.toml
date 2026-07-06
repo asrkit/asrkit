@@ -25,27 +25,27 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
-# 基础安装即含全部接口所需（本地引擎 sherpa-onnx + 云端 HTTP + 音频读取）。
-# `pip install asrkit` 一步到位；模型权重用 `asrkit pull` 下载，云端填 API key。
+# 定位：ASRKit 是**接口**——引擎可插拔、模型可插拔、云端内置（代码/依赖极小）。
+# 基础安装 = 接口层 + 云端（只需 HTTP）。极小、秒装、随处可跑（含 asrkit serve 的调用方）。
+# 本地引擎按需加 extra；模型权重用 `asrkit pull` 下载；云端填 API key。
 dependencies = [
-    "sherpa-onnx>=1.13.3",   # 本地端侧引擎
-    "numpy",                 # 采样点
-    "soundfile",             # 读音频
-    "soxr",                  # 重采样（--convert 时）
-    "requests",              # 云端 HTTP
+    "requests",              # 云端 HTTP（云端内置，依赖仅此一个）
 ]
 
 [project.optional-dependencies]
-# 可选引擎（默认只带 sherpa-onnx；其余按需装，见 docs/engines-and-addressing.md §八）
+# —— 本地引擎（可插拔；sherpa/whispercpp 需音频 io，faster-whisper/transformers 自带解码）——
+sherpa = ["sherpa-onnx>=1.13.3", "numpy", "soundfile", "soxr"]   # 默认端侧引擎（47 模型）
+whispercpp = ["pywhispercpp", "numpy", "soundfile", "soxr"]
 faster-whisper = ["faster-whisper"]
 transformers = ["transformers", "torch"]
-whispercpp = ["pywhispercpp"]
-engines = ["faster-whisper", "transformers", "torch", "pywhispercpp"]
-# 本地 OpenAI 兼容服务：asrkit serve（见 docs/roadmap-cli-completeness.md C 组）
+# —— 组合别名 ——
+local = ["asrkit[sherpa]"]                 # “本地默认体验” = sherpa
+engines = ["asrkit[sherpa]", "asrkit[whispercpp]", "asrkit[faster-whisper]", "asrkit[transformers]"]
+# —— 本地 OpenAI 兼容服务：asrkit serve ——
 serve = ["fastapi", "uvicorn", "python-multipart"]
-# 兼容旧命令（0.1.x 曾用 asrkit[all]/[local]/[cloud]）；基础安装已含核心，这些为空别名。
-all = []
-local = []
+# —— 全家桶 ——
+all = ["asrkit[engines]", "asrkit[serve]"]
+# 云端内置，无需 extra；保留空别名兼容旧命令
 cloud = []
 
 [project.scripts]

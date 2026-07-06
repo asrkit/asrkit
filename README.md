@@ -14,9 +14,28 @@ ASRKit 是**语音识别领域的 Ollama + LiteLLM**:一条命令拉起端侧模
 > ⚠️ **早期 Beta,开发中。** 核心接口已可用,我们仍在积极迭代 —— 小版本间 API 与寻址可能调整。欢迎试用与反馈。
 
 ```bash
-pip install asrkit
-asrkit run local/sensevoice audio.wav      # 首次自动下载模型,然后识别
+pipx install asrkit                                          # 当工具用(隔离,全局命令,不折腾环境)
+asrkit transcribe audio.wav -m dashscope/qwen3-asr-flash --api-key <KEY>   # 云端,秒装即用
+
+pipx inject asrkit "asrkit[local]"                          # 要端侧再加(sherpa,47 模型)
+asrkit run local/sensevoice audio.wav                       # 首次自动下载模型,然后识别
 ```
+
+> `pip install asrkit` 同样可以(当库 import 进代码用);`pipx` / `uv tool install` 更适合"只想要命令"。
+
+## 安装:接口内核极小,一切可插拔
+
+**基础安装只有接口 + 云端(仅依赖 `requests`,秒装、随处可跑)。** 本地引擎按需加:
+
+| 想要 | 装什么 |
+|---|---|
+| 云端 + CLI + `serve` 的调用方 | `pip install asrkit`（或 `pipx install asrkit`） |
+| 端侧默认引擎(sherpa,47 模型) | `pip install "asrkit[local]"` |
+| 其它引擎 | `asrkit[faster-whisper]` / `asrkit[whispercpp]` / `asrkit[transformers]` |
+| 本地服务 | `asrkit[serve]` |
+| 全都要 | `asrkit[all]` |
+
+没装某引擎就用它 → **友好报错(带安装命令)**,不是 `ImportError`。
 
 ## 一套接口,任意切换
 
@@ -41,7 +60,7 @@ print(transcribe("local/sensevoice", "audio.wav").text)
 - **四个引擎,还能插更多。** sherpa-onnx、faster-whisper、whisper.cpp、transformers(接整个 HuggingFace 生态,含 LLM 架构 SOTA)。`pip install asrkit-<engine>` 加你自己的。
 - **透明,不越界。** 默认**不改动你的音频、不改变模型原生行为**。格式不对?**诚实报错**,绝不静默出乱码。格式转换、长音频分段都是 opt-in 开关。
 - **隐私。** 音频与密钥永不离开你的机器 —— ASRKit 是个库,不是托管服务。
-- **即拉即用。** 模型按需下载、本地缓存,Ollama 式。`pip install asrkit` 只带默认引擎,其余可选装。
+- **接口即内核。** `pip install asrkit` 只装接口 + 云端(极小,仅 `requests`);引擎、模型、服务全按需加。云端内置(代码/依赖极小),端侧一条 extra 就位。
 
 ## 命令
 

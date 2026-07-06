@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import glob
+import importlib.util
 import os
 import time
 
@@ -14,6 +15,14 @@ from .. import store
 from ..audio import AudioFormatError, load_samples
 from ..registry import register_protocol
 from ..types import AudioInput, BaseAdapter, TranscribeOptions, TranscribeResult
+
+# sherpa-onnx 是可选引擎（不在基础安装内）；含端侧解码所需的音频 io。
+_INSTALL_HINT = 'engine \'sherpa-onnx\' not installed. Run: pip install "asrkit[local]"'
+
+
+def _available() -> bool:
+    return all(importlib.util.find_spec(m) is not None
+               for m in ("sherpa_onnx", "numpy", "soundfile", "soxr"))
 
 
 def _find(d: str, prefer: str, *patterns: str) -> str:
@@ -170,6 +179,8 @@ class SherpaLocal(BaseAdapter):
         return store.pull(self.meta, self.config, log=log)
 
     def transcribe(self, audio: AudioInput, opts: TranscribeOptions) -> TranscribeResult:
+        if not _available():
+            return TranscribeResult(text="", error=_INSTALL_HINT)
         streaming = "streaming" in self.meta.modes
         prefer = self.meta.tag or "int8"
         try:

@@ -10,6 +10,24 @@
 > 2. 记 CHANGELOG —— 在下方加一节 `## [X.Y.Z] - YYYY-MM-DD`,分 `### 新增 / 变更 / 修复` 三段;**破坏性变更要醒目标出**。
 > 3. 打 tag 并推 —— `git tag -a vX.Y.Z -m "…" && git push origin main --tags`(tag 与 PyPI 版本一一对应)。
 
+## [0.5.0] - 2026-07-06
+
+主题：**接口内核极简化——引擎/模型/云端全可插拔**。定位钉死：ASRKit 是个**接口**，base 只有接口 + 云端。
+
+### ⚠️ 破坏性变更（安装契约）
+- **`pip install asrkit` 不再自带本地引擎。** base 依赖砍到只剩 `requests`（云端内置，仅需 HTTP）。端侧需显式 `pip install "asrkit[local]"`（sherpa + 音频 io）。
+  - 迁移：本地用户加装 `asrkit[local]`（或 `asrkit[all]`）。CLI/API/model string/寻址**均不变**——只是 base 更薄。
+  - 用未安装的引擎 → 友好报错（带安装命令），不是 `ImportError`。
+- 这是本项目 0.x 里第一个**真正的 MINOR**（破坏性变更 → MINOR，见顶部纪律）；不是版本虚涨。
+
+### 变更
+- **依赖分层**：`sherpa`(=默认端侧引擎，含 numpy/soundfile/soxr)、`whispercpp`、`faster-whisper`、`transformers`、`serve` 各自 extra；`local`=sherpa，`engines`=全引擎，`all`=引擎+serve；`cloud` 内置（空别名）。
+- **单一版本源**已在 0.4.x 生效（hatchling 从 `__init__.py` 读）。
+- 安装文档改为**分层 + 推荐 `pipx` / `uv tool install`**（当工具用，不折腾 Python 环境）。
+
+### 说明
+- 云端秒装即用（`pip install asrkit` → 只有 asrkit + requests）；`asrkit serve` 的**调用方**零 asrkit 依赖（走 HTTP）。
+
 ## [0.4.1] - 2026-07-06
 
 主题：**完善——工具与服务**（对照 Ollama + LiteLLM，见 `docs/roadmap-cli-completeness.md` A/B/C 三组，合并为一个补丁版发布）。均为向后兼容增量。

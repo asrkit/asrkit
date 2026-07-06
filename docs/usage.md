@@ -11,11 +11,13 @@
 ## 安装
 
 ```bash
-pip install asrkit            # 一步装好端云接口（sherpa-onnx + 云端 + 音频）
+pipx install asrkit           # 当工具用（隔离/全局命令，推荐）；或 pip install asrkit（当库 import）
+pip install "asrkit[local]"   # 端侧默认引擎（sherpa，47 模型）；base 不含引擎
+pip install "asrkit[all]"     # 引擎全家桶 + serve
 pip install -e .              # 开发模式（改代码即时生效）
 ```
 
-模型权重用 `asrkit pull` 按需下载；云端填 API key。
+**base 只有接口 + 云端**（仅依赖 `requests`，秒装、随处可跑）。本地引擎按需加 extra；模型权重用 `asrkit pull` 下载；云端填 API key。没装某引擎就用它 → 友好报错（带安装命令）。
 
 ---
 

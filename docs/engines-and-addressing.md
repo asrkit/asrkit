@@ -136,7 +136,7 @@ asrkit run  siliconflow/sensevoice a.wav --api-key <KEY>
 | 是什么 | 权重文件（`.onnx` 等） | Python 包（sherpa-onnx / faster-whisper / pywhispercpp） |
 | 怎么获取 | `asrkit pull`（下文件 → `~/.asrkit/models`） | **`pip` 安装**（有依赖树） |
 
-**默认**：`pip install asrkit` 只带 sherpa-onnx（覆盖面最广）；其它引擎按需装，避免基础安装被 torch/ctranslate2 等撑爆。
+**默认（0.5.0 起）**：`pip install asrkit` 只装**接口 + 云端**（仅 `requests`，秒装）；**所有本地引擎都是 opt-in extra**（含默认的 sherpa：`pip install "asrkit[local]"`）。避免基础安装被 onnx/torch/ctranslate2 等撑爆——ASRKit 是接口，引擎按需挂。
 
 注册中心本就按 `provider`（=引擎名）路由，故多引擎是**纯增量**，不改核心结构。
 

@@ -14,9 +14,28 @@ ASRKit is **Ollama + LiteLLM for speech recognition**. Pull an on-device model a
 > ⚠️ **Early beta, under active development.** The core interface is usable, but we're still iterating fast — APIs and addressing may change between minor versions. Try it and tell us what breaks.
 
 ```bash
-pip install asrkit
-asrkit run local/sensevoice audio.wav      # downloads on first run, then transcribes
+pipx install asrkit                                         # use it as a tool (isolated, global command)
+asrkit transcribe audio.wav -m dashscope/qwen3-asr-flash --api-key <KEY>   # cloud, works instantly
+
+pipx inject asrkit "asrkit[local]"                         # add on-device (sherpa, 47 models)
+asrkit run local/sensevoice audio.wav                      # downloads on first run, then transcribes
 ```
+
+> `pip install asrkit` works too (to `import` it in your code); `pipx` / `uv tool install` are better when you just want the command.
+
+## Install: a tiny interface core, everything pluggable
+
+**The base install is just the interface + cloud (only `requests` — installs in seconds, runs anywhere).** Add local engines on demand:
+
+| You want | Install |
+|---|---|
+| Cloud + CLI + a client for `serve` | `pip install asrkit` (or `pipx install asrkit`) |
+| Default on-device engine (sherpa, 47 models) | `pip install "asrkit[local]"` |
+| Other engines | `asrkit[faster-whisper]` / `asrkit[whispercpp]` / `asrkit[transformers]` |
+| Local server | `asrkit[serve]` |
+| Everything | `asrkit[all]` |
+
+Use an engine you haven't installed → **a friendly error with the install command**, not an `ImportError`.
 
 ## One interface, swap anything
 
@@ -41,7 +60,7 @@ print(transcribe("local/sensevoice", "audio.wav").text)
 - **Four engines, more via plugins.** sherpa-onnx, faster-whisper, whisper.cpp, and transformers (the entire HuggingFace hub, incl. LLM-architecture SOTA). `pip install asrkit-<engine>` adds your own.
 - **Transparent by design.** ASRKit doesn't touch your audio or change a model's native behavior by default. Wrong format? An honest error — never silent garbage. Format conversion and long-audio chunking are opt-in flags.
 - **Private.** Your audio and API keys never leave your machine — ASRKit is a library, not a hosted service.
-- **Pull-and-go.** Models download on demand and cache locally, Ollama-style. `pip install asrkit` ships only the default engine; the rest are optional.
+- **The interface is the core.** `pip install asrkit` ships only the interface + cloud (tiny — just `requests`); engines, models, and the server are all add-ons. Cloud is built in (minuscule code/deps); on-device is one extra away.
 
 ## Commands
 
