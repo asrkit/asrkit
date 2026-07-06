@@ -1,6 +1,11 @@
 # Changelog
 
-本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
+本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。0.x 阶段:破坏性变更只 bump MINOR(0.3→0.4),加功能/修 bug bump PATCH(0.4.0→0.4.1)。
+
+> **发版三步**
+> 1. 改版本号 —— 只改 `src/asrkit/__init__.py` 的 `__version__`(单一版本源,pyproject 自动同步),并同步 `tests/test_smoke.py` 的断言。
+> 2. 记 CHANGELOG —— 在下方加一节 `## [X.Y.Z] - YYYY-MM-DD`,分 `### 新增 / 变更 / 修复` 三段;**破坏性变更要醒目标出**。
+> 3. 打 tag 并推 —— `git tag -a vX.Y.Z -m "…" && git push origin main --tags`(tag 与 PyPI 版本一一对应)。
 
 ## [0.4.0] - 2026-07-06
 
