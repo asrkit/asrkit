@@ -6,31 +6,36 @@
 > - `asr_bench`（Flutter/Dart，端侧 32 + 云端 21，含 6 家流式协议）
 >
 > 契约是 ASRKit 的"宪法"。任何人照本文写一个 adapter，即可接入 ASRKit 的全部能力
-> （bench 横评 / CLI / SDK / OpenAI 兼容网关）。
+> （CLI / pull / Python SDK / OpenAI 兼容网关；bench 横评为后续路线项）。
 
 ---
 
-## 0. 设计原则（每条都有代码依据）
+## 0. 设计原则
 
-1. **平台归一化音频，adapter 只管识别。** 平台把任意输入统一转成 `16kHz 单声道 float32 [-1,1]` 再交给 adapter。*依据：`worker.py:load_wav`；Dart 侧同样喂 16k 单声道。*
-2. **能力声明消化端云不齐。** adapter 通过 `meta.capabilities` 声明自己能干什么，引擎据此路由与降级。
-3. **进程隔离是硬要求（本地 adapter）。** 本地推理必须能在子进程/isolate 中运行。*依据：`worker.py` 每模型一个子进程；Dart `Isolate.run`。*
-4. **字段宁少勿多。** 加字段容易、改字段是灾难。可选能力走可选字段。
-5. **原始响应可复核。** 结果保留 `raw_response`。
+0. **透明层优先（最高原则）。** ASRKit 默认**不改变模型的原生行为**——用 asrkit 跑某模型，结果应与直接用该模型一致。默认不做任何"音频增强"（VAD / 降噪 / 音量归一化 / 长音频切段），不对模型输出做后处理。所有此类处理均为 **opt-in（默认关）**，由用户显式开启。ASRKit 只做"统一接口 + 快速换模型"这一层——多我们这一层，能力与直接用模型一模一样。
+1. **音频只做"运行所必需"的最小转换。**
+   - **云端 adapter**：默认上传**原始音频文件**，不重采样、不转码——云端 API 自行处理各种格式，我们预处理反而可能削弱它。
+   - **本地 adapter**：模型物理上只吃特定格式（sherpa = 16k 单声道 float32）。ASRKit 做"喂给模型它能吃的格式"所必需的最小转换（解码容器 + 必要时重采样到模型要求采样率），用高质量重采样（soxr）。这不是增强，等价于你直接用该模型时本来就要做的。
+   - **长音频**：默认不切段（尊重模型原生行为）；但当音频超过模型已知窗口（如 whisper 30s）时**绝不静默截断**——发警告或在 result 标注，提示可开启 opt-in 分段。透明 ≠ 静默丢数据。
+2. **能力声明消化端云不齐。** adapter 通过 `meta.capabilities` 声明能力，引擎据此路由与降级。
+3. **字段宁少勿多。** 加字段容易、改字段是灾难。可选能力走可选字段。
+4. **原始响应可复核。** 结果保留 `raw_response`。
+
+> **进程隔离**（本地推理跑子进程、崩溃不连坐）为**路线项，非 v1 硬要求**——当前实现为同进程加载。原型 `worker.py` 用子进程隔离，可选 runner 待后续提供（见 hardening 规格 H-*）。
 
 ---
 
 ## 1. 统一数据结构
 
 ```python
-# 【仅用于 batch】平台已归一化。流式不走 AudioInput，走 §5 的 chunks。
+# 【仅用于 batch】流式不走 AudioInput，走 §5 的 chunks。
 @dataclass
 class AudioInput:
-    samples: np.ndarray                  # float32 [-1,1], 16kHz mono（平台保证已填充）
-    path: str                            # 已归一化的 16k 单声道 WAV 文件路径（平台保证已生成）
-    sample_rate: int = 16000
+    original_path: str                   # 原始音频文件路径（未改动）；云端 adapter 原样上传它
+    samples: np.ndarray | None = None    # 解码后的 float32；本地 adapter 用（按模型要求解码/重采样）
+    sample_rate: int = 0                 # samples 的采样率（本地模型要求的目标率，如 16000）
     duration_s: float | None = None
-# 约定：本地 adapter 用 samples；云端批量 adapter 用 path（上传文件/base64）。各取所需。
+# 透明原则（§0.1）：云端用 original_path（原样上传，平台不预处理）；本地用 samples（最小必需转换）。
 
 
 @dataclass
@@ -59,9 +64,8 @@ class TranscribeResult:
 
 ```python
 class BaseAdapter:
-    meta: AdapterMeta                            # 见 §3，静态可读
-
-    def __init__(self, config: dict): ...        # config 来自 config_schema
+    # 一个 adapter 处理一种协议，按 meta 参数化到具体模型（同一 SherpaLocal 吃 47 个模型）
+    def __init__(self, meta: AdapterMeta, config: dict): ...   # config 来自 config_schema
 
     # —— 批量（必须实现）——
     def transcribe(self, audio: AudioInput, opts: "TranscribeOptions") -> TranscribeResult: ...
@@ -117,6 +121,8 @@ class AdapterMeta:
     config_type: str = ""         # 引擎架构：whisper/paraformer/senseVoice/transducer/qwen3Asr/...
     download_url: str = ""
     install_files: list[str] = field(default_factory=list)  # 支持精确名或 glob，见 §6
+    tag: str = ""                 # 精度标签（int8/fp32），Ollama 式 base:tag 寻址
+    base: str = ""                # 逻辑模型名（多精度共享一个 base）
 ```
 
 > **改动依据评审 🔴#4 / 🟡#9**：`id` 不再是可解析的二段式，改为不透明唯一串；`provider`（协议）、`vendor`（账号）、`model`（厂商 model 名）、`resource_id` 各自独立——因为火山同一 `bigmodel` 有三条目、DashScope 一个账号挂多协议，二段式 id 表达不了。原 `default_model_id` 并入 `model`。
@@ -211,11 +217,12 @@ install_files = ["*encoder*.onnx", "*decoder*.onnx", "<tokenizer_dir>/"]
 
 | 职责 | 平台/引擎 | Adapter |
 |---|---|---|
-| 音频解码/重采样到 16k 单声道 | ✅ | ❌ |
+| 解码容器 + 本地模型必需的重采样（最小转换，见 §0.1） | ✅ | ❌ |
+| 云端音频：原样传递、不预处理 | ✅（透明） | 上传 original_path |
+| 音频增强（VAD/降噪/切段）——**默认关，opt-in** | ✅（用户开启时） | ❌ |
 | 端到端计时兜底 | ✅ | 可补 metrics |
-| 本地推理进程隔离 | ✅（提供 runner） | 实现同步 transcribe |
+| 本地推理进程隔离（**路线项，非 v1 要求**） | 🔜 可选 runner | 实现同步 transcribe |
 | 重试/超时/密钥轮换 | ✅（阶段 4） | ❌ |
-| VAD/心跳/重连 | ✅ | ❌ |
 | 厂商协议细节（鉴权/帧格式/内部重采样） | ❌ | ✅ |
 | 能力声明 | ❌ | ✅ |
 
@@ -235,7 +242,9 @@ install_files = ["*encoder*.onnx", "*decoder*.onnx", "<tokenizer_dir>/"]
 2. `vendor` → `meta` 一等字段，密钥按 vendor 聚合。
 3. `word_timestamps` → `[{word, start, end, conf?}]`，conf 可选。
 4. `maturity="experimental"` → bench 照常展示、显著标注、不人为降权；另用 `model_kind` 表达"纯 ASR / 音频 LLM"。
-5. `AudioInput` → 仅 batch，samples/path 双备；流式走 chunks。
+5. `AudioInput` → 仅 batch，`original_path`（原样，云端用）+ `samples`（最小转换，本地用）；流式走 chunks。
 6. `id` → 不透明唯一串；provider/vendor/model/resource_id 各自独立字段。
+7. **透明层原则（§0）** → 默认不动音频、不改模型原生行为；增强处理 opt-in；进程隔离降为路线项。
+8. `BaseAdapter.__init__(meta, config)`；`AdapterMeta` 增 `tag`/`base`（精度寻址）。
 
-> 评审总判：**改完可冻结**。以上修改已全部吸收。
+> 二次修订（2026-07，音频透明原则）后需**重新走一遍评审再冻结**。
