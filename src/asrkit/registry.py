@@ -65,14 +65,14 @@ def resolve(model_id: str) -> AdapterMeta:
             return _MODELS[cand]
         if cand in _ALIASES:
             return _MODELS[_ALIASES[cand]]
-    raise ModelNotFoundError(f"未注册的模型 '{model_id}'。用 `asrkit list` 查看全部。")
+    raise ModelNotFoundError(f"unknown model '{model_id}'. Run `asrkit list` to see all.")
 
 
 def make_adapter(model_id: str, config: Optional[dict] = None) -> BaseAdapter:
     meta = resolve(model_id)
     cls = _PROTOCOLS.get(meta.provider)
     if cls is None:
-        raise ModelNotFoundError(f"模型 '{model_id}' 的协议 '{meta.provider}' 没有对应 adapter。")
+        raise ModelNotFoundError(f"model '{model_id}': no adapter for provider '{meta.provider}'.")
     config = dict(config or {})
     # H-05：云端 key 环境变量兜底 <VENDOR>_API_KEY（显式 config 优先）
     if meta.source == "cloud" and not config.get("api_key") and meta.vendor:

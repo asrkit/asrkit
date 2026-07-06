@@ -18,7 +18,7 @@ def transcribe(
     adapter = registry.make_adapter(model, config or {})
     if not adapter.is_configured():   # H-18：缺配置（如云端无 key）先给友好错误
         return TranscribeResult(
-            text="", error=f"{model} 未配置（缺 API Key？）。see docs/usage.md")
+            text="", error=f"{model} is not configured (missing API key?). See docs/usage.md")
     if isinstance(audio, str):
         audio = AudioInput(original_path=audio)   # 内核零处理：不解码，adapter 各取所需
     return adapter.transcribe(audio, opts or TranscribeOptions())
@@ -28,7 +28,7 @@ def pull(model: str, *, config: Optional[dict] = None, log=print) -> str:
     """下载并安装一个本地模型（Ollama 式）。返回模型目录。"""
     meta = registry.resolve(model)
     if meta.source != "local":
-        raise ValueError(f"{model} 是云端模型，无需下载（配置 API Key 即可用）。")
+        raise ValueError(f"{model} is a cloud model; no download needed (just set the API key).")
     return store.pull(meta, config or {}, log=log)
 
 

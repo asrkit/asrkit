@@ -8,6 +8,7 @@
 - `asrkit --version` / `-V` 显示版本。
 - `asrkit rm <model>` 删除已下载的本地模型（补全 pull/rm 生命周期，Ollama 对齐）。
 - **本地模型名可省略 `local/` 前缀**：`asrkit pull sensevoice` = `local/sensevoice`（含精度别名 `sensevoice:fp32`）。全名与云端 `provider/model` 不受影响；命名空间仍是正式名（未来多引擎不打脸）。
+- **终端输出全英文**：CLI 帮助/报错/提示/模型显示名/`show` 字段全部英文（面向全球开发者；代码注释与设计文档仍为中文）。
 
 ### 说明
 - 无 `update` 命令：模型按 id 钉死（换模型即 `pull` 另一个 id）；升级软件包用 `pip install -U asrkit`。

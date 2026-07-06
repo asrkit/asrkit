@@ -85,7 +85,7 @@ def _verify_sha256(path: str, expected: str, log) -> None:
             h.update(chunk)
     got = h.hexdigest()
     if got.lower() != expected.lower():
-        raise ValueError(f"下载校验和不匹配（期望 {expected[:12]}…，实际 {got[:12]}…），已拒绝")
+        raise ValueError(f"checksum mismatch (expected {expected[:12]}…, got {got[:12]}…); rejected")
 
 
 def _safe_extract(tf: tarfile.TarFile, dest: str) -> None:
@@ -93,10 +93,10 @@ def _safe_extract(tf: tarfile.TarFile, dest: str) -> None:
     base = os.path.realpath(dest)
     for m in tf.getmembers():
         if m.issym() or m.islnk() or m.isdev():
-            raise ValueError(f"tarball 含不安全成员（{m.name}），拒绝解压")
+            raise ValueError(f"unsafe member in tarball ({m.name}); refusing to extract")
         tgt = os.path.realpath(os.path.join(dest, m.name))
         if tgt != base and not tgt.startswith(base + os.sep):
-            raise ValueError(f"tarball 成员路径逃逸（{m.name}），拒绝解压")
+            raise ValueError(f"tarball member escapes target dir ({m.name}); refusing")
     try:
         tf.extractall(dest, filter="data")   # Python 3.12+
     except TypeError:
@@ -106,13 +106,13 @@ def _safe_extract(tf: tarfile.TarFile, dest: str) -> None:
 def pull(meta: AdapterMeta, config: dict | None = None, log=print) -> str:
     """下载并安装本地模型（原子）。已装则直接返回模型目录。"""
     if meta.source != "local":
-        raise ValueError(f"{meta.id} 不是本地模型，无需 pull")
+        raise ValueError(f"{meta.id} is not a local model; no pull needed")
     dest = model_dir(meta, config)
     if is_installed(meta, config):
-        log(f"已安装：{dest}")
+        log(f"already installed: {dest}")
         return dest
     if not meta.download_url:
-        raise ValueError(f"{meta.id} 未登记下载地址")
+        raise ValueError(f"{meta.id} has no download URL")
 
     parent = os.path.dirname(os.path.abspath(dest))
     os.makedirs(parent, exist_ok=True)
@@ -121,10 +121,10 @@ def pull(meta: AdapterMeta, config: dict | None = None, log=print) -> str:
     shutil.rmtree(staging, ignore_errors=True)
     try:
         tar_path = os.path.join(tmp, "m.tar.bz2")
-        log(f"下载 {meta.download_url}")
+        log(f"downloading {meta.download_url}")
         _download(meta.download_url, tar_path, log)
         _verify_sha256(tar_path, meta.sha256, log)
-        log("解压 ...")
+        log("extracting ...")
         with tarfile.open(tar_path, "r:bz2") as tf:
             _safe_extract(tf, tmp)
 
@@ -143,8 +143,8 @@ def pull(meta: AdapterMeta, config: dict | None = None, log=print) -> str:
 
         if not _install_files_ok(meta, dest):
             shutil.rmtree(dest, ignore_errors=True)
-            raise ValueError(f"{meta.id} 安装不完整（缺文件）")
-        log(f"完成 → {dest}")
+            raise ValueError(f"{meta.id} install incomplete (missing files)")
+        log(f"done → {dest}")
         return dest
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

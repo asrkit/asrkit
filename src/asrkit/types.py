@@ -103,4 +103,4 @@ class BaseAdapter:
     def transcribe_stream(
         self, chunks: Iterable[Any], opts: TranscribeOptions
     ) -> Iterator[PartialResult]:
-        raise NotImplementedError("此 adapter 不支持流式")
+        raise NotImplementedError("this adapter does not support streaming")

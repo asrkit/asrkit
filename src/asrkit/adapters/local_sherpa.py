@@ -27,7 +27,7 @@ def _find(d: str, prefer: str, *patterns: str) -> str:
         if prefer == "fp32":
             return (non or hits)[0]
         return (int8 or hits)[0]
-    raise FileNotFoundError(f"{d} 内找不到 {patterns}")
+    raise FileNotFoundError(f"none of {patterns} found in {d}")
 
 
 def _find_tokenizer_dir(d: str) -> str:
@@ -38,7 +38,7 @@ def _find_tokenizer_dir(d: str) -> str:
             or os.path.exists(os.path.join(p, "tokenizer.json"))
         ):
             return p
-    raise FileNotFoundError(f"{d} 内找不到 tokenizer 目录")
+    raise FileNotFoundError(f"no tokenizer dir found in {d}")
 
 
 def _build(ct: str, d: str, threads: int, lang_hint: str, streaming: bool,
@@ -114,7 +114,7 @@ def _build(ct: str, d: str, threads: int, lang_hint: str, streaming: bool,
     if ct == "dolphin":
         return so.OfflineRecognizer.from_dolphin_ctc(
             model=_find(d, prefer, "model*.onnx", "*.onnx"), tokens=_tok(), num_threads=threads)
-    raise ValueError(f"未知 config_type: {ct}")
+    raise ValueError(f"unknown config_type: {ct}")
 
 
 def _decode_offline(rec, samples, sr):
@@ -170,7 +170,7 @@ class SherpaLocal(BaseAdapter):
             d = store.model_dir(self.meta, self.config)
             if not os.path.isdir(d):
                 return TranscribeResult(
-                    text="", error=f"模型未安装：{self.meta.id}。先运行 `asrkit pull {self.meta.id}`")
+                    text="", error=f"model not installed: {self.meta.id}. Run `asrkit pull {self.meta.id}` first.")
 
             # 解码 + 格式守卫（内核零处理，解码在此；convert=False 时不符即诚实报错）
             try:
@@ -198,8 +198,8 @@ class SherpaLocal(BaseAdapter):
                 vad_model = self.config.get("vad_model") or os.environ.get("ASRKIT_VAD_MODEL")
                 if not vad_model or not os.path.exists(vad_model):
                     return TranscribeResult(
-                        text="", error="开启 --segment 需要 VAD 模型：请设 ASRKIT_VAD_MODEL "
-                        "或 config['vad_model'] 指向 silero_vad.onnx。")
+                        text="", error="--segment needs a VAD model: set ASRKIT_VAD_MODEL "
+                        "or config['vad_model'] to silero_vad.onnx.")
                 parts = []
                 for seg in _vad_segments(samples, sr, vad_model):
                     rr = _decode_offline(self._rec, seg, sr)
@@ -212,8 +212,9 @@ class SherpaLocal(BaseAdapter):
                 lang = getattr(r, "lang", "") or None
                 if win and dur > win:
                     warnings.append(
-                        f"音频 {dur:.0f}s 超过该模型窗口 {win}s，可能仅识别前 {win}s；"
-                        f"完整识别请加 --segment / opts.segment=True。")
+                        f"audio is {dur:.0f}s but this model's window is {win}s; "
+                        f"only the first {win}s may be recognized. "
+                        f"Use --segment / opts.segment=True for the full audio.")
             decode_ms = int((time.perf_counter() - t1) * 1000)
 
             return TranscribeResult(

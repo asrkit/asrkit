@@ -20,7 +20,7 @@ class OpenAICompatible(BaseAdapter):
         try:
             key = self.config.get("api_key", "")
             if not key:
-                return TranscribeResult(text="", error=f"缺少 api_key（vendor={self.meta.vendor}）")
+                return TranscribeResult(text="", error=f"missing api_key (vendor={self.meta.vendor})")
             base = self.config.get("base_url") or self.meta.default_base_url
             import requests  # asrkit[cloud] 依赖
             t0 = time.perf_counter()
@@ -50,7 +50,7 @@ register_model(AdapterMeta(
     id="siliconflow/sensevoice",
     provider="openai",
     vendor="siliconflow",
-    name="SenseVoiceSmall（硅基·免费）",
+    name="SenseVoiceSmall (SiliconFlow, free)",
     source="cloud",
     modes=["batch"],
     langs=["zh", "en", "ja", "ko", "yue"],
@@ -61,6 +61,6 @@ register_model(AdapterMeta(
     model="FunAudioLLM/SenseVoiceSmall",
     config_schema={
         "api_key": {"type": "secret", "required": True, "label": "SiliconFlow API Key"},
-        "base_url": {"type": "string", "required": False, "label": "Base URL 覆盖"},
+        "base_url": {"type": "string", "required": False, "label": "Base URL override"},
     },
 ))

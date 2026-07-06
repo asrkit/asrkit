@@ -1,4 +1,4 @@
-"""asrkit 命令行。"""
+"""asrkit command-line interface."""
 from __future__ import annotations
 
 import argparse
@@ -27,9 +27,9 @@ def _opts(a):
 
 def _print_result(r) -> int:
     for w in (r.warnings or []):
-        print(f"[提示] {w}", file=sys.stderr)
+        print(f"[warn] {w}", file=sys.stderr)
     if r.error:
-        print(f"[错误] {r.error}", file=sys.stderr)
+        print(f"[error] {r.error}", file=sys.stderr)
         return 1
     print(r.text)
     bits = []
@@ -48,9 +48,10 @@ def _add_transcribe_flags(sp):
     sp.add_argument("--api-key", default=None)
     sp.add_argument("--base-url", default=None)
     sp.add_argument("--convert", action="store_true",
-                    help="自动解码/重采样/混单声道以适配本地引擎（默认关：不符则报错）")
+                    help="decode/resample/downmix to fit the local engine "
+                         "(off by default: on mismatch it errors)")
     sp.add_argument("--segment", action="store_true",
-                    help="长音频 VAD 分段（默认关：超窗仅警告）")
+                    help="VAD-segment long audio (off by default: over-window only warns)")
 
 
 def main(argv: Optional[list] = None) -> int:
@@ -62,23 +63,23 @@ def main(argv: Optional[list] = None) -> int:
     p.add_argument("-V", "--version", action="version", version=f"asrkit {__version__}")
     sub = p.add_subparsers(dest="cmd")
 
-    sub.add_parser("list", help="列出模型（✓=已安装）")
+    sub.add_parser("list", help="list models (✓ = installed)")
 
-    sh = sub.add_parser("show", help="显示模型详情")
+    sh = sub.add_parser("show", help="show model details")
     sh.add_argument("model")
 
-    pp = sub.add_parser("pull", help="下载一个本地模型")
+    pp = sub.add_parser("pull", help="download a local model")
     pp.add_argument("model")
 
-    rmp = sub.add_parser("rm", help="删除已下载的本地模型")
+    rmp = sub.add_parser("rm", help="remove a downloaded local model")
     rmp.add_argument("model")
 
-    rp = sub.add_parser("run", help="缺则下载 + 转写（Ollama 式）")
+    rp = sub.add_parser("run", help="download if missing, then transcribe (Ollama-style)")
     rp.add_argument("model")
     rp.add_argument("audio")
     _add_transcribe_flags(rp)
 
-    tp = sub.add_parser("transcribe", help="转写（不自动下载）")
+    tp = sub.add_parser("transcribe", help="transcribe only (no auto-download)")
     tp.add_argument("audio")
     tp.add_argument("-m", "--model", required=True)
     tp.add_argument("--model-dir", default=None)
@@ -102,24 +103,24 @@ def main(argv: Optional[list] = None) -> int:
         try:
             m = registry.resolve(a.model)
         except Exception as e:
-            print(f"[错误] {e}", file=sys.stderr)
+            print(f"[error] {e}", file=sys.stderr)
             return 1
         print(f"id:       {m.id}")
-        print(f"名称:     {m.name}")
-        print(f"来源:     {m.source}  (provider={m.provider}, vendor={m.vendor})")
-        print(f"语言:     {', '.join(m.langs)}")
-        print(f"模式:     {', '.join(m.modes)}")
+        print(f"name:     {m.name}")
+        print(f"source:   {m.source}  (provider={m.provider}, vendor={m.vendor})")
+        print(f"langs:    {', '.join(m.langs)}")
+        print(f"modes:    {', '.join(m.modes)}")
         if m.source == "local":
-            print(f"架构:     {m.config_type}")
-            print(f"精度:     {m.tag or '—'}  (base={m.base or m.id.split('/')[-1]})")
-            print(f"已安装:   {'是' if store.is_installed(m) else '否'}")
-            print(f"下载:     {m.download_url}")
+            print(f"arch:     {m.config_type}")
+            print(f"precision:{m.tag or '—'}  (base={m.base or m.id.split('/')[-1]})")
+            print(f"installed:{'yes' if store.is_installed(m) else 'no'}")
+            print(f"download: {m.download_url}")
         else:
             print(f"model:    {m.model}")
             print(f"base_url: {m.default_base_url}")
-        print(f"许可证:   {m.license or '未标注（见官方来源）'}")
+        print(f"license:  {m.license or 'not labeled (see official source)'}")
         if m.pricing:
-            print(f"价格:     {m.pricing}")
+            print(f"price:    {m.pricing}")
         return 0
 
     if a.cmd == "pull":
@@ -128,7 +129,7 @@ def main(argv: Optional[list] = None) -> int:
             print(f"✓ {a.model} → {d}")
             return 0
         except Exception as e:
-            print(f"[错误] {e}", file=sys.stderr)
+            print(f"[error] {e}", file=sys.stderr)
             return 1
 
     if a.cmd == "rm":
@@ -136,27 +137,27 @@ def main(argv: Optional[list] = None) -> int:
         try:
             m = registry.resolve(a.model)
         except Exception as e:
-            print(f"[错误] {e}", file=sys.stderr)
+            print(f"[error] {e}", file=sys.stderr)
             return 1
         if m.source != "local":
-            print("[错误] 只有本地模型可删除", file=sys.stderr)
+            print("[error] only local models can be removed", file=sys.stderr)
             return 1
         d = store.remove(m)
-        print(f"✓ 已删除 {m.id} → {d}" if d else f"{m.id} 未安装，无需删除")
+        print(f"✓ removed {m.id} → {d}" if d else f"{m.id} not installed; nothing to remove")
         return 0
 
     if a.cmd == "run":
         try:
             return _print_result(api.run(a.model, a.audio, config=_cfg(a), opts=_opts(a)))
         except Exception as e:
-            print(f"[错误] {e}", file=sys.stderr)
+            print(f"[error] {e}", file=sys.stderr)
             return 1
 
     if a.cmd == "transcribe":
         try:
             return _print_result(api.transcribe(a.model, a.audio, config=_cfg(a), opts=_opts(a)))
         except Exception as e:
-            print(f"[错误] {e}", file=sys.stderr)
+            print(f"[error] {e}", file=sys.stderr)
             return 1
 
     p.print_help()

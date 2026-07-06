@@ -30,8 +30,9 @@ def load_samples(
         data, sr = sf.read(path, dtype="float32", always_2d=False)
     except Exception as e:
         raise AudioFormatError(
-            f"无法解码音频文件（{type(e).__name__}: {e}）。"
-            f"本地引擎需要可解码的 WAV；mp3/m4a 等请先转码，或加 --convert / opts.convert=True。"
+            f"cannot decode audio file ({type(e).__name__}: {e}). "
+            f"The local engine needs a decodable WAV; transcode mp3/m4a first, "
+            f"or pass --convert / opts.convert=True."
         )
 
     channels = 1 if getattr(data, "ndim", 1) == 1 else data.shape[1]
@@ -48,7 +49,8 @@ def load_samples(
     # 守卫：不转换，格式必须已符合引擎要求
     if channels != required_channels or sr != required_sr:
         raise AudioFormatError(
-            f"输入为 {sr}Hz {channels} 声道，该模型要求 {required_sr}Hz {required_channels} 声道。"
-            f"请自行转换，或加 --convert / opts.convert=True 让 asrkit 自动转换。"
+            f"input is {sr}Hz {channels}-channel, but this model requires "
+            f"{required_sr}Hz {required_channels}-channel. Convert it yourself, "
+            f"or pass --convert / opts.convert=True."
         )
     return np.ascontiguousarray(data, dtype=np.float32), sr
