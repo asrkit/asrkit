@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "asrkit"
-version = "0.1.0"
+version = "0.1.1"
 description = "One interface to run and compare any speech-to-text model — local & cloud."
 readme = "README.en.md"
 requires-python = ">=3.9"
@@ -25,15 +25,21 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
-dependencies = []
+# 基础安装即含全部接口所需（本地引擎 sherpa-onnx + 云端 HTTP + 音频读取）。
+# `pip install asrkit` 一步到位；模型权重用 `asrkit pull` 下载，云端填 API key。
+dependencies = [
+    "sherpa-onnx>=1.13.3",   # 本地端侧引擎
+    "numpy",                 # 采样点
+    "soundfile",             # 读音频
+    "soxr",                  # 重采样（--convert 时）
+    "requests",              # 云端 HTTP
+]
 
 [project.optional-dependencies]
-# 端侧本地推理（sherpa-onnx 全家桶）+ 音频解码/重采样（opt-in convert 时用）
-local = ["sherpa-onnx>=1.13.3", "numpy", "soundfile", "soxr"]
-# 云端 API
-cloud = ["requests", "numpy", "soundfile", "soxr"]
-# 摊平为显式列表（避免自引用 asrkit[...] 在旧 pip 下解析不可靠）
-all = ["sherpa-onnx>=1.13.3", "requests", "numpy", "soundfile", "soxr"]
+# 兼容旧命令（0.1.0 曾用 asrkit[all]/[local]/[cloud]）；基础安装已含全部，这些为空别名。
+all = []
+local = []
+cloud = []
 
 [project.scripts]
 asrkit = "asrkit.cli:main"

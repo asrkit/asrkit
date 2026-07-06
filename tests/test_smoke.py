@@ -9,7 +9,7 @@ from asrkit import audio, registry, store
 
 
 def test_version():
-    assert asrkit.__version__ == "0.1.0"
+    assert asrkit.__version__ == "0.1.1"
 
 
 def test_list_models():

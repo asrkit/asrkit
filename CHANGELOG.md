@@ -2,7 +2,13 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [0.1.0] - 未发布
+## [0.1.1] - 未发布
+
+### 变更
+- **安装简化**：`pip install asrkit` 一步装好端云接口（sherpa-onnx + 云端 + 音频）——运行时依赖从 extras 提升为基础依赖，不再需要 `asrkit[all]`。模型权重仍按需 `asrkit pull`、云端填 API key。
+- 新增 `asrkit show <model>` 显示模型详情（含许可证展示位）。
+
+## [0.1.0] - 2026-07-06
 
 首个有功能的版本：一套接口跑遍端云。
 

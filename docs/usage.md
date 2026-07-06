@@ -11,11 +11,11 @@
 ## 安装
 
 ```bash
-pip install asrkit[local]     # 端侧（sherpa-onnx）
-pip install asrkit[cloud]     # 云端 API
-pip install asrkit[all]       # 都要
-pip install -e ".[all]"       # 开发模式（改代码即时生效）
+pip install asrkit            # 一步装好端云接口（sherpa-onnx + 云端 + 音频）
+pip install -e .              # 开发模式（改代码即时生效）
 ```
+
+模型权重用 `asrkit pull` 按需下载；云端填 API key。
 
 ---
 

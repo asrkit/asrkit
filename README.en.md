@@ -11,10 +11,10 @@ ASRKit is the Ollama + LiteLLM for speech recognition: pull and run open-source 
 ## Install
 
 ```bash
-pip install "asrkit[local]"   # on-device (sherpa-onnx, 47 models)
-pip install "asrkit[cloud]"   # cloud APIs
-pip install "asrkit[all]"
+pip install asrkit
 ```
+
+One command sets up both local and cloud. Model weights are downloaded on demand via `asrkit pull`; cloud needs your API key (just like Ollama: install the engine, fetch models when you use them).
 
 ## Quickstart
 
