@@ -79,6 +79,7 @@ class AdapterMeta:
     config_type: str = ""
     download_url: str = ""          # 完整 tarball 地址
     install_files: List[str] = field(default_factory=list)
+    sha256: str = ""                # tarball 校验和；pull 后校验（空则跳过）
     tag: str = ""                   # 精度标签（int8/fp32），Ollama 式
     base: str = ""                  # 逻辑模型名（多精度共享，寻址用 base:tag）
 

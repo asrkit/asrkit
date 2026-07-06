@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import os
 from typing import Dict, List, Optional, Type
 
 from .types import AdapterMeta, BaseAdapter
@@ -65,7 +66,13 @@ def make_adapter(model_id: str, config: Optional[dict] = None) -> BaseAdapter:
     cls = _PROTOCOLS.get(meta.provider)
     if cls is None:
         raise ModelNotFoundError(f"模型 '{model_id}' 的协议 '{meta.provider}' 没有对应 adapter。")
-    return cls(meta, config or {})
+    config = dict(config or {})
+    # H-05：云端 key 环境变量兜底 <VENDOR>_API_KEY（显式 config 优先）
+    if meta.source == "cloud" and not config.get("api_key") and meta.vendor:
+        env = os.environ.get(f"{meta.vendor.upper()}_API_KEY")
+        if env:
+            config["api_key"] = env
+    return cls(meta, config)
 
 
 def list_metas() -> List[AdapterMeta]:
