@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "asrkit"
-version = "0.4.0"
+dynamic = ["version"]
 description = "One interface to run and compare any speech-to-text model — local & cloud."
 readme = "README.en.md"
 requires-python = ">=3.9"
@@ -52,6 +52,9 @@ asrkit = "asrkit.cli:main"
 [project.urls]
 Homepage = "https://github.com/asrkit/asrkit"
 Repository = "https://github.com/asrkit/asrkit"
+
+[tool.hatch.version]
+path = "src/asrkit/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/asrkit"]
