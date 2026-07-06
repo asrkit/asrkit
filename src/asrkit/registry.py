@@ -110,6 +110,58 @@ def load_builtin() -> None:
         local_faster_whisper,
         local_sherpa,
         local_transformers,
+        local_whispercpp,
         models_local,
     )
-    _loaded = True
+    _loaded = True           # 先置位，防止插件回调 load_builtin 造成递归
+    _load_plugins()          # 第三方引擎插件（entry-point）
+    _load_user_models()      # 用户自定义模型（~/.asrkit/models.json）
+
+
+def _load_plugins() -> None:
+    """发现并加载 entry-point 插件（group=asrkit.adapters）。插件模块导入时自注册；坏插件不连坐。"""
+    import importlib.metadata as im
+    try:
+        eps = im.entry_points(group="asrkit.adapters")       # py3.10+
+    except TypeError:
+        eps = im.entry_points().get("asrkit.adapters", [])   # py3.9
+    for ep in eps:
+        try:
+            ep.load()
+        except Exception:
+            pass
+
+
+def _load_user_models() -> None:
+    """加载用户自定义模型：$ASRKIT_MODELS_JSON 或 ~/.asrkit/models.json（sherpa 等本地引擎，任意补充）。"""
+    import json
+    import os
+    path = os.environ.get("ASRKIT_MODELS_JSON") or os.path.expanduser("~/.asrkit/models.json")
+    if not os.path.isfile(path):
+        return
+    try:
+        entries = json.load(open(path, encoding="utf-8"))
+    except Exception:
+        return
+    metas = []
+    for e in (entries if isinstance(entries, list) else []):
+        try:
+            metas.append(AdapterMeta(
+                id=e["id"],
+                provider=e.get("provider", "sherpa-onnx"),
+                vendor=e.get("vendor", "local"),
+                name=e.get("name", e["id"]),
+                source=e.get("source", "local"),
+                modes=e.get("modes", ["streaming"] if e.get("streaming") else ["batch"]),
+                langs=e.get("langs", []),
+                config_type=e.get("config_type", ""),
+                download_url=e.get("download_url", ""),
+                model=e.get("model", ""),
+                tag=e.get("tag", "int8"),
+                base=e.get("base", ""),
+                sha256=e.get("sha256", ""),
+            ))
+        except Exception:
+            pass
+    if metas:
+        register_models(metas)

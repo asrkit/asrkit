@@ -9,7 +9,7 @@ from asrkit import audio, registry, store
 
 
 def test_version():
-    assert asrkit.__version__ == "0.2.0"
+    assert asrkit.__version__ == "0.3.0"
 
 
 def test_list_models():
@@ -19,6 +19,20 @@ def test_list_models():
     assert "local/sensevoice" in ids
     assert "siliconflow/sensevoice" in ids
     assert "faster-whisper/tiny" in ids   # 第二个引擎已注册（可选,懒加载）
+    assert "whispercpp/tiny" in ids       # 第三个引擎
+
+
+def test_user_models(tmp_path, monkeypatch):
+    # 用户自定义模型注册表（~/.asrkit/models.json）——sherpa 模型开放
+    import json
+    p = tmp_path / "models.json"
+    p.write_text(json.dumps([{"id": "local/mytest", "config_type": "senseVoice",
+                              "langs": ["zh"], "download_url": "http://x/y.tar.bz2"}]))
+    monkeypatch.setenv("ASRKIT_MODELS_JSON", str(p))
+    registry._loaded = False   # 强制重载以吃到 env
+    registry.load_builtin()
+    m = registry.resolve("local/mytest")
+    assert m.id == "local/mytest" and m.config_type == "senseVoice" and m.provider == "sherpa-onnx"
 
 
 def test_transformers_open_provider():

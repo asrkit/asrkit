@@ -117,7 +117,7 @@ asrkit run  siliconflow/sensevoice a.wav --api-key <KEY>
 
 ## 七、现状 vs 路线，以及"不破坏"保证
 
-**现状（已实现，0.2.0）**：三个本地引擎——**sherpa-onnx（默认）**、**faster-whisper（extra）**、**transformers（extra，含 torch）**；寻址 `local/<model>` / `faster-whisper/<model>` / **`transformers/<任意 HF id>`（开放寻址）** + 裸名简写（落默认引擎）+ `:tag` 精度；云端 `provider/model`。`asrkit engine list/install` 管理引擎；`is_installed`/`install` 已下沉到各 adapter。
+**现状（已实现，0.3.0）**：四个本地引擎——**sherpa-onnx（默认）**、**faster-whisper**、**transformers（含 torch）**、**whisper.cpp**；+ **entry-point 第三方引擎插件**；+ **sherpa 用户模型注册表**（模型开放）。寻址 `local/<model>` / `faster-whisper/<model>` / `whispercpp/<model>` / **`transformers/<任意 HF id>`** + 裸名简写 + `:tag`；云端 `provider/model`。`asrkit engine list/install` 管理引擎；`is_installed`/`install` 下沉各 adapter。
 
 **路线（未实现，已留口子）**：更多引擎（whisper.cpp / transformers/vLLM）；entry-point 第三方引擎插件；`local/` 作"默认引擎"别名的进一步统一。
 
@@ -127,7 +127,7 @@ asrkit run  siliconflow/sensevoice a.wav --api-key <KEY>
 
 ## 八、引擎作为可选组件（0.2.0 起部分实现）
 
-> 状态：pip extras + `asrkit engine list/install` + 懒加载/友好报错 + 可插拔 install + 开放 provider = **已实现**（faster-whisper、transformers 为首批）；entry-point 第三方插件 = 路线。
+> 状态（0.3.0）：pip extras + `asrkit engine list/install` + 懒加载/友好报错 + 可插拔 install + 开放 provider + **entry-point 第三方插件** + **sherpa 用户模型注册表** = **全部已实现**。首批第一方引擎：faster-whisper、transformers、whisper.cpp。扩展实操见 §九。
 
 引擎不像模型是"下个权重文件"，它是**一个 Python 包**（含代码+二进制、有依赖树）。所以：
 
@@ -183,10 +183,52 @@ asrkit run faster-whisper/whisper-small a.wav
 1. **懒加载 + 友好错误**：引擎库只在真正推理时 import；缺了返回"装这个引擎"的提示。没装某引擎的人，`list` / `pull sherpa/...` 一切照常。
 2. **`engine install` 用 `sys.executable -m pip`**：即用 asrkit 当前所在的 Python/venv 去装，避免装错环境；执行前回显真实 `pip install ...` 命令（透明）。默认真跑（Ollama 式），留 `--print-only` 逃生舱。
 
-### 落地顺序（真做时）
+---
 
-1. pyproject 加引擎 extras + 写第 2 个引擎 adapter（建议 faster-whisper，验证多引擎跑通）；
-2. 加 `asrkit engine list/install/rm/default` 命令；
-3. 补 entry-point 插件文档（第三方引擎接入指南）。
+## 九、扩展实操（0.3.0）
 
-依赖：**先真接一个第二引擎才有意义**（否则命令是空架子）。当前为 `路线`，不实现。
+### 加一个自定义 sherpa 模型（模型开放）
+
+不在内置 47 表里的 sherpa 模型，写进 `~/.asrkit/models.json`（或 `$ASRKIT_MODELS_JSON`）即可：
+
+```json
+[
+  {
+    "id": "local/my-firered",
+    "download_url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/xxx.tar.bz2",
+    "config_type": "fireRedAsrCtc",
+    "langs": ["zh", "en"]
+  }
+]
+```
+
+然后 `asrkit pull local/my-firered` → `asrkit run local/my-firered a.wav`。
+字段：`id`（必填）、`download_url`、`config_type`（引擎架构，见 local_sherpa 支持列表）、`langs`；可选 `provider`（默认 sherpa-onnx）、`tag`、`base`、`sha256`。
+
+### 写一个引擎插件（引擎开放）
+
+第三方包让任何人加引擎，无需改 asrkit 核心：
+
+1. 你的包里写一个 adapter 模块，导入时自注册：
+```python
+# asrkit_vosk/adapter.py
+from asrkit.registry import register_protocol, register_models
+from asrkit.types import AdapterMeta, BaseAdapter, TranscribeResult
+
+@register_protocol("vosk")
+class Vosk(BaseAdapter):
+    def is_installed(self): ...
+    def install(self, log=print): ...
+    def transcribe(self, audio, opts): ...
+
+register_models([AdapterMeta(id="vosk/small-en", provider="vosk", vendor="vosk",
+    name="Vosk small (en)", source="local", modes=["batch"], langs=["en"])])
+```
+2. 在你的 `pyproject.toml` 声明 entry point：
+```toml
+[project.entry-points."asrkit.adapters"]
+vosk = "asrkit_vosk.adapter"
+```
+3. `pip install asrkit-vosk` → asrkit 启动时自动发现、导入、注册；用户即可 `asrkit run vosk/small-en a.wav`。
+
+契约细节见 `adapter-spec.md`。这就是"无偏见开放"：项目不当裁判，任何引擎都能插进来、且住在自己的包里（核心零维护负担）。

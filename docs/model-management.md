@@ -68,6 +68,7 @@ sensevoice:
 - **独立包** → 不同 `download_url`。
 - **只有一种** → 只登记一个 tag。
 - **无需自建服务器**：`download_url` 直连 sherpa-onnx 的 GitHub releases。数据源：你已有的 `models.dart` / `registry.json` / 下载脚本。
+- **用户自定义模型（模型开放）**：不在内置表里的 sherpa 模型，写进 `~/.asrkit/models.json`（或 `$ASRKIT_MODELS_JSON`）即 `pull` 即用，无需改包。字段与实操见 `engines-and-addressing.md §九`。
 
 ---
 

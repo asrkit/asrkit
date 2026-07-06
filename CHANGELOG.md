@@ -2,6 +2,19 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.3.0] - 未发布
+
+主题：**全开放** —— 引擎开放 + 模型开放。
+
+### 新增
+- **entry-point 插件机制**：第三方可发布 `asrkit-<engine>` 包，用 `[project.entry-points."asrkit.adapters"]` 声明；`pip install` 即自动发现注册（坏插件不连坐）。加引擎无需改核心。
+- **whisper.cpp 引擎**（`pip install "asrkit[whispercpp]"`）：`whispercpp/<model>`，超轻量（无 torch/onnx）。
+- **sherpa 模型开放：用户模型注册表** `~/.asrkit/models.json`（或 `$ASRKIT_MODELS_JSON`）——登记任意 sherpa 模型（id/download_url/config_type/langs）即 `pull` 即用，无需改包。
+- 至此：四个本地引擎（sherpa-onnx / faster-whisper / transformers / whisper.cpp）+ 云端 + 第三方插件 + 开放寻址（transformers 任意 HF id、sherpa 用户注册表）。
+
+### 说明
+- 默认仍只带 sherpa-onnx；引擎按需装或走插件。
+
 ## [0.2.0] - 未发布
 
 ### 新增
