@@ -80,6 +80,8 @@ def _metas():
             modes=["streaming"] if streaming else ["batch"],
             langs=langs,
             model_kind="asr",
+            # whisper 是 30s 定长窗口，超长会截断 → 引擎据此发 warnings（见 D-3）
+            capabilities={"max_input_duration_s": 30} if ctype == "whisper" else {},
             config_type=ctype,
             download_url=f"{_BASE}/{asset}.tar.bz2",
             base=_BASE_OVERRIDE.get(folder, folder),

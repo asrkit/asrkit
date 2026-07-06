@@ -11,6 +11,7 @@ import os
 import time
 
 from .. import store
+from ..audio import AudioFormatError, load_samples
 from ..registry import register_protocol
 from ..types import AudioInput, BaseAdapter, TranscribeOptions, TranscribeResult
 
@@ -134,6 +135,28 @@ def _decode_online(rec, samples, sr):
     return rec.get_result(st)
 
 
+def _vad_segments(samples, sr, vad_model):
+    """opt-in 长音频分段：silero-VAD 按停顿切段。移植自 worker.py:vad_segments。"""
+    import numpy as np
+    import sherpa_onnx as so
+    cfg = so.VadModelConfig()
+    cfg.silero_vad.model = vad_model
+    cfg.silero_vad.min_silence_duration = 0.5
+    cfg.silero_vad.max_speech_duration = 20.0
+    cfg.sample_rate = sr
+    vad = so.VoiceActivityDetector(cfg, buffer_size_in_seconds=180)
+    win = 512
+    for i in range(0, len(samples) - win + 1, win):
+        vad.accept_waveform(samples[i:i + win])
+    if hasattr(vad, "flush"):
+        vad.flush()
+    segs = []
+    while not vad.empty():
+        segs.append(np.ascontiguousarray(vad.front.samples, dtype=np.float32))
+        vad.pop()
+    return segs or [samples]
+
+
 @register_protocol("sherpa-onnx")
 class SherpaLocal(BaseAdapter):
     def __init__(self, meta, config=None):
@@ -148,6 +171,17 @@ class SherpaLocal(BaseAdapter):
             if not os.path.isdir(d):
                 return TranscribeResult(
                     text="", error=f"模型未安装：{self.meta.id}。先运行 `asrkit pull {self.meta.id}`")
+
+            # 解码 + 格式守卫（内核零处理，解码在此；convert=False 时不符即诚实报错）
+            try:
+                samples, sr = load_samples(audio.original_path, 16000, 1, convert=opts.convert)
+            except AudioFormatError as e:
+                return TranscribeResult(text="", error=str(e))
+
+            dur = len(samples) / sr if sr else 0.0
+            warnings = []
+            win = self.meta.capabilities.get("max_input_duration_s")
+
             t0 = time.perf_counter()
             if self._rec is None:
                 self._rec = _build(self.meta.config_type, d, 4,
@@ -155,16 +189,37 @@ class SherpaLocal(BaseAdapter):
             load_ms = int((time.perf_counter() - t0) * 1000)
 
             t1 = time.perf_counter()
-            r = (_decode_online if streaming else _decode_offline)(
-                self._rec, audio.samples, audio.sample_rate)
+            if streaming:
+                r = _decode_online(self._rec, samples, sr)
+                text = r if isinstance(r, str) else getattr(r, "text", str(r))
+                lang = getattr(r, "lang", "") or None
+            elif opts.segment and win and dur > win:
+                # opt-in 长音频分段（需 VAD 模型）
+                vad_model = self.config.get("vad_model") or os.environ.get("ASRKIT_VAD_MODEL")
+                if not vad_model or not os.path.exists(vad_model):
+                    return TranscribeResult(
+                        text="", error="开启 --segment 需要 VAD 模型：请设 ASRKIT_VAD_MODEL "
+                        "或 config['vad_model'] 指向 silero_vad.onnx。")
+                parts = []
+                for seg in _vad_segments(samples, sr, vad_model):
+                    rr = _decode_offline(self._rec, seg, sr)
+                    parts.append((rr if isinstance(rr, str) else getattr(rr, "text", "")).strip())
+                text = " ".join(p for p in parts if p)
+                lang = None
+            else:
+                r = _decode_offline(self._rec, samples, sr)
+                text = r if isinstance(r, str) else getattr(r, "text", str(r))
+                lang = getattr(r, "lang", "") or None
+                if win and dur > win:
+                    warnings.append(
+                        f"音频 {dur:.0f}s 超过该模型窗口 {win}s，可能仅识别前 {win}s；"
+                        f"完整识别请加 --segment / opts.segment=True。")
             decode_ms = int((time.perf_counter() - t1) * 1000)
 
-            text = r if isinstance(r, str) else getattr(r, "text", str(r))
-            lang = getattr(r, "lang", "") or None
-            dur = audio.duration_s or (len(audio.samples) / audio.sample_rate)
             return TranscribeResult(
                 text=(text or "").strip(), lang=lang, latency_ms=load_ms + decode_ms,
                 metrics={"load_ms": load_ms, "decode_ms": decode_ms,
-                         "rtf": round((decode_ms / 1000) / dur, 4) if dur else None})
+                         "rtf": round((decode_ms / 1000) / dur, 4) if dur else None},
+                warnings=warnings or None)
         except Exception as e:
             return TranscribeResult(text="", error=f"{type(e).__name__}: {e}")

@@ -7,10 +7,11 @@ from typing import Any, Iterable, Iterator, List, Optional
 
 @dataclass
 class AudioInput:
-    """仅用于 batch。平台已归一化为 16kHz 单声道 float32；samples 与 path 双备。"""
-    samples: Any                       # np.ndarray float32 [-1,1], 16kHz mono
-    path: str                          # 已归一化的 16k 单声道 WAV 文件路径
-    sample_rate: int = 16000
+    """仅用于 batch。内核零处理：只持有原始文件路径。
+    云端 adapter 原样上传 original_path；本地 adapter 按需解码（见 audio.load_samples）。"""
+    original_path: str                 # 原始音频文件（未改动）
+    samples: Any = None                # 解码后的 float32（本地 adapter 填）；内核不填
+    sample_rate: int = 0               # samples 的采样率
     duration_s: Optional[float] = None
 
 
@@ -30,6 +31,7 @@ class TranscribeResult:
     latency_ms: Optional[int] = None
     cost_estimate: Optional[float] = None
     metrics: Optional[dict] = None                 # {load_ms, decode_ms, rtf, rss_peak_mb, ...}
+    warnings: Optional[List[str]] = None           # 非致命提示（如长音频超窗只处理前 Ns）；CLI 应打印
     raw_response: Optional[dict] = None
     error: Optional[str] = None
 
@@ -40,6 +42,8 @@ class TranscribeOptions:
     enable_punctuation: bool = True
     enable_itn: bool = True
     word_timestamps: bool = False
+    convert: bool = False              # opt-in：自动解码/重采样/混单声道适配本地引擎；默认关（不符则报错）
+    segment: bool = False             # opt-in：长音频 VAD 分段拼接；默认关（超窗仅警告）
 
 
 @dataclass

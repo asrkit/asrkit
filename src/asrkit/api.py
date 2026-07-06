@@ -4,7 +4,6 @@ from __future__ import annotations
 from typing import List, Optional, Union
 
 from . import registry, store
-from .audio import load_audio
 from .types import AdapterMeta, AudioInput, TranscribeOptions, TranscribeResult
 
 
@@ -18,7 +17,7 @@ def transcribe(
     """换个 model 字符串即切换端/云模型。"""
     adapter = registry.make_adapter(model, config or {})
     if isinstance(audio, str):
-        audio = load_audio(audio)
+        audio = AudioInput(original_path=audio)   # 内核零处理：不解码，adapter 各取所需
     return adapter.transcribe(audio, opts or TranscribeOptions())
 
 

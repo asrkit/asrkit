@@ -10,6 +10,10 @@ from typing import Dict, List, Optional, Type
 
 from .types import AdapterMeta, BaseAdapter
 
+class ModelNotFoundError(Exception):
+    """未注册的模型 id / 别名（用普通异常，str() 不会像 KeyError 那样加引号）。"""
+
+
 _PROTOCOLS: Dict[str, Type[BaseAdapter]] = {}
 _MODELS: Dict[str, AdapterMeta] = {}
 _ALIASES: Dict[str, str] = {}   # 别名 -> 真实 id
@@ -53,14 +57,14 @@ def resolve(model_id: str) -> AdapterMeta:
         return _MODELS[model_id]
     if model_id in _ALIASES:
         return _MODELS[_ALIASES[model_id]]
-    raise KeyError(f"未注册的模型 '{model_id}'。用 `asrkit list` 查看全部。")
+    raise ModelNotFoundError(f"未注册的模型 '{model_id}'。用 `asrkit list` 查看全部。")
 
 
 def make_adapter(model_id: str, config: Optional[dict] = None) -> BaseAdapter:
     meta = resolve(model_id)
     cls = _PROTOCOLS.get(meta.provider)
     if cls is None:
-        raise KeyError(f"模型 '{model_id}' 的协议 '{meta.provider}' 没有对应 adapter。")
+        raise ModelNotFoundError(f"模型 '{model_id}' 的协议 '{meta.provider}' 没有对应 adapter。")
     return cls(meta, config or {})
 
 

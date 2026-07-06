@@ -24,7 +24,8 @@ class OpenAICompatible(BaseAdapter):
             base = self.config.get("base_url") or self.meta.default_base_url
             import requests  # asrkit[cloud] 依赖
             t0 = time.perf_counter()
-            with open(audio.path, "rb") as f:
+            # 透明原则：原始文件字节级原样上传，不解码/不重采样
+            with open(audio.original_path, "rb") as f:
                 resp = requests.post(
                     f"{base}/audio/transcriptions",
                     headers={"Authorization": f"Bearer {key}"},
