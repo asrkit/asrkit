@@ -73,8 +73,10 @@ class AdapterMeta:
     resource_id: str = ""
     # 本地
     config_type: str = ""
-    download_url: str = ""
+    download_url: str = ""          # 完整 tarball 地址
     install_files: List[str] = field(default_factory=list)
+    tag: str = ""                   # 精度标签（int8/fp32），Ollama 式
+    base: str = ""                  # 逻辑模型名（多精度共享，寻址用 base:tag）
 
 
 class BaseAdapter:

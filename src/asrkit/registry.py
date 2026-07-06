@@ -1,8 +1,8 @@
-"""注册中心：两层——协议 adapter（按 provider）+ 模型表（按 id）。
+"""注册中心：协议 adapter（按 provider）+ 模型表（按 id）+ Ollama 式别名。
 
-    provider ──▶ 一个协议 adapter 类（sherpa-onnx / openai / deepgram …）
-    model id ──▶ 一条 AdapterMeta（含 provider、config_type、model 等）
-    make_adapter(id) = 用 meta.provider 找到协议类，实例化到该模型。
+    provider ──▶ 协议 adapter 类（sherpa-onnx / openai / …）
+    model id ──▶ 一条 AdapterMeta
+    别名：local/<base>[:<tag>] ──▶ 具体 id（默认 tag 优先 int8）
 """
 from __future__ import annotations
 
@@ -10,8 +10,9 @@ from typing import Dict, List, Optional, Type
 
 from .types import AdapterMeta, BaseAdapter
 
-_PROTOCOLS: Dict[str, Type[BaseAdapter]] = {}   # provider -> 协议 adapter 类
-_MODELS: Dict[str, AdapterMeta] = {}            # model id -> meta
+_PROTOCOLS: Dict[str, Type[BaseAdapter]] = {}
+_MODELS: Dict[str, AdapterMeta] = {}
+_ALIASES: Dict[str, str] = {}   # 别名 -> 真实 id
 
 
 def register_protocol(provider: str):
@@ -23,18 +24,40 @@ def register_protocol(provider: str):
 
 def register_model(meta: AdapterMeta) -> None:
     _MODELS[meta.id] = meta
+    _rebuild_aliases()
 
 
 def register_models(metas: List[AdapterMeta]) -> None:
     for m in metas:
         _MODELS[m.id] = m
+    _rebuild_aliases()
+
+
+def _rebuild_aliases() -> None:
+    _ALIASES.clear()
+    groups: Dict[str, list] = {}
+    for m in _MODELS.values():
+        if not m.base:
+            continue
+        prefix = m.id.split("/", 1)[0]                 # "local"
+        _ALIASES[f"{prefix}/{m.base}:{m.tag}"] = m.id  # 显式 base:tag
+        groups.setdefault(f"{prefix}/{m.base}", []).append(m)
+    for basekey, ms in groups.items():
+        default = next((x for x in ms if x.tag == "int8"), ms[0])
+        _ALIASES.setdefault(basekey, default.id)       # 不覆盖真实 id
+
+
+def resolve(model_id: str) -> AdapterMeta:
+    load_builtin()
+    if model_id in _MODELS:
+        return _MODELS[model_id]
+    if model_id in _ALIASES:
+        return _MODELS[_ALIASES[model_id]]
+    raise KeyError(f"未注册的模型 '{model_id}'。用 `asrkit list` 查看全部。")
 
 
 def make_adapter(model_id: str, config: Optional[dict] = None) -> BaseAdapter:
-    load_builtin()
-    if model_id not in _MODELS:
-        raise KeyError(f"未注册的模型 '{model_id}'。用 `asrkit list` 查看全部。")
-    meta = _MODELS[model_id]
+    meta = resolve(model_id)
     cls = _PROTOCOLS.get(meta.provider)
     if cls is None:
         raise KeyError(f"模型 '{model_id}' 的协议 '{meta.provider}' 没有对应 adapter。")
@@ -53,6 +76,5 @@ def load_builtin() -> None:
     global _loaded
     if _loaded:
         return
-    # 导入即注册：协议 + 模型表
     from .adapters import cloud_openai, local_sherpa, models_local  # noqa: F401
     _loaded = True

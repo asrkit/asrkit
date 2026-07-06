@@ -1,9 +1,9 @@
-"""高层 API：transcribe(model=..., audio=...)。"""
+"""高层 API：transcribe / pull / run / list_models。"""
 from __future__ import annotations
 
 from typing import List, Optional, Union
 
-from . import registry
+from . import registry, store
 from .audio import load_audio
 from .types import AdapterMeta, AudioInput, TranscribeOptions, TranscribeResult
 
@@ -20,6 +20,29 @@ def transcribe(
     if isinstance(audio, str):
         audio = load_audio(audio)
     return adapter.transcribe(audio, opts or TranscribeOptions())
+
+
+def pull(model: str, *, config: Optional[dict] = None, log=print) -> str:
+    """下载并安装一个本地模型（Ollama 式）。返回模型目录。"""
+    meta = registry.resolve(model)
+    if meta.source != "local":
+        raise ValueError(f"{model} 是云端模型，无需下载（配置 API Key 即可用）。")
+    return store.pull(meta, config or {}, log=log)
+
+
+def run(
+    model: str,
+    audio: Union[str, AudioInput],
+    *,
+    config: Optional[dict] = None,
+    opts: Optional[TranscribeOptions] = None,
+    log=print,
+) -> TranscribeResult:
+    """Ollama 式一步到位：本地模型缺失则先下载，再转写。"""
+    meta = registry.resolve(model)
+    if meta.source == "local" and not store.is_installed(meta, config or {}):
+        pull(model, config=config, log=log)
+    return transcribe(model, audio, config=config, opts=opts)
 
 
 def list_models() -> List[AdapterMeta]:

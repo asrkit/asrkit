@@ -6,6 +6,34 @@ import sys
 from typing import Optional
 
 
+def _cfg(a) -> dict:
+    cfg = {}
+    if getattr(a, "model_dir", None):
+        cfg["model_dir"] = a.model_dir
+    if getattr(a, "api_key", None):
+        cfg["api_key"] = a.api_key
+    if getattr(a, "base_url", None):
+        cfg["base_url"] = a.base_url
+    return cfg
+
+
+def _print_result(r) -> int:
+    if r.error:
+        print(f"[错误] {r.error}", file=sys.stderr)
+        return 1
+    print(r.text)
+    bits = []
+    if r.latency_ms is not None:
+        bits.append(f"{r.latency_ms}ms")
+    if r.lang:
+        bits.append(f"lang={r.lang}")
+    if r.metrics and r.metrics.get("rtf") is not None:
+        bits.append(f"rtf={r.metrics['rtf']}")
+    if bits:
+        print("  (" + ", ".join(bits) + ")", file=sys.stderr)
+    return 0
+
+
 def main(argv: Optional[list] = None) -> int:
     p = argparse.ArgumentParser(
         prog="asrkit",
@@ -13,47 +41,51 @@ def main(argv: Optional[list] = None) -> int:
     )
     sub = p.add_subparsers(dest="cmd")
 
-    sub.add_parser("list", help="列出已注册模型")
+    sub.add_parser("list", help="列出模型（✓=已安装）")
 
-    tp = sub.add_parser("transcribe", help="转写一个音频文件")
-    tp.add_argument("audio", help="音频文件路径")
-    tp.add_argument("-m", "--model", required=True, help="模型 id，如 local/sensevoice")
-    tp.add_argument("--model-dir", default=None, help="本地模型目录")
-    tp.add_argument("--api-key", default=None, help="云端 API Key")
-    tp.add_argument("--base-url", default=None, help="云端 Base URL 覆盖")
+    pp = sub.add_parser("pull", help="下载一个本地模型")
+    pp.add_argument("model")
+
+    rp = sub.add_parser("run", help="缺则下载 + 转写（Ollama 式）")
+    rp.add_argument("model")
+    rp.add_argument("audio")
+    rp.add_argument("--api-key", default=None)
+    rp.add_argument("--base-url", default=None)
+
+    tp = sub.add_parser("transcribe", help="转写（不自动下载）")
+    tp.add_argument("audio")
+    tp.add_argument("-m", "--model", required=True)
+    tp.add_argument("--model-dir", default=None)
+    tp.add_argument("--api-key", default=None)
+    tp.add_argument("--base-url", default=None)
 
     a = p.parse_args(argv)
-    from . import api
+    from . import api, registry, store
 
     if a.cmd == "list":
         for m in api.list_models():
-            flag = "☁️ " if m.source == "cloud" else "💻"
-            print(f"{flag} {m.id:26s} {m.name}")
+            if m.source == "cloud":
+                mark, flag = " ", "☁️ "
+            else:
+                mark = "✓" if store.is_installed(m) else " "
+                flag = "💻"
+            print(f"{mark} {flag} {m.id:26s} {m.name}")
         return 0
 
-    if a.cmd == "transcribe":
-        cfg = {}
-        if a.model_dir:
-            cfg["model_dir"] = a.model_dir
-        if a.api_key:
-            cfg["api_key"] = a.api_key
-        if a.base_url:
-            cfg["base_url"] = a.base_url
-        r = api.transcribe(a.model, a.audio, config=cfg)
-        if r.error:
-            print(f"[错误] {r.error}", file=sys.stderr)
+    if a.cmd == "pull":
+        try:
+            d = api.pull(a.model)
+            print(f"✓ {a.model} → {d}")
+            return 0
+        except Exception as e:
+            print(f"[错误] {e}", file=sys.stderr)
             return 1
-        print(r.text)
-        bits = []
-        if r.latency_ms is not None:
-            bits.append(f"{r.latency_ms}ms")
-        if r.lang:
-            bits.append(f"lang={r.lang}")
-        if r.metrics and r.metrics.get("rtf") is not None:
-            bits.append(f"rtf={r.metrics['rtf']}")
-        if bits:
-            print("  (" + ", ".join(bits) + ")", file=sys.stderr)
-        return 0
+
+    if a.cmd == "run":
+        return _print_result(api.run(a.model, a.audio, config=_cfg(a)))
+
+    if a.cmd == "transcribe":
+        return _print_result(api.transcribe(a.model, a.audio, config=_cfg(a)))
 
     p.print_help()
     return 0
