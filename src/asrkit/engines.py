@@ -9,7 +9,7 @@ import importlib.util
 
 # name -> (python module to probe for availability, pip extra)
 ENGINES = {
-    "sherpa-onnx":    ("sherpa_onnx", "local"),            # 默认端侧引擎（47 模型）
+    "sherpa-onnx":    ("sherpa_onnx", "sherpa"),           # 默认端侧引擎（47 模型）
     "faster-whisper": ("faster_whisper", "faster-whisper"),
     "transformers":   ("transformers", "transformers"),    # 接整个 HF ASR 生态（重,含 torch）
     "whispercpp":     ("pywhispercpp", "whispercpp"),      # whisper.cpp,超轻量（无 torch/onnx）

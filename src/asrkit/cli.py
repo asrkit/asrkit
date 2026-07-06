@@ -314,7 +314,7 @@ def main(argv: Optional[list] = None) -> int:
             import subprocess
             extra = engines.extra_of(a.name)
             if extra is None:
-                print(f"[error] unknown or built-in engine '{a.name}'", file=sys.stderr)
+                print(f"[error] unknown engine '{a.name}' (see: asrkit engine list)", file=sys.stderr)
                 return 1
             cmd = [sys.executable, "-m", "pip", "install", f"asrkit[{extra}]"]
             print("running:", " ".join(cmd))

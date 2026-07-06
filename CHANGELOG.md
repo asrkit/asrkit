@@ -24,6 +24,8 @@
 - **依赖分层**：`sherpa`(=默认端侧引擎，含 numpy/soundfile/soxr)、`whispercpp`、`faster-whisper`、`transformers`、`serve` 各自 extra；`local`=sherpa，`engines`=全引擎，`all`=引擎+serve；`cloud` 内置（空别名）。
 - **单一版本源**已在 0.4.x 生效（hatchling 从 `__init__.py` 读）。
 - 安装文档改为**分层 + 推荐 `pipx` / `uv tool install`**（当工具用，不折腾 Python 环境）。
+- `asrkit engine install sherpa-onnx` 对齐到 `asrkit[sherpa]`（不再跳成 `local`）；未知引擎报错去掉过时的 "built-in" 措辞。
+- 定位澄清：引擎（共享 pip 包）asrkit 只帮装（用对的环境）、不代卸（卸归 `pip uninstall`，你的环境你做主）；模型（asrkit 独占）`pull`/`rm` 对称管理。
 
 ### 说明
 - 云端秒装即用（`pip install asrkit` → 只有 asrkit + requests）；`asrkit serve` 的**调用方**零 asrkit 依赖（走 HTTP）。
