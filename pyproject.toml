@@ -20,6 +20,18 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
+dependencies = []
+
+[project.optional-dependencies]
+# 端侧本地推理（sherpa-onnx 全家桶）+ 音频归一化
+local = ["sherpa-onnx>=1.10", "numpy", "soundfile", "soxr"]
+# 云端 API + 音频归一化
+cloud = ["requests", "numpy", "soundfile", "soxr"]
+all = ["asrkit[local]", "asrkit[cloud]"]
+
+[project.scripts]
+asrkit = "asrkit.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/asrkit/asrkit"
 Repository = "https://github.com/asrkit/asrkit"
