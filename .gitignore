@@ -1,0 +1,20 @@
+# --- 内部资料，禁止发布 ---
+ASR全景调研/
+.omc/
+
+# --- 构建产物 ---
+dist/
+build/
+*.egg-info/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# --- OS / 编辑器 ---
+.DS_Store
+.idea/
+.vscode/
