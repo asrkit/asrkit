@@ -2,7 +2,26 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [0.3.1] - 未发布
+## [0.4.0] - 2026-07-06
+
+主题：**云端第 2 波** —— 火山豆包（双版本）、阿里百炼、ElevenLabs、OpenAI Whisper 全部接入（协议移植自作者已真机接通的 asr_bench）。
+
+### 新增
+- **火山引擎 / 豆包**（`doubao` 协议，submit + poll）：`doubao/auc-2`（2.0 Seed，`volc.seedasr.auc`）与 `doubao/auc-1`（1.0，`volc.bigasr.auc`）。双鉴权：新版单 `api_key`（`x-api-key`）或旧版 `app_key` + `access_key`。
+- **阿里云百炼 / DashScope**：
+  - `dashscope/qwen3-asr-flash`（`qwen` 协议，compatible chat/completions，input_audio-only）。
+  - `dashscope/fun-asr-flash`（`funasr-flash` 协议，原生 multimodal-generation）。
+  - `dashscope/qwen-omni-plus` / `dashscope/qwen-omni-flash`（`qwen-omni` 协议，audio LLM，标 experimental）。
+- **ElevenLabs Scribe**（`elevenlabs` 协议，multipart + `xi-api-key`）：`elevenlabs/scribe-v1`。
+- **OpenAI Whisper**：`openai/whisper-1`；**硅基流动 TeleSpeech**：`siliconflow/telespeech`（复用 openai 协议）。
+- **CLI**：`--app-key` / `--access-key`（火山双密钥）。
+- **环境变量兜底扩展**：除 `<VENDOR>_API_KEY` 外，双密钥厂商支持 `<VENDOR>_APP_KEY` / `<VENDOR>_ACCESS_KEY`（如 `DOUBAO_APP_KEY` / `DOUBAO_ACCESS_KEY`）。
+
+### 说明
+- 云端 adapter 沿用透明原则：原始文件字节级上传，不解码/不重采样。
+- 所有 adapter 不抛异常，错误进 `TranscribeResult.error`。
+
+## [0.3.1] - 2026-07-06
 
 ### 新增
 - **`asrkit add-model`** —— 一条命令注册自定义 sherpa 模型（写入 `~/.asrkit/models.json`），无需手动编辑文件：

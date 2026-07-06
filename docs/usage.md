@@ -109,8 +109,9 @@ transcribe("siliconflow/sensevoice", "a.wav", config={"api_key": "<KEY>"})
 - **端侧 47 个模型 / 14 种架构**：paraformer、senseVoice、whisper、moonshine(v1/v2)、
   transducer(离线/流式/NeMo)、telespeech、fireRed(CTC/AED)、qwen3-asr、funasr-nano、
   dolphin、omnilingual —— 统一由一个 sherpa-onnx adapter 处理，全部可 `pull` 即用。
-- **云端**：OpenAI 兼容协议已接（OpenAI / 硅基流动等）。Deepgram / DashScope / 火山豆包 /
-  ElevenLabs 陆续接入。
+- **云端**：硅基流动（SenseVoice 免费 / TeleSpeech）、OpenAI（whisper-1）、阿里云百炼
+  （Qwen3-ASR / Fun-ASR-Flash / Qwen-Omni）、火山引擎豆包（录音文件识别 1.0 / 2.0，
+  submit+poll）、ElevenLabs（Scribe）均已接入。密钥自带，寻址 `<厂商>/<模型>`。
 - **多引擎**：默认 sherpa-onnx；可选装 faster-whisper（`faster-whisper/<model>`）、whisper.cpp（`whispercpp/<model>`）、transformers（**`transformers/<任意 HF 模型 id>`**，接整个 HuggingFace ASR 生态）。`asrkit engine list` / `install <name>` 管理引擎。
 - **全开放扩展**：加自定义 sherpa 模型（`asrkit add-model <id> --url <tarball> --arch <type>`，或已有文件加 `--model-dir`）、写第三方引擎插件（`pip install asrkit-<engine>` 自动接入）——实操见 `docs/engines-and-addressing.md §九`。
 - **扩展**：非内置的引擎/模型，照 `docs/adapter-spec.md` 写一个 adapter 即可接入（见该文档与 `engines-and-addressing.md`）。

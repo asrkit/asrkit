@@ -85,11 +85,17 @@ def make_adapter(model_id: str, config: Optional[dict] = None) -> BaseAdapter:
     if cls is None:
         raise ModelNotFoundError(f"model '{model_id}': no adapter for provider '{meta.provider}'.")
     config = dict(config or {})
-    # H-05：云端 key 环境变量兜底 <VENDOR>_API_KEY（显式 config 优先）
-    if meta.source == "cloud" and not config.get("api_key") and meta.vendor:
-        env = os.environ.get(f"{meta.vendor.upper()}_API_KEY")
-        if env:
-            config["api_key"] = env
+    # H-05：云端凭据环境变量兜底（显式 config 优先）。<VENDOR>_API_KEY，
+    # 以及双密钥厂商（如火山 doubao）的 <VENDOR>_APP_KEY / <VENDOR>_ACCESS_KEY。
+    if meta.source == "cloud" and meta.vendor:
+        vp = meta.vendor.upper()
+        for cfg_key, env_suffix in (("api_key", "API_KEY"),
+                                    ("app_key", "APP_KEY"),
+                                    ("access_key", "ACCESS_KEY")):
+            if not config.get(cfg_key):
+                env = os.environ.get(f"{vp}_{env_suffix}")
+                if env:
+                    config[cfg_key] = env
     return cls(meta, config)
 
 
@@ -106,6 +112,9 @@ def load_builtin() -> None:
     if _loaded:
         return
     from .adapters import (  # noqa: F401
+        cloud_dashscope,
+        cloud_doubao,
+        cloud_elevenlabs,
         cloud_openai,
         local_faster_whisper,
         local_sherpa,

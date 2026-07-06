@@ -64,3 +64,32 @@ register_model(AdapterMeta(
         "base_url": {"type": "string", "required": False, "label": "Base URL override"},
     },
 ))
+
+register_model(AdapterMeta(
+    id="siliconflow/telespeech",
+    provider="openai",
+    vendor="siliconflow",
+    name="TeleSpeechASR (SiliconFlow)",
+    source="cloud",
+    modes=["batch"],
+    langs=["zh"],
+    model_kind="asr",
+    default_base_url="https://api.siliconflow.cn/v1",
+    model="TeleAI/TeleSpeechASR",
+    config_schema={"api_key": {"type": "secret", "required": True, "label": "SiliconFlow API Key"}},
+))
+
+register_model(AdapterMeta(
+    id="openai/whisper-1",
+    provider="openai",
+    vendor="openai",
+    name="Whisper (OpenAI whisper-1)",
+    source="cloud",
+    modes=["batch"],
+    langs=["zh", "en", "ja", "ko"],
+    model_kind="asr",
+    pricing={"unit": "hour", "cny": 2.6},
+    default_base_url="https://api.openai.com/v1",
+    model="whisper-1",
+    config_schema={"api_key": {"type": "secret", "required": True, "label": "OpenAI API Key"}},
+))

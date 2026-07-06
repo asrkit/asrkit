@@ -14,6 +14,10 @@ def _cfg(a) -> dict:
         cfg["api_key"] = a.api_key
     if getattr(a, "base_url", None):
         cfg["base_url"] = a.base_url
+    if getattr(a, "app_key", None):
+        cfg["app_key"] = a.app_key
+    if getattr(a, "access_key", None):
+        cfg["access_key"] = a.access_key
     return cfg
 
 
@@ -47,6 +51,10 @@ def _print_result(r) -> int:
 def _add_transcribe_flags(sp):
     sp.add_argument("--api-key", default=None)
     sp.add_argument("--base-url", default=None)
+    sp.add_argument("--app-key", default=None,
+                    help="Volcengine/Doubao App ID (X-Api-App-Key), pairs with --access-key")
+    sp.add_argument("--access-key", default=None,
+                    help="Volcengine/Doubao Access Key (X-Api-Access-Key)")
     sp.add_argument("--convert", action="store_true",
                     help="decode/resample/downmix to fit the local engine "
                          "(off by default: on mismatch it errors)")

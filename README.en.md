@@ -11,6 +11,8 @@
 
 ASRKit is **Ollama + LiteLLM for speech recognition**. Pull an on-device model and run it with one command; call a cloud API by changing one string; snap in a whole new inference engine as a plugin. One contract, everything behind it.
 
+> ⚠️ **Early beta, under active development.** The core interface is usable, but we're still iterating fast — APIs and addressing may change between minor versions. Try it and tell us what breaks.
+
 ```bash
 pip install asrkit
 asrkit run local/sensevoice audio.wav      # downloads on first run, then transcribes
@@ -60,7 +62,19 @@ print(transcribe("local/sensevoice", "audio.wav").text)
 | **faster-whisper** | `asrkit[faster-whisper]` | `faster-whisper/<model>` | fast Whisper, native long-audio |
 | **whisper.cpp** | `asrkit[whispercpp]` | `whispercpp/<model>` | ultra-light Whisper (no torch/onnx) |
 | **transformers** | `asrkit[transformers]` | `transformers/<any-hf-id>` | the whole HuggingFace ASR hub + LLM-arch SOTA |
-| **cloud** (OpenAI-compatible) | built-in | `siliconflow/sensevoice` | bring your own key |
+| **cloud** | built-in | `<vendor>/<model>` | see below, bring your own key |
+
+### Cloud vendors
+
+| Vendor | Addressing | Key |
+|---|---|---|
+| SiliconFlow | `siliconflow/sensevoice` (free), `siliconflow/telespeech` | `--api-key` |
+| OpenAI | `openai/whisper-1` | `--api-key` |
+| Alibaba DashScope | `dashscope/qwen3-asr-flash`, `dashscope/fun-asr-flash`, `dashscope/qwen-omni-plus`, `dashscope/qwen-omni-flash` | `--api-key` |
+| Volcengine / Doubao | `doubao/auc-2` (2.0 Seed), `doubao/auc-1` (1.0) | `--api-key`, or `--app-key` + `--access-key` |
+| ElevenLabs | `elevenlabs/scribe-v1` | `--api-key` |
+
+Keys also fall back to env vars: `<VENDOR>_API_KEY` (e.g. `DASHSCOPE_API_KEY`); Volcengine's dual key uses `DOUBAO_APP_KEY` / `DOUBAO_ACCESS_KEY`.
 
 ## Extend it
 

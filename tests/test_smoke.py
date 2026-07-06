@@ -9,7 +9,7 @@ from asrkit import audio, registry, store
 
 
 def test_version():
-    assert asrkit.__version__ == "0.3.1"
+    assert asrkit.__version__ == "0.4.0"
 
 
 def test_list_models():
@@ -20,6 +20,21 @@ def test_list_models():
     assert "siliconflow/sensevoice" in ids
     assert "faster-whisper/tiny" in ids   # 第二个引擎已注册（可选,懒加载）
     assert "whispercpp/tiny" in ids       # 第三个引擎
+    # 云端第 2 波：火山豆包（双版本）、阿里百炼、ElevenLabs、OpenAI whisper-1
+    for cid in ("doubao/auc-1", "doubao/auc-2", "dashscope/qwen3-asr-flash",
+                "dashscope/fun-asr-flash", "dashscope/qwen-omni-plus",
+                "elevenlabs/scribe-v1", "openai/whisper-1", "siliconflow/telespeech"):
+        assert cid in ids, cid
+
+
+def test_doubao_dual_key_env_injection(monkeypatch):
+    # 火山双密钥（app_key + access_key）环境变量兜底
+    monkeypatch.setenv("DOUBAO_APP_KEY", "app-x")
+    monkeypatch.setenv("DOUBAO_ACCESS_KEY", "acc-y")
+    a = registry.make_adapter("doubao/auc-2")
+    assert a.config.get("app_key") == "app-x"
+    assert a.config.get("access_key") == "acc-y"
+    assert a.is_configured()
 
 
 def test_user_models(tmp_path, monkeypatch):

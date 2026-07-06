@@ -11,6 +11,8 @@
 
 ASRKit 是**语音识别领域的 Ollama + LiteLLM**:一条命令拉起端侧模型就跑;换个字符串就切云端 API;想加一个全新的推理引擎,写成插件即可接入。一份契约,背后什么都能挂。
 
+> ⚠️ **早期 Beta,开发中。** 核心接口已可用,我们仍在积极迭代 —— 小版本间 API 与寻址可能调整。欢迎试用与反馈。
+
 ```bash
 pip install asrkit
 asrkit run local/sensevoice audio.wav      # 首次自动下载模型,然后识别
@@ -60,7 +62,19 @@ print(transcribe("local/sensevoice", "audio.wav").text)
 | **faster-whisper** | `asrkit[faster-whisper]` | `faster-whisper/<模型>` | 快速 Whisper,自带长音频分块 |
 | **whisper.cpp** | `asrkit[whispercpp]` | `whispercpp/<模型>` | 超轻量 Whisper(无 torch/onnx) |
 | **transformers** | `asrkit[transformers]` | `transformers/<任意 HF id>` | 整个 HuggingFace ASR 生态 + LLM 架构 SOTA |
-| **云端**(OpenAI 兼容) | 内置 | `siliconflow/sensevoice` | 密钥自带 |
+| **云端** | 内置 | `<厂商>/<模型>` | 见下表,密钥自带 |
+
+### 云端厂商
+
+| 厂商 | 寻址 | 密钥 |
+|---|---|---|
+| 硅基流动 | `siliconflow/sensevoice`(免费)、`siliconflow/telespeech` | `--api-key` |
+| OpenAI | `openai/whisper-1` | `--api-key` |
+| 阿里云百炼 | `dashscope/qwen3-asr-flash`、`dashscope/fun-asr-flash`、`dashscope/qwen-omni-plus`、`dashscope/qwen-omni-flash` | `--api-key` |
+| 火山引擎 / 豆包 | `doubao/auc-2`(2.0 Seed)、`doubao/auc-1`(1.0) | `--api-key` 或 `--app-key` + `--access-key` |
+| ElevenLabs | `elevenlabs/scribe-v1` | `--api-key` |
+
+密钥也可走环境变量兜底:`<厂商>_API_KEY`(如 `DASHSCOPE_API_KEY`),火山双密钥用 `DOUBAO_APP_KEY` / `DOUBAO_ACCESS_KEY`。
 
 ## 扩展
 
