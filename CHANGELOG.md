@@ -7,6 +7,22 @@
 > 2. 记 CHANGELOG —— 在下方加一节 `## [X.Y.Z] - YYYY-MM-DD`,分 `### 新增 / 变更 / 修复` 三段;**破坏性变更要醒目标出**。
 > 3. 打 tag 并推 —— `git tag -a vX.Y.Z -m "…" && git push origin main --tags`(tag 与 PyPI 版本一一对应)。
 
+## [0.5.0] - 2026-07-06
+
+主题：**工具 → 服务**（C 组）。坐实 "Ollama + **LiteLLM**" 的服务那一半。
+
+### 新增
+- **`asrkit serve`** —— OpenAI 兼容的本地转写服务（可选 extra `pip install "asrkit[serve]"`）：
+  - `POST /v1/audio/transcriptions`（multipart：`file` / `model` / `language` / `response_format`），`response_format` 支持 `json`(默认) / `verbose_json` / `text` / `srt` / `vtt`（复用 0.4.1 formats 模块）。
+  - `GET /v1/models`（OpenAI list 结构）、`GET /health`。
+  - 任何 OpenAI 客户端改 `base_url` 即可调用 ASRKit 背后的全部端云模型；云端密钥走 0.4.2 keystore，无需每次传。
+- **透明原则贯穿**：上传文件按原始字节落临时文件，不解码/不重采样，请求结束清理。
+- **安全默认**：绑 `127.0.0.1`（仅本机）；`--host 0.0.0.0` 显式警告暴露到网络。
+- 懒加载：`asrkit.server` 顶层不 import fastapi/uvicorn，基础安装不受影响；缺 extra 时友好报错。
+
+### 已知局限（0.5.x 后续）
+- 本地模型每请求重新加载（无常驻缓存）；无 `stream=true` / 无鉴权（本机工具定位）。
+
 ## [0.4.2] - 2026-07-06
 
 主题：**配置持久化**（B 组，见 `docs/roadmap-cli-completeness.md`）。让云端"像本地一样顺手"。

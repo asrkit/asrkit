@@ -76,6 +76,23 @@ print(transcribe("local/sensevoice", "audio.wav").text)
 
 Keys also fall back to env vars: `<VENDOR>_API_KEY` (e.g. `DASHSCOPE_API_KEY`); Volcengine's dual key uses `DOUBAO_APP_KEY` / `DOUBAO_ACCESS_KEY`.
 
+## Run it as a server: OpenAI-compatible endpoint
+
+`asrkit serve` starts a local server; any app built on the OpenAI SDK reaches every model behind it by changing one `base_url` — this is the "LiteLLM proxy" half:
+
+```bash
+pip install "asrkit[serve]"
+asrkit config set-key dashscope <KEY>     # store a key once (only for cloud)
+asrkit serve                              # 127.0.0.1:11435 by default, local only
+```
+```python
+from openai import OpenAI
+c = OpenAI(base_url="http://localhost:11435/v1", api_key="unused")
+c.audio.transcriptions.create(model="local/sensevoice", file=open("a.wav", "rb"))
+```
+- Endpoints: `POST /v1/audio/transcriptions` (`response_format`: json/text/srt/vtt), `GET /v1/models`, `GET /health`.
+- Cloud keys come from the `asrkit config` keystore — no per-request key needed. Transparent: raw bytes uploaded, no decoding.
+
 ## Extend it
 
 **Add any sherpa model** — drop an entry in `~/.asrkit/models.json`:

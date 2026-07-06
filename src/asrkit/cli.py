@@ -140,6 +140,10 @@ def main(argv: Optional[list] = None) -> int:
     am.add_argument("--model-dir", default=None,
                     help="use already-downloaded files (symlinked into place)")
 
+    svp = sub.add_parser("serve", help="run an OpenAI-compatible transcription server")
+    svp.add_argument("--host", default="127.0.0.1", help="bind host (default: 127.0.0.1, local only)")
+    svp.add_argument("--port", type=int, default=11435, help="port (default: 11435)")
+
     rp = sub.add_parser("run", help="download if missing, then transcribe (Ollama-style)")
     rp.add_argument("model")
     rp.add_argument("audio")
@@ -324,6 +328,18 @@ def main(argv: Optional[list] = None) -> int:
             print(f"✓ default engine → {a.name} (bare model names now resolve to it)")
             return 0
         ep.print_help()
+        return 0
+
+    if a.cmd == "serve":
+        from . import server
+        if a.host not in ("127.0.0.1", "localhost"):
+            print(f"[warn] binding to {a.host} exposes the server to the network", file=sys.stderr)
+        print(f"asrkit serving on http://{a.host}:{a.port}  (OpenAI-compatible /v1)", file=sys.stderr)
+        try:
+            server.serve(host=a.host, port=a.port)
+        except RuntimeError as e:
+            print(f"[error] {e}", file=sys.stderr)
+            return 1
         return 0
 
     if a.cmd == "config":

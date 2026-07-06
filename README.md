@@ -76,6 +76,23 @@ print(transcribe("local/sensevoice", "audio.wav").text)
 
 密钥也可走环境变量兜底:`<厂商>_API_KEY`(如 `DASHSCOPE_API_KEY`),火山双密钥用 `DOUBAO_APP_KEY` / `DOUBAO_ACCESS_KEY`。
 
+## 当服务跑：OpenAI 兼容端点
+
+`asrkit serve` 起一个本地服务,任何用 OpenAI SDK 的应用改个 `base_url` 就能调用背后全部端云模型——这就是 "LiteLLM proxy" 那一半:
+
+```bash
+pip install "asrkit[serve]"
+asrkit config set-key dashscope <KEY>     # 密钥存一次(可选,云端才需)
+asrkit serve                              # 默认 127.0.0.1:11435,仅本机
+```
+```python
+from openai import OpenAI
+c = OpenAI(base_url="http://localhost:11435/v1", api_key="unused")
+c.audio.transcriptions.create(model="local/sensevoice", file=open("a.wav", "rb"))
+```
+- 端点:`POST /v1/audio/transcriptions`(`response_format` 支持 json/text/srt/vtt)、`GET /v1/models`、`GET /health`。
+- 云端密钥走 `asrkit config` 存的库,无需每次传;透明原则:原始字节上传,不解码。
+
 ## 扩展
 
 **加任意 sherpa 模型** —— 往 `~/.asrkit/models.json` 写一条:

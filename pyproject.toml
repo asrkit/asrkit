@@ -41,6 +41,8 @@ faster-whisper = ["faster-whisper"]
 transformers = ["transformers", "torch"]
 whispercpp = ["pywhispercpp"]
 engines = ["faster-whisper", "transformers", "torch", "pywhispercpp"]
+# 本地 OpenAI 兼容服务：asrkit serve（见 docs/roadmap-cli-completeness.md C 组）
+serve = ["fastapi", "uvicorn", "python-multipart"]
 # 兼容旧命令（0.1.x 曾用 asrkit[all]/[local]/[cloud]）；基础安装已含核心，这些为空别名。
 all = []
 local = []
