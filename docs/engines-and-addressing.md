@@ -122,3 +122,69 @@ asrkit run  siliconflow/sensevoice a.wav --api-key <KEY>
 **路线（未实现，已留口子）**：多本地引擎，用引擎名作命名空间；`local/` 退化为"默认引擎"的友好别名。
 
 **不破坏保证**：因为命名空间从第一天就是正式名、裸名只是"默认引擎"的简写——将来新增引擎时，新引擎用自己的前缀，**所有既有写法（裸名 / `local/x` / 云端）含义不变、永不失效**。这就是我们保留命名空间的回报。
+
+---
+
+## 八、引擎作为可选组件（路线）
+
+引擎不像模型是"下个权重文件"，它是**一个 Python 包**（含代码+二进制、有依赖树）。所以：
+
+| | 模型（model） | 引擎（engine） |
+|---|---|---|
+| 是什么 | 权重文件（`.onnx` 等） | Python 包（sherpa-onnx / faster-whisper / pywhispercpp） |
+| 怎么获取 | `asrkit pull`（下文件 → `~/.asrkit/models`） | **`pip` 安装**（有依赖树） |
+
+**默认**：`pip install asrkit` 只带 sherpa-onnx（覆盖面最广）；其它引擎按需装，避免基础安装被 torch/ctranslate2 等撑爆。
+
+注册中心本就按 `provider`（=引擎名）路由，故多引擎是**纯增量**，不改核心结构。
+
+### 三个机制
+
+**① pip extras —— 官方内置引擎**
+```bash
+pip install "asrkit[faster-whisper]"   # 装 ctranslate2 等 + 内置 adapter
+pip install "asrkit[whispercpp]"
+pip install "asrkit[engines]"          # 内置引擎全装
+```
+adapter 内置于 asrkit，但**懒加载**（用到才 import 引擎库），没装不崩。
+
+**② entry-point 插件 —— 第三方/社区引擎**（见 §7 契约的 entry point）
+```bash
+pip install asrkit-vosk    # 独立包，启动时被 asrkit 自动发现注册
+```
+外部贡献者写新引擎无需改主仓。
+
+**③ `asrkit engine` 命令 —— Ollama 式封装（对 pip 的糖）**
+```bash
+asrkit engine list                    # 引擎列表：装没装 / 谁是默认
+asrkit engine install faster-whisper  # 底层 = pip 装对应 extra/插件
+asrkit engine rm faster-whisper
+asrkit engine default whispercpp      # 设默认引擎（裸名落到它）
+```
+
+### 跑起来什么样
+
+```bash
+asrkit engine install faster-whisper
+asrkit pull faster-whisper/whisper-large-v3
+asrkit run  faster-whisper/whisper-large-v3 a.wav
+
+# 没装该引擎就用它 → 友好报错（带安装命令），不是 ModuleNotFoundError
+asrkit run faster-whisper/whisper-small a.wav
+# [error] engine 'faster-whisper' not installed. Run: pip install "asrkit[faster-whisper]"
+```
+
+`asrkit list` 里未安装引擎的模型照样列出（可发现），标注"引擎未装"引导安装。
+
+### 两个设计要点
+
+1. **懒加载 + 友好错误**：引擎库只在真正推理时 import；缺了返回"装这个引擎"的提示。没装某引擎的人，`list` / `pull sherpa/...` 一切照常。
+2. **`engine install` 用 `sys.executable -m pip`**：即用 asrkit 当前所在的 Python/venv 去装，避免装错环境；执行前回显真实 `pip install ...` 命令（透明）。默认真跑（Ollama 式），留 `--print-only` 逃生舱。
+
+### 落地顺序（真做时）
+
+1. pyproject 加引擎 extras + 写第 2 个引擎 adapter（建议 faster-whisper，验证多引擎跑通）；
+2. 加 `asrkit engine list/install/rm/default` 命令；
+3. 补 entry-point 插件文档（第三方引擎接入指南）。
+
+依赖：**先真接一个第二引擎才有意义**（否则命令是空架子）。当前为 `路线`，不实现。
