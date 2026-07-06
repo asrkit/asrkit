@@ -2,7 +2,16 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [0.1.1] - 未发布
+## [0.1.2] - 未发布
+
+### 新增
+- `asrkit --version` / `-V` 显示版本。
+- `asrkit rm <model>` 删除已下载的本地模型（补全 pull/rm 生命周期，Ollama 对齐）。
+
+### 说明
+- 无 `update` 命令：模型按 id 钉死（换模型即 `pull` 另一个 id）；升级软件包用 `pip install -U asrkit`。
+
+## [0.1.1] - 2026-07-06
 
 ### 变更
 - **安装简化**：`pip install asrkit` 一步装好端云接口（sherpa-onnx + 云端 + 音频）——运行时依赖从 extras 提升为基础依赖，不再需要 `asrkit[all]`。模型权重仍按需 `asrkit pull`、云端填 API key。

@@ -50,6 +50,15 @@ def is_installed(meta: AdapterMeta, config: dict | None = None) -> bool:
     return os.path.isdir(d) and _install_files_ok(meta, d)
 
 
+def remove(meta: AdapterMeta, config: dict | None = None):
+    """删除已下载的本地模型目录，返回被删路径（未安装则 None）。"""
+    d = model_dir(meta, config)
+    if os.path.isdir(d):
+        shutil.rmtree(d, ignore_errors=True)
+        return d
+    return None
+
+
 def _download(url: str, path: str, log, timeout: int = 30) -> None:
     req = urllib.request.Request(url, headers={"User-Agent": "asrkit"})
     with urllib.request.urlopen(req, timeout=timeout) as r, open(path, "wb") as f:

@@ -54,10 +54,12 @@ def _add_transcribe_flags(sp):
 
 
 def main(argv: Optional[list] = None) -> int:
+    from . import __version__
     p = argparse.ArgumentParser(
         prog="asrkit",
         description="One interface to run and compare any speech-to-text model — local & cloud.",
     )
+    p.add_argument("-V", "--version", action="version", version=f"asrkit {__version__}")
     sub = p.add_subparsers(dest="cmd")
 
     sub.add_parser("list", help="列出模型（✓=已安装）")
@@ -67,6 +69,9 @@ def main(argv: Optional[list] = None) -> int:
 
     pp = sub.add_parser("pull", help="下载一个本地模型")
     pp.add_argument("model")
+
+    rmp = sub.add_parser("rm", help="删除已下载的本地模型")
+    rmp.add_argument("model")
 
     rp = sub.add_parser("run", help="缺则下载 + 转写（Ollama 式）")
     rp.add_argument("model")
@@ -125,6 +130,20 @@ def main(argv: Optional[list] = None) -> int:
         except Exception as e:
             print(f"[错误] {e}", file=sys.stderr)
             return 1
+
+    if a.cmd == "rm":
+        from . import registry
+        try:
+            m = registry.resolve(a.model)
+        except Exception as e:
+            print(f"[错误] {e}", file=sys.stderr)
+            return 1
+        if m.source != "local":
+            print("[错误] 只有本地模型可删除", file=sys.stderr)
+            return 1
+        d = store.remove(m)
+        print(f"✓ 已删除 {m.id} → {d}" if d else f"{m.id} 未安装，无需删除")
+        return 0
 
     if a.cmd == "run":
         try:
