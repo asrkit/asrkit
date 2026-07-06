@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "asrkit"
-version = "0.0.1"
+version = "0.1.0"
 description = "One interface to run and compare any speech-to-text model — local & cloud."
 readme = "README.en.md"
 requires-python = ">=3.9"
