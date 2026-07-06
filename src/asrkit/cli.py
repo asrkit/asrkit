@@ -24,27 +24,41 @@ def _cfg(a) -> dict:
 def _opts(a):
     from .types import TranscribeOptions
     return TranscribeOptions(
+        lang_hint=getattr(a, "language", None),
         convert=getattr(a, "convert", False),
         segment=getattr(a, "segment", False),
     )
 
 
-def _print_result(r) -> int:
+def _print_result(r, fmt="txt", output=None) -> int:
+    from . import formats
     for w in (r.warnings or []):
         print(f"[warn] {w}", file=sys.stderr)
     if r.error:
         print(f"[error] {r.error}", file=sys.stderr)
         return 1
-    print(r.text)
-    bits = []
-    if r.latency_ms is not None:
-        bits.append(f"{r.latency_ms}ms")
-    if r.lang:
-        bits.append(f"lang={r.lang}")
-    if r.metrics and r.metrics.get("rtf") is not None:
-        bits.append(f"rtf={r.metrics['rtf']}")
-    if bits:
-        print("  (" + ", ".join(bits) + ")", file=sys.stderr)
+    try:
+        text = formats.render(r, fmt)
+    except formats.FormatError as e:
+        print(f"[error] {e}", file=sys.stderr)
+        return 1
+    if output:
+        with open(output, "w", encoding="utf-8") as f:
+            f.write(text if text.endswith("\n") else text + "\n")
+        print(f"✓ wrote {fmt} → {output}", file=sys.stderr)
+    else:
+        print(text)
+    # txt 到 stdout 时附带指标到 stderr（其它格式不掺杂）
+    if fmt == "txt" and not output:
+        bits = []
+        if r.latency_ms is not None:
+            bits.append(f"{r.latency_ms}ms")
+        if r.lang:
+            bits.append(f"lang={r.lang}")
+        if r.metrics and r.metrics.get("rtf") is not None:
+            bits.append(f"rtf={r.metrics['rtf']}")
+        if bits:
+            print("  (" + ", ".join(bits) + ")", file=sys.stderr)
     return 0
 
 
@@ -55,6 +69,11 @@ def _add_transcribe_flags(sp):
                     help="Volcengine/Doubao App ID (X-Api-App-Key), pairs with --access-key")
     sp.add_argument("--access-key", default=None,
                     help="Volcengine/Doubao Access Key (X-Api-Access-Key)")
+    sp.add_argument("--language", default=None,
+                    help="language hint (e.g. zh, en) — helps Whisper-family models")
+    sp.add_argument("-f", "--format", default="txt", choices=("txt", "json", "srt", "vtt"),
+                    dest="format", help="output format (default: txt)")
+    sp.add_argument("-o", "--output", default=None, help="write result to file (default: stdout)")
     sp.add_argument("--convert", action="store_true",
                     help="decode/resample/downmix to fit the local engine "
                          "(off by default: on mismatch it errors)")
@@ -71,7 +90,10 @@ def main(argv: Optional[list] = None) -> int:
     p.add_argument("-V", "--version", action="version", version=f"asrkit {__version__}")
     sub = p.add_subparsers(dest="cmd")
 
-    sub.add_parser("list", help="list models (✓ = installed)")
+    lp = sub.add_parser("list", help="list models (✓ = installed)")
+    lp.add_argument("--json", action="store_true", help="machine-readable output")
+    lp.add_argument("--installed", action="store_true", help="only installed local models")
+    lp.add_argument("--source", default=None, choices=("cloud", "local"), help="filter by source")
 
     sh = sub.add_parser("show", help="show model details")
     sh.add_argument("model")
@@ -122,13 +144,42 @@ def main(argv: Optional[list] = None) -> int:
             return False
 
     if a.cmd == "list":
+        from . import store
+        def _human(n):
+            size = float(n)
+            for unit in ("B", "KB", "MB", "GB"):
+                if size < 1024 or unit == "GB":
+                    return f"{int(size)}{unit}" if unit == "B" else f"{size:.1f}{unit}"
+                size /= 1024
+        rows = []
         for m in api.list_models():
+            if a.source and m.source != a.source:
+                continue
+            inst = _installed(m) if m.source == "local" else None
+            if a.installed and not inst:
+                continue
+            rows.append((m, inst))
+        if a.json:
+            import json as _json
+            out = []
+            for m, inst in rows:
+                d = {"id": m.id, "name": m.name, "source": m.source,
+                     "provider": m.provider, "vendor": m.vendor, "langs": m.langs,
+                     "model_kind": m.model_kind}
+                if m.source == "local":
+                    d["installed"] = bool(inst)
+                    d["size_bytes"] = store.dir_size(m) if inst else 0
+                out.append(d)
+            print(_json.dumps(out, ensure_ascii=False, indent=2))
+            return 0
+        for m, inst in rows:
             if m.source == "cloud":
-                mark, flag = " ", "☁️ "
+                mark, flag, size = " ", "☁️ ", ""
             else:
-                mark = "✓" if _installed(m) else " "
+                mark = "✓" if inst else " "
                 flag = "💻"
-            print(f"{mark} {flag} {m.id:26s} {m.name}")
+                size = _human(store.dir_size(m)) if inst else ""
+            print(f"{mark} {flag} {m.id:26s} {size:>9s}  {m.name}")
         return 0
 
     if a.cmd == "show":
@@ -181,14 +232,16 @@ def main(argv: Optional[list] = None) -> int:
 
     if a.cmd == "run":
         try:
-            return _print_result(api.run(a.model, a.audio, config=_cfg(a), opts=_opts(a)))
+            r = api.run(a.model, a.audio, config=_cfg(a), opts=_opts(a))
+            return _print_result(r, fmt=a.format, output=a.output)
         except Exception as e:
             print(f"[error] {e}", file=sys.stderr)
             return 1
 
     if a.cmd == "transcribe":
         try:
-            return _print_result(api.transcribe(a.model, a.audio, config=_cfg(a), opts=_opts(a)))
+            r = api.transcribe(a.model, a.audio, config=_cfg(a), opts=_opts(a))
+            return _print_result(r, fmt=a.format, output=a.output)
         except Exception as e:
             print(f"[error] {e}", file=sys.stderr)
             return 1

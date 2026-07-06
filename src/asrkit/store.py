@@ -50,6 +50,22 @@ def is_installed(meta: AdapterMeta, config: dict | None = None) -> bool:
     return os.path.isdir(d) and _install_files_ok(meta, d)
 
 
+def dir_size(meta: AdapterMeta, config: dict | None = None) -> int:
+    """已安装本地模型占用的磁盘字节数（未安装返回 0）。"""
+    d = model_dir(meta, config)
+    if not os.path.isdir(d):
+        return 0
+    total = 0
+    for root, _dirs, files in os.walk(d):
+        for f in files:
+            fp = os.path.join(root, f)
+            try:
+                total += os.path.getsize(fp)
+            except OSError:
+                pass
+    return total
+
+
 def remove(meta: AdapterMeta, config: dict | None = None):
     """删除已下载的本地模型目录，返回被删路径（未安装则 None）。"""
     d = model_dir(meta, config)

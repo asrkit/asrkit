@@ -158,11 +158,12 @@ pip install asrkit-vosk    # 独立包，启动时被 asrkit 自动发现注册
 
 **③ `asrkit engine` 命令 —— Ollama 式封装（对 pip 的糖）**
 ```bash
-asrkit engine list                    # 引擎列表：装没装 / 谁是默认
-asrkit engine install faster-whisper  # 底层 = pip 装对应 extra/插件
-asrkit engine rm faster-whisper
-asrkit engine default whispercpp      # 设默认引擎（裸名落到它）
+asrkit engine list                    # 引擎列表：装没装 / 谁是默认   （现状）
+asrkit engine install faster-whisper  # 底层 = pip 装对应 extra/插件  （现状）
+asrkit engine rm faster-whisper       # 卸载引擎                      （路线）
+asrkit engine default whispercpp      # 设默认引擎（裸名落到它）       （路线，随 0.4.2 config 落地）
 ```
+> 现状：`engine` 仅实现 `list` / `install`。`rm`（安全卸载）与 `default`（依赖配置持久化存"默认引擎"）为路线；`default` 计划随 0.4.2 的 `asrkit config` 一并实现，届时裸名解析改读配置。
 
 ### 跑起来什么样
 

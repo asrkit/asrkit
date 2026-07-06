@@ -36,3 +36,17 @@ def run(model, audio, *, config=None, opts=None, log=print):
 
 def list_models() -> List[AdapterMeta]:
     return registry.list_metas()
+
+
+def show(model: str) -> AdapterMeta:
+    """解析模型 id/别名/裸名为其 AdapterMeta（未注册则抛 ModelNotFoundError）。"""
+    return registry.resolve(model)
+
+
+def remove(model: str, *, config=None):
+    """删除已下载的本地模型，返回被删目录（未装则 None）。仅本地模型。"""
+    from . import store
+    meta = registry.resolve(model)
+    if meta.source != "local":
+        raise ValueError(f"{model} is not a local model; nothing to remove")
+    return store.remove(meta, config or {})

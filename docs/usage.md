@@ -36,11 +36,16 @@ asrkit list                          # 列出所有模型（✓ = 已安装）
 asrkit pull local/sensevoice         # 下载一个端侧模型（Ollama 式）
 asrkit run  local/sensevoice a.wav   # 缺则自动下载 + 转写（一步到位，推荐）
 asrkit transcribe a.wav -m local/sensevoice   # 只转写（不自动下载）
+asrkit transcribe a.wav -m local/whisper --format srt -o a.srt   # 出字幕
+asrkit transcribe a.wav -m local/sensevoice --format json        # 全字段 JSON
 ```
 
 - 换模型只换字符串：`local/whisper-small`、`local/paraformer-zh`、`local/qwen3-asr-0.6b` …
 - **精度标签**（Ollama 式）：`local/sensevoice:int8`（默认）/ `local/sensevoice:fp32`。
-- 输出：第一行为识别文字；stderr 第二行为 `耗时、语言、rtf`。
+- **输出格式** `--format txt|json|srt|vtt`（默认 txt）+ `-o <file>`；`--language zh` 给语言提示。
+  字幕（srt/vtt）需模型返回时间戳，否则诚实报错。
+- 默认输出：第一行为识别文字；stderr 第二行为 `耗时、语言、rtf`。
+- 列表：`asrkit list --json`（脚本用）/ `--installed` / `--source cloud|local`。
 
 例：
 

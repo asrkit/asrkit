@@ -7,6 +7,23 @@
 > 2. 记 CHANGELOG —— 在下方加一节 `## [X.Y.Z] - YYYY-MM-DD`,分 `### 新增 / 变更 / 修复` 三段;**破坏性变更要醒目标出**。
 > 3. 打 tag 并推 —— `git tag -a vX.Y.Z -m "…" && git push origin main --tags`(tag 与 PyPI 版本一一对应)。
 
+## [0.4.1] - 2026-07-06
+
+主题：**快速完善**（A 组，纯增量，见 `docs/roadmap-cli-completeness.md`）。
+
+### 新增
+- **输出格式** `--format {txt,json,srt,vtt}` + `-o/--output`（`run` 与 `transcribe` 均支持）：
+  - `json` 输出全字段（含 segments/word_timestamps/metrics），脚本可解析。
+  - `srt` / `vtt` 输出字幕（依赖模型返回 segments；无时间戳时诚实报错，不伪造）。
+  - 新模块 `asrkit.formats.render`（未来 `asrkit serve` 的 response_format 复用）。
+- **`asrkit list` 增强**：`--json`（机器可读）、`--installed`（只看已装本地）、`--source cloud|local`；人读输出加体积列。
+- **`--language`** 语言提示透传（`TranscribeOptions.lang_hint`），利于 Whisper 类模型。
+- **`py.typed`** 类型标记：下游 IDE/mypy 可获取类型提示。
+- **api 对称**：`asrkit.api.show()` / `remove()`，与 CLI 对齐。
+
+### 修复
+- 文档-代码缺口：`docs/engines-and-addressing.md` 中 `asrkit engine rm` / `engine default` 明确标为"路线"（未实现）；`default` 将随 0.4.2 `config` 落地。
+
 ## [0.4.0] - 2026-07-06
 
 主题：**云端第 2 波** —— 火山豆包（双版本）、阿里百炼、ElevenLabs、OpenAI Whisper 全部接入（协议移植自作者已真机接通的 asr_bench）。
