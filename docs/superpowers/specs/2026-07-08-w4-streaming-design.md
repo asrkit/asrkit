@@ -1,6 +1,11 @@
 # W4 设计 — 最小流式 `asrkit stream`(行使并校订 PartialResult 契约)
 
-> 状态:brainstorming 完成、用户已批准三点取舍,待 Codex 评审 → 写实现计划。
+> 状态:brainstorming 完成、用户已批准三点取舍、**Codex(gpt-5.5)评审已采纳 3 项修订 → v2**,待写实现计划。
+>
+> **v2 修订**(Codex `.omc/artifacts/ask/codex-*2026-07-07T16-16-52*.md`):
+> 1. `transcribe_stream` 拆成**非生成器外壳**(立即校验能力、call-time 抛 `NotImplementedError`)**+ 内层 `_stream` 生成器**——否则守卫延迟到首次 `next()` 才触发,直接调 adapter 的调用方拿不到基类式即时错误。
+> 2. **错误对称**:`_build`/缺文件/sherpa 运行时/解码异常会逃出生成器,而 batch 收进 `TranscribeResult.error`。→ 包 try/except,末尾 yield `PartialResult(text="", is_final=True, error=...)`;但 **`AudioFormatError` re-raise**(交 CLI 格式错误分支,保持退 1)、**`ValueError`(不支持模型)仍及早抛**。
+> 3. `window_s <= 0` 经 `max(1, int())` 静默退化成 1 样本/块(像卡死)→ `api.transcribe_stream` **及早 `ValueError`**。
 > 波次:W4(求职方向最看重的一刀);落地默认下个 PATCH,**升号先问人类**。
 > 定位约束:守"接口内核极薄";**零新运行时依赖**(文件分块、纯 Python);仅本地 sherpa online 模型;透明音频(格式不符诚实报错,`--convert` opt-in)。
 >
@@ -40,15 +45,25 @@ roadmap 把"最小流式"列为 W4。地基已在:`types.py` 有 `PartialResult`
 
 ### 3.2 引擎侧 `SherpaLocal.transcribe_stream`(`adapters/local_sherpa.py`)
 
-覆盖基类方法(基类默认 `raise NotImplementedError`)。因 `SherpaLocal` 同时承 batch+streaming 模型,**必须自守**:非 streaming 模型走此方法要抛 `NotImplementedError`。
+覆盖基类方法(基类默认 `raise NotImplementedError`)。因 `SherpaLocal` 同时承 batch+streaming 模型,**必须自守**:非 streaming 模型抛 `NotImplementedError`。**外壳非生成器**(能力校验 call-time 立即抛),内层 `_stream` 才是生成器(v2 修订 1)。
+
+先加一个模块级小工具,归一 `get_result` 的返回(str 或带 `.text` 的对象):
+
+```python
+def _result_text(r) -> str:
+    return r if isinstance(r, str) else getattr(r, "text", str(r))
+```
 
 ```python
 def transcribe_stream(self, chunks, opts):
-    # 1) 能力守卫:非流式模型不支持(SherpaLocal 覆盖了基类,故须自抛)
+    # 能力守卫:非流式模型不支持 —— 立即抛(非生成器,保持基类 call-time 语义)
     if "streaming" not in self.meta.modes:
         raise NotImplementedError(
             f"{self.meta.id} is a batch model; streaming needs a streaming model")
-    # 2) 引擎就绪守卫
+    return self._stream(chunks, opts)
+
+def _stream(self, chunks, opts):
+    # 引擎就绪守卫
     if not _available():
         yield PartialResult(text="", is_final=True, error=_INSTALL_HINT)
         return
@@ -59,34 +74,36 @@ def transcribe_stream(self, chunks, opts):
             text="", is_final=True,
             error=f"model not installed: {self.meta.id}. Run `asrkit pull {self.meta.id}` first.")
         return
-    # 3) 建/复用在线识别器(与 batch 同一 _build,streaming=True)
     prefer = self.meta.tag or "int8"
-    if self._rec is None:
-        self._rec = _build(self.meta.config_type, d, 4,
-                           opts.lang_hint or "", True, opts.enable_itn, prefer)
-    rec = self._rec
-    st = rec.create_stream()
-    sr = 16000                       # chunks 已是 16k 单声道 float32
-    # 4) 逐块喂 + 逐块产出增量
-    for chunk in chunks:
-        st.accept_waveform(sr, chunk)
+    try:
+        # 建/复用在线识别器(与 batch 同一 _build,streaming=True)
+        if self._rec is None:
+            self._rec = _build(self.meta.config_type, d, 4,
+                               opts.lang_hint or "", True, opts.enable_itn, prefer)
+        rec = self._rec
+        st = rec.create_stream()
+        sr = 16000                       # chunks 已是 16k 单声道 float32
+        # 逐块喂 + 逐块产出增量
+        for chunk in chunks:
+            st.accept_waveform(sr, chunk)
+            while rec.is_ready(st):
+                rec.decode_stream(st)
+            yield PartialResult(text=_result_text(rec.get_result(st)), is_final=False)
+        # flush 尾音 + 定稿(沿用 _decode_online 的 0.5s 静音收尾)
+        st.accept_waveform(sr, np.zeros(sr // 2, dtype=np.float32))
+        st.input_finished()
         while rec.is_ready(st):
             rec.decode_stream(st)
-        r = rec.get_result(st)
-        text = r if isinstance(r, str) else getattr(r, "text", str(r))
-        yield PartialResult(text=text, is_final=False)
-    # 5) flush 尾音 + 定稿(沿用 _decode_online 的 0.5s 静音收尾)
-    st.accept_waveform(sr, np.zeros(sr // 2, dtype=np.float32))
-    st.input_finished()
-    while rec.is_ready(st):
-        rec.decode_stream(st)
-    r = rec.get_result(st)
-    text = r if isinstance(r, str) else getattr(r, "text", str(r))
-    yield PartialResult(text=text, is_final=True)
+        yield PartialResult(text=_result_text(rec.get_result(st)), is_final=True)
+    except AudioFormatError:
+        raise                            # v2:交 CLI 格式错误分支(退 1),不吞
+    except Exception as e:               # v2:_build/缺文件/运行时/解码 → 对称收进 error
+        yield PartialResult(text="", is_final=True, error=f"streaming failed: {e}")
 ```
 
 - **纯流处理器**:输入是"已解码的 16k 单声道 float32 窗口迭代器",不碰文件。这样麦克风将来只需换一个 chunk 源即可复用,无需动引擎。
-- 复用 `self._rec` 缓存,与 `transcribe` 一致。
+- 复用 `self._rec` 缓存,与 `transcribe` 一致(`create_stream()` 每次新建,顺序复用无状态泄漏——Codex 确认)。
+- `AudioFormatError`(来自 `chunks` 迭代内首个 `load_samples`)**re-raise**,不被通用 `except` 吞:CLI 仍走 `except AudioFormatError` 退 1。
 
 ### 3.3 文件分块 `audio.iter_file_chunks`(`audio.py`,新)
 
@@ -110,6 +127,8 @@ def iter_file_chunks(path, sr=16000, channels=1, window_s=0.1, *, convert=False)
 def transcribe_stream(model, audio, *, config=None, opts=None, window_s=0.1):
     """流式转写:换 model 字符串即切模型。返回 PartialResult 迭代器。
     仅 streaming 模型可用;非流式模型抛 ValueError(及早,不进生成器)。"""
+    if window_s <= 0:                                     # v2:防静默退化成 1 样本/块
+        raise ValueError("window_s must be > 0")
     adapter = registry.make_adapter(model, config or {})
     if "streaming" not in adapter.meta.modes:
         raise ValueError(f"{model} is not a streaming model")
@@ -171,7 +190,7 @@ if a.cmd == "stream":
 
 | 文件 | 改动 |
 |---|---|
-| `src/asrkit/adapters/local_sherpa.py` | **新增** `SherpaLocal.transcribe_stream`(逐块喂 online 识别器) |
+| `src/asrkit/adapters/local_sherpa.py` | **新增** `_result_text` 工具 + `SherpaLocal.transcribe_stream`(非生成器外壳)+ `_stream`(内层生成器,逐块喂 online 识别器) |
 | `src/asrkit/audio.py` | **新增** `iter_file_chunks(path, sr, channels, window_s, *, convert)` |
 | `src/asrkit/api.py` | **新增** `transcribe_stream(model, audio, *, config, opts, window_s)` |
 | `src/asrkit/cli.py` | **新增** `stream` 子命令 + 渲染 + 退出码 |
@@ -183,7 +202,10 @@ if a.cmd == "stream":
 ## 6. 测试(mock sherpa,不需真引擎;numpy 用 `importorskip`)
 
 - **引擎逐块产出(`importorskip("numpy")`)**:构造 streaming meta 的 `SherpaLocal`;`monkeypatch` `_available`→True、`store.model_dir`→临时已存在目录、`_build`→返回 `FakeRec`(`create_stream`/`is_ready`(恒 False)/`decode_stream`(pass)/`get_result`→随喂入块数递增的文本)。喂 N 块 → 断言 yield N+1 个 `PartialResult`、`text` 递增、最后一个 `is_final=True` 且前 N 个 `is_final=False`、**所有项 `committed==""` 且 `partial==""`**。
-- **非流式模型守卫**:batch-only meta 的 `SherpaLocal`,`list(adapter.transcribe_stream(iter([]), opts))` → `pytest.raises(NotImplementedError)`(须先于 `_available` 检查触发)。
+- **非流式模型守卫(v2:call-time)**:batch-only meta 的 `SherpaLocal`,`pytest.raises(NotImplementedError)` 包 **`adapter.transcribe_stream(iter([]), opts)` 这次调用本身**(外壳非生成器,不需 `list()` 即抛;须先于 `_available` 检查触发)。
+- **建/解码异常对称收进 error(v2,`importorskip("numpy")`)**:`_build` monkeypatch 成抛 `RuntimeError`(或 `FakeRec.decode_stream` 抛),迭代 → 最后一个 `PartialResult` 的 `is_final=True` 且 `error` 含 "streaming failed";异常**不逃出**生成器。
+- **`AudioFormatError` 不被吞(v2)**:`chunks` 迭代首个即抛 `AudioFormatError`(用会抛的假 chunks 迭代器),断言它**穿透** `_stream` 传播出来(`pytest.raises(AudioFormatError)`),不变成 `PartialResult.error`。
+- **`window_s<=0` 及早守卫(v2)**:`api.transcribe_stream(streaming_model, path, window_s=0)` → `pytest.raises(ValueError)`(不迭代即抛)。
 - **`iter_file_chunks` 分块正确(无需 numpy)**:`monkeypatch audio.load_samples`→返回(长度 5000 的序列, 16000);断言产出 4 块(1600/1600/1600/200)、拼接等于原序列、窗口数 = ceil(5000/1600)。
 - **`iter_file_chunks` 格式守卫**:`monkeypatch load_samples`→抛 `AudioFormatError`;断言迭代首个即抛。
 - **`api.transcribe_stream` 及早守卫**:非流式 model → `pytest.raises(ValueError)`(不迭代即抛)。
