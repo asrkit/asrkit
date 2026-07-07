@@ -147,6 +147,9 @@ def main(argv: Optional[list] = None) -> int:
     lp.add_argument("--lang", default=None, help="only models supporting this language (e.g. ja)")
     lp.add_argument("--arch", default=None, help="only models of this architecture (e.g. senseVoice)")
 
+    cmp = sub.add_parser("completion", help="print a shell completion script")
+    cmp.add_argument("shell", choices=("bash", "zsh", "fish"))
+
     sp = sub.add_parser("search", help="search models by id/name substring")
     sp.add_argument("term")
     sp.add_argument("--json", action="store_true", help="machine-readable output")
@@ -247,6 +250,11 @@ def main(argv: Optional[list] = None) -> int:
         if a.ids:
             return 0
         return _emit_model_rows(rows, a.json)
+
+    if a.cmd == "completion":
+        from . import completion
+        print(completion.script_for(a.shell))
+        return 0
 
     if a.cmd == "search":
         term = a.term.strip().lower()
