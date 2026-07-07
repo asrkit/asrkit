@@ -56,3 +56,22 @@ def remove(model: str, *, config=None):
     if meta.source != "local":
         raise ValueError(f"{model} is not a local model; nothing to remove")
     return store.remove(meta, config or {})
+
+
+def transcribe_stream(model, audio, *, config=None, opts=None, window_s=0.1):
+    """流式转写:换 model 字符串即切模型。返回 PartialResult 迭代器。
+
+    仅 modes 含 "streaming" 的模型可用。及早校验(不进生成器):
+    window_s<=0 / 非流式模型 / 未配置 → ValueError;未注册模型 → ModelNotFoundError。
+    """
+    if window_s <= 0:
+        raise ValueError("window_s must be > 0")
+    adapter = registry.make_adapter(model, config or {})
+    if "streaming" not in adapter.meta.modes:
+        raise ValueError(f"{model} is not a streaming model")
+    if not adapter.is_configured():
+        raise ValueError(f"{model} is not configured (missing API key?)")
+    opts = opts or TranscribeOptions()
+    from . import audio as _audio
+    chunks = _audio.iter_file_chunks(audio, 16000, 1, window_s, convert=opts.convert)
+    return adapter.transcribe_stream(chunks, opts)

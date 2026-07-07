@@ -1,7 +1,7 @@
 """Tests for W4 minimal streaming (iter_file_chunks / transcribe_stream / api / CLI)."""
 import pytest
 
-from asrkit import audio
+from asrkit import api, audio
 from asrkit.adapters import local_sherpa
 from asrkit.types import AdapterMeta, PartialResult, TranscribeOptions  # noqa: F401
 
@@ -108,3 +108,15 @@ def test_transcribe_stream_audioformat_error_propagates(monkeypatch, tmp_path):
         yield  # noqa (make it a generator)
     with pytest.raises(local_sherpa.AudioFormatError):
         list(ad.transcribe_stream(bad_chunks(), TranscribeOptions()))
+
+
+def test_api_stream_rejects_non_streaming_model():
+    """非流式 model → 及早 ValueError(不迭代即抛)。"""
+    with pytest.raises(ValueError):
+        api.transcribe_stream("openai/whisper-1", "x.wav")    # 云端 batch 模型
+
+
+def test_api_stream_rejects_bad_window():
+    """window_s<=0 → 及早 ValueError(在 make_adapter 之前,故未注册 model 也先抛这个)。"""
+    with pytest.raises(ValueError):
+        api.transcribe_stream("local/fake-stream", "x.wav", window_s=0)
