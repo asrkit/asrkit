@@ -464,9 +464,9 @@ def main(argv: Optional[list] = None) -> int:
         from . import doctor
         marks = {"ok": "✓", "info": "○", "fail": "✗"}
         checks = doctor.diagnose(net=a.net)
-        for c in checks:
-            print(f"{marks.get(c.status, ' ')} {c.name}: {c.detail}")
-        return 1 if any(c.status == "fail" for c in checks) else 0
+        for chk in checks:
+            print(f"{marks.get(chk.status, ' ')} {chk.name}: {chk.detail}")
+        return 1 if any(chk.status == "fail" for chk in checks) else 0
 
     if a.cmd == "serve":
         from . import server
