@@ -71,6 +71,13 @@ _TAG_OVERRIDE = {"sensevoice-fp32": "fp32"}
 def _metas():
     out = []
     for folder, name, ctype, streaming, langs, asset in _TABLE:
+        # 按架构计算 capabilities: whisper 支持语言提示，senseVoice 忽略
+        if ctype == "whisper":
+            caps = {"max_input_duration_s": 30, "language_hint": "supported"}
+        elif ctype == "senseVoice":
+            caps = {"language_hint": "none"}
+        else:
+            caps = {}
         out.append(AdapterMeta(
             id=f"local/{folder}",
             provider="sherpa-onnx",
@@ -81,7 +88,7 @@ def _metas():
             langs=langs,
             model_kind="asr",
             # whisper 是 30s 定长窗口，超长会截断 → 引擎据此发 warnings（见 D-3）
-            capabilities={"max_input_duration_s": 30} if ctype == "whisper" else {},
+            capabilities=caps,
             config_type=ctype,
             download_url=f"{_BASE}/{asset}.tar.bz2",
             base=_BASE_OVERRIDE.get(folder, folder),

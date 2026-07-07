@@ -13,7 +13,13 @@ def _run_adapter(adapter, model, audio, opts):
             text="", error=f"{model} is not configured (missing API key?). See docs/usage.md")
     if isinstance(audio, str):
         audio = AudioInput(original_path=audio)   # 内核零处理：不解码，adapter 各取所需
-    return adapter.transcribe(audio, opts or TranscribeOptions())
+    opts = opts or TranscribeOptions()
+    result = adapter.transcribe(audio, opts)
+    from . import capabilities
+    w = capabilities.warnings_for(opts, adapter.meta)
+    if w:
+        result.warnings = (result.warnings or []) + w
+    return result
 
 
 def transcribe(model, audio, *, config=None, opts=None):
