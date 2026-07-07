@@ -10,7 +10,9 @@
 > 2. 记 CHANGELOG —— 在下方加一节 `## [X.Y.Z] - YYYY-MM-DD`,分 `### 新增 / 变更 / 修复` 三段;**破坏性变更要醒目标出**。
 > 3. 打 tag 并推 —— `git tag -a vX.Y.Z -m "…" && git push origin main --tags`(tag 与 PyPI 版本一一对应)。
 
-## [Unreleased]
+## [0.5.2] - 2026-07-07
+
+主题：**批量 + 结果契约化 + 云端健壮性**（W0/W1/W2 三波累积;均向后兼容,唯退出码为醒目的行为微调）。
 
 ### 新增
 - **批量 / 目录 / glob / stdin 输入**：`asrkit run/transcribe` 接受多个路径、目录（递归按扩展名收音频）、glob、`-`（stdin，`--stdin-format` 指定格式）。
@@ -20,9 +22,16 @@
 - **云端重试**：云端 adapter 走共享 Session + 分级重试/退避（`asrkit/_http.py`）。计费转写请求只重试 429/连接未建立（读超时/5xx 不重，避免重复计费）；doubao 轮询（只读）重试全部。`ASRKIT_HTTP_RETRIES` 可调（默认 3）。doubao 改用 uuid 幂等 `X-Api-Request-Id`。
 - **`asrkit pull --url`**：从自定义地址下载（限 http/https；格式按内容识别）。HF 系引擎镜像用 `HF_ENDPOINT`（零配置）。
 - openai/elevenlabs 上传补 200MB 大小守卫（与 dashscope/doubao 对齐）。
+- **`pull` 多格式** —— `store.pull` 按内容（magic bytes）识别 `.tar.{bz2,gz,xz}` / 纯 tar / `.zip`,不再限死 bz2;`add-model --url` 给任意压缩包都能解（zip 加同款路径穿越防护）。
 
 ### 变更（行为）
 - **退出码分级**（醒目）：从"几乎都 1"改为 `0` 成功 / `1` 意外 / `2` 用法错 / `3` 模型不存在 / `4` 转写失败。批量取最严（优先级 `1>3>4`）。单文件转写失败退出码可能由 `1` 变 `4`。
+
+### 修复
+- **transformers adapter 不再崩** —— pipeline 返回 dict 无 `text` 键时不再 `None.strip()` 抛错，改为兜底空串。
+
+### 工程
+- **CI 加固**：纳入 `ruff`（lint）+ `mypy`（类型）;`serve` 测试不再 skip、出覆盖率;新增 nightly 真实 E2E（`pull whisper-tiny` → 用其自带样本做真实推理）。
 
 ## [0.5.1] - 2026-07-07
 

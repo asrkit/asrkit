@@ -6,7 +6,7 @@
 """
 from __future__ import annotations
 
-__version__ = "0.5.1"
+__version__ = "0.5.2"
 
 from .api import list_models, transcribe
 from .types import (
