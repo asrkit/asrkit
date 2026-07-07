@@ -5,6 +5,8 @@ import argparse
 import sys
 from typing import Optional
 
+from . import api
+
 
 def _cfg(a) -> dict:
     cfg = {}
@@ -221,8 +223,18 @@ def main(argv: Optional[list] = None) -> int:
     tp.add_argument("--model-dir", default=None)
     _add_transcribe_flags(tp)
 
+    stp = sub.add_parser("stream", help="stream-transcribe one file with a streaming model")
+    stp.add_argument("model")
+    stp.add_argument("audio")
+    stp.add_argument("--model-dir", default=None)
+    stp.add_argument("--language", default=None,
+                     help="language hint (e.g. zh, en) — helps Whisper-family models")
+    stp.add_argument("--convert", action="store_true",
+                     help="decode/resample/downmix to fit the local engine "
+                          "(off by default: on mismatch it errors)")
+
     a = p.parse_args(argv)
-    from . import api, registry, store
+    from . import registry, store
 
     def _installed(m) -> bool:
         try:
@@ -391,6 +403,43 @@ def main(argv: Optional[list] = None) -> int:
         finally:
             for c in cleanups:
                 c()
+
+    if a.cmd == "stream":
+        from . import emit
+        from .audio import AudioFormatError
+        cfg, opts = _cfg(a), _opts(a)      # 复用:lang_hint/convert(segment 对流式无意义,忽略)
+        live = sys.stderr.isatty()
+        try:
+            stream = api.transcribe_stream(a.model, a.audio, config=cfg, opts=opts)
+        except registry.ModelNotFoundError as e:
+            print(f"[error] {e}", file=sys.stderr)
+            return emit.EXIT_MODEL_NOT_FOUND
+        except ValueError as e:            # 非流式模型 / 未配置 / window_s<=0
+            print(f"[error] {e}", file=sys.stderr)
+            return emit.EXIT_USAGE
+        try:
+            for pr in stream:
+                if pr.error:
+                    if live:
+                        sys.stderr.write("\r\x1b[K")
+                        sys.stderr.flush()
+                    print(f"[error] {pr.error}", file=sys.stderr)
+                    return emit.EXIT_FAILED
+                if pr.is_final:
+                    if live:
+                        sys.stderr.write("\r\x1b[K")
+                        sys.stderr.flush()
+                    print(pr.text)                     # 最终 → stdout(可管道)
+                elif live:
+                    sys.stderr.write("\r\x1b[K" + pr.text)
+                    sys.stderr.flush()
+        except AudioFormatError as e:        # 格式不符且未 --convert(穿透而来)
+            if live:
+                sys.stderr.write("\r\x1b[K")
+                sys.stderr.flush()
+            print(f"[error] {e}", file=sys.stderr)
+            return emit.EXIT_FAILED
+        return emit.EXIT_OK
 
     if a.cmd == "add-model":
         import os

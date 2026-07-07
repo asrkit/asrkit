@@ -1,7 +1,7 @@
 """Tests for W4 minimal streaming (iter_file_chunks / transcribe_stream / api / CLI)."""
 import pytest
 
-from asrkit import api, audio
+from asrkit import api, audio, cli, emit
 from asrkit.adapters import local_sherpa
 from asrkit.types import AdapterMeta, PartialResult, TranscribeOptions  # noqa: F401
 
@@ -120,3 +120,37 @@ def test_api_stream_rejects_bad_window():
     """window_s<=0 → 及早 ValueError(在 make_adapter 之前,故未注册 model 也先抛这个)。"""
     with pytest.raises(ValueError):
         api.transcribe_stream("local/fake-stream", "x.wav", window_s=0)
+
+
+def test_cli_stream_renders_final_to_stdout(monkeypatch, capsys):
+    """最终文本进 stdout,退 EXIT_OK。"""
+    def fake_stream(model, audio, *, config=None, opts=None):
+        yield PartialResult(text="he", is_final=False)
+        yield PartialResult(text="hello", is_final=True)
+    monkeypatch.setattr(cli.api, "transcribe_stream", fake_stream)
+    rc = cli.main(["stream", "local/fake-stream", "x.wav"])
+    out = capsys.readouterr().out
+    assert rc == emit.EXIT_OK
+    assert "hello" in out
+
+
+def test_cli_stream_non_streaming_usage(monkeypatch, capsys):
+    """非流式 model(api 抛 ValueError)→ EXIT_USAGE,提示进 stderr。"""
+    def boom(*a, **k):
+        raise ValueError("openai/whisper-1 is not a streaming model")
+    monkeypatch.setattr(cli.api, "transcribe_stream", boom)
+    rc = cli.main(["stream", "openai/whisper-1", "x.wav"])
+    err = capsys.readouterr().err
+    assert rc == emit.EXIT_USAGE
+    assert "not a streaming model" in err
+
+
+def test_cli_stream_runtime_failure(monkeypatch, capsys):
+    """PartialResult.error → EXIT_FAILED,[error] 进 stderr。"""
+    def fake_stream(model, audio, *, config=None, opts=None):
+        yield PartialResult(text="", is_final=True, error="streaming failed: boom")
+    monkeypatch.setattr(cli.api, "transcribe_stream", fake_stream)
+    rc = cli.main(["stream", "local/fake-stream", "x.wav"])
+    err = capsys.readouterr().err
+    assert rc == emit.EXIT_FAILED
+    assert "[error]" in err
