@@ -10,7 +10,7 @@ import time
 
 from .. import _http
 from ..registry import register_model, register_protocol
-from ..types import AdapterMeta, AudioInput, BaseAdapter, TranscribeOptions, TranscribeResult
+from ..types import AdapterMeta, AudioInput, BaseAdapter, Segment, TranscribeOptions, TranscribeResult
 
 
 @register_protocol("openai")
@@ -34,10 +34,19 @@ class OpenAICompatible(BaseAdapter):
             # 透明原则：原始文件字节级原样上传，不解码/不重采样
             with open(audio.original_path, "rb") as f:
                 data = f.read()
+            # 构造请求表单，按能力位门控 verbose_json 和 language
+            from .. import capabilities
+            caps = self.meta.capabilities or {}
+            form = {"model": self.meta.model}
+            if caps.get("segment_timestamps"):
+                form["response_format"] = "verbose_json"
+                form["timestamp_granularities[]"] = "segment"
+            if capabilities.language_supported(self.meta) and opts.lang_hint:
+                form["language"] = opts.lang_hint
             resp = _http.post(
                 f"{base}/audio/transcriptions",
                 headers={"Authorization": f"Bearer {key}"},
-                data={"model": self.meta.model},
+                data=form,
                 files={"file": (os.path.basename(audio.original_path), data)},
                 timeout=120, idempotent=False)
             ms = int((time.perf_counter() - t0) * 1000)
@@ -45,9 +54,13 @@ class OpenAICompatible(BaseAdapter):
                 return TranscribeResult(text="", latency_ms=ms,
                                         error=f"HTTP {resp.status_code}: {resp.text[:200]}")
             j = resp.json()
+            # 解析 segments（防御：无 segments 或非列表或空 → None）
+            raw = j.get("segments")
+            segs = ([Segment(s["start"], s["end"], s["text"].strip()) for s in raw]
+                    if isinstance(raw, list) and raw else None)
             return TranscribeResult(
                 text=str(j.get("text") or j.get("result") or "").strip(),
-                latency_ms=ms, raw_response=j)
+                segments=segs, latency_ms=ms, raw_response=j)
         except Exception as e:
             return TranscribeResult(text="", error=f"{type(e).__name__}: {e}")
 
@@ -98,5 +111,6 @@ register_model(AdapterMeta(
     pricing={"unit": "hour", "cny": 2.6},
     default_base_url="https://api.openai.com/v1",
     model="whisper-1",
+    capabilities={"language_hint": "supported", "segment_timestamps": True},
     config_schema={"api_key": {"type": "secret", "required": True, "label": "OpenAI API Key"}},
 ))

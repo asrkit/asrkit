@@ -84,3 +84,46 @@ def test_whispercpp_meta_capabilities():
     m = registry.resolve("whispercpp/tiny")
     assert m.capabilities.get("segment_timestamps") is True
     assert m.capabilities.get("language_hint") == "supported"
+
+
+def test_openai_whisper1_verbose_and_segments(monkeypatch, tmp_path):
+    from asrkit import _http
+    seen = {}
+
+    def fake_post(url, **kw):
+        seen.update(kw)
+        return _R(200, jsonobj={"text": "hi", "segments": [{"start": 0.0, "end": 1.0, "text": " hi"}]})
+
+    monkeypatch.setattr(_http, "post", fake_post)
+    wav = tmp_path / "a.wav"
+    wav.write_bytes(b"x")
+    a = registry.make_adapter("openai/whisper-1", {"api_key": "k"})
+    r = a.transcribe(AudioInput(original_path=str(wav)), TranscribeOptions(lang_hint="en"))
+    assert seen["data"]["response_format"] == "verbose_json"
+    assert seen["data"]["timestamp_granularities[]"] == "segment"
+    assert seen["data"]["language"] == "en"
+    assert r.text == "hi" and r.segments and r.segments[0].start == 0.0 and r.segments[0].text == "hi"
+
+
+def test_openai_no_segments_fallback(monkeypatch, tmp_path):
+    from asrkit import _http
+    monkeypatch.setattr(_http, "post", lambda url, **kw: _R(200, jsonobj={"text": "hi"}))
+    wav = tmp_path / "a.wav"
+    wav.write_bytes(b"x")
+    a = registry.make_adapter("openai/whisper-1", {"api_key": "k"})
+    r = a.transcribe(AudioInput(original_path=str(wav)), TranscribeOptions())
+    assert r.text == "hi" and r.segments is None
+
+
+def test_siliconflow_unchanged_p0_regression(monkeypatch, tmp_path):
+    from asrkit import _http
+    seen = {}
+    monkeypatch.setattr(_http, "post", lambda url, **kw: (seen.update(kw), _R(200, jsonobj={"text": "hi"}))[1])
+    wav = tmp_path / "a.wav"
+    wav.write_bytes(b"x")
+    a = registry.make_adapter("siliconflow/sensevoice", {"api_key": "k"})
+    r = a.transcribe(AudioInput(original_path=str(wav)), TranscribeOptions(lang_hint="zh"))
+    # 三态 "none" 不被当真值:请求不含 verbose_json、不含 language;形状不变
+    assert "response_format" not in seen["data"]
+    assert "language" not in seen["data"]
+    assert r.segments is None and r.text == "hi"
