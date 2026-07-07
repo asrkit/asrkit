@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import os
-from typing import Dict, List, Optional, Type
+from typing import Callable, Dict, List, Optional, Type
 
 from .types import AdapterMeta, BaseAdapter
 
@@ -18,7 +18,7 @@ class ModelNotFoundError(Exception):
 _PROTOCOLS: Dict[str, Type[BaseAdapter]] = {}
 _MODELS: Dict[str, AdapterMeta] = {}
 _ALIASES: Dict[str, str] = {}   # 别名 -> 真实 id
-_OPEN: Dict[str, object] = {}   # 开放 provider 前缀 -> factory(model_str)->AdapterMeta（如 transformers/<任意 HF id>）
+_OPEN: Dict[str, Callable[[str], AdapterMeta]] = {}   # 开放 provider 前缀 -> factory(model_str)->AdapterMeta（如 transformers/<任意 HF id>）
 
 
 def register_protocol(provider: str):
@@ -28,7 +28,7 @@ def register_protocol(provider: str):
     return deco
 
 
-def register_open_provider(prefix: str, factory) -> None:
+def register_open_provider(prefix: str, factory: Callable[[str], AdapterMeta]) -> None:
     """开放 provider：`<prefix>/<任意串>` 动态合成 meta（如 transformers 接整个 HF hub）。"""
     _OPEN[prefix] = factory
 
@@ -154,7 +154,7 @@ def _load_plugins() -> None:
     try:
         eps = im.entry_points(group="asrkit.adapters")       # py3.10+
     except TypeError:
-        eps = im.entry_points().get("asrkit.adapters", [])   # py3.9
+        eps = im.entry_points().get("asrkit.adapters", [])   # type: ignore[attr-defined]  # py3.9
     for ep in eps:
         try:
             ep.load()

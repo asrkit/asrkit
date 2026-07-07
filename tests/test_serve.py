@@ -12,7 +12,8 @@ from asrkit.types import AdapterMeta, BaseAdapter, TranscribeResult
 def client(monkeypatch):
     pytest.importorskip("fastapi")
     pytest.importorskip("multipart")  # python-multipart
-    from fastapi.testclient import TestClient  # 需 httpx
+    pytest.importorskip("httpx")      # TestClient 依赖（CI 装 asrkit[dev] 提供）
+    from fastapi.testclient import TestClient
     from asrkit import server
 
     # 注册一个 stub adapter/模型，避免真实推理

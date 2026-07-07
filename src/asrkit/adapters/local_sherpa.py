@@ -54,7 +54,8 @@ def _build(ct: str, d: str, threads: int, lang_hint: str, streaming: bool,
            use_itn: bool, prefer: str):
     import sherpa_onnx as so
     # 按需查找 tokens.txt（qwen3/funasr-nano 用 tokenizer 目录，无 tokens.txt，不能提前强求）
-    _tok = lambda: _find(d, prefer, "tokens*.txt", "*tokens.txt", "*tokens*.txt")
+    def _tok():
+        return _find(d, prefer, "tokens*.txt", "*tokens.txt", "*tokens*.txt")
 
     if streaming:
         if ct == "onlineParaformer":

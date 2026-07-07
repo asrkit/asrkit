@@ -47,6 +47,8 @@ serve = ["fastapi", "uvicorn", "python-multipart"]
 all = ["asrkit[engines]", "asrkit[serve]"]
 # 云端内置，无需 extra；保留空别名兼容旧命令
 cloud = []
+# —— 开发 / CI 工具（lint + 类型 + 测试 + serve 测试所需 httpx）——
+dev = ["ruff", "mypy", "pytest", "pytest-cov", "httpx"]
 
 [project.scripts]
 asrkit = "asrkit.cli:main"
@@ -60,3 +62,22 @@ path = "src/asrkit/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/asrkit"]
+
+# —— lint（ruff）——
+# 高价值低摩擦：pyflakes(F,真·死代码/bug) + pycodestyle(E/W)。忽略 E501（行长）：
+# 模型表等处刻意用长行更易读。不上 I/UP/B（会引入大量纯风格改写 churn）。
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501"]
+
+# —— 类型（mypy）——
+# 宽松起步：只做基本类型检查，不强制全量注解（disallow-untyped-defs 会炸）。
+# 可选引擎（sherpa/torch/fastapi…）未装，故 ignore_missing_imports。
+[tool.mypy]
+files = ["src/asrkit"]
+ignore_missing_imports = true
+
+# —— 测试（pytest）——
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

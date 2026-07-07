@@ -72,7 +72,8 @@ class Transformers(BaseAdapter):
 
             t1 = time.perf_counter()
             out = self._pipe(audio.original_path)   # 引擎自解码/分块，原始文件直接给它
-            text = (out.get("text") if isinstance(out, dict) else str(out)).strip()
+            raw = out.get("text") if isinstance(out, dict) else str(out)
+            text = (raw or "").strip()              # dict 无 "text" 时不炸（防 None.strip）
             decode_ms = int((time.perf_counter() - t1) * 1000)
             return TranscribeResult(
                 text=text, latency_ms=load_ms + decode_ms,

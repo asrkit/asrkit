@@ -11,7 +11,7 @@ import os
 import time
 
 from ..registry import register_model, register_protocol
-from ..types import AdapterMeta, AudioInput, BaseAdapter, TranscribeOptions, TranscribeResult
+from ..types import AdapterMeta, BaseAdapter, TranscribeResult
 
 _KEY = {"api_key": {"type": "secret", "required": True, "label": "DashScope API Key"}}
 _MAX_UPLOAD_BYTES = 200 * 1024 * 1024   # base64 内联上传，防超大文件内存尖峰

@@ -1,0 +1,23 @@
+name: E2E (nightly)
+
+# 真实端到端：装 sherpa-onnx、pull 一个小端侧模型、用其自带样本做一次真实推理。
+# 慢且要下载权重，故不进每次 push 的 CI，只每天跑一次 + 可手动触发。
+on:
+  schedule:
+    - cron: "0 18 * * *"   # 每日 UTC 18:00（≈ 北京 02:00）
+  workflow_dispatch: {}
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install ".[sherpa,dev]"
+      - name: real pull + transcribe
+        env:
+          ASRKIT_E2E: "1"
+          ASRKIT_E2E_MODEL: whisper-tiny
+        run: pytest tests/test_e2e.py -v

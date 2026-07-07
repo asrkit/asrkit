@@ -185,9 +185,9 @@ def main(argv: Optional[list] = None) -> int:
             import json as _json
             out = []
             for m, inst in rows:
-                d = {"id": m.id, "name": m.name, "source": m.source,
-                     "provider": m.provider, "vendor": m.vendor, "langs": m.langs,
-                     "model_kind": m.model_kind}
+                d: dict = {"id": m.id, "name": m.name, "source": m.source,
+                           "provider": m.provider, "vendor": m.vendor, "langs": m.langs,
+                           "model_kind": m.model_kind}
                 if m.source == "local":
                     d["installed"] = bool(inst)
                     d["size_bytes"] = store.dir_size(m) if inst else 0
@@ -283,8 +283,8 @@ def main(argv: Optional[list] = None) -> int:
             entry["streaming"] = True
         if a.sha256:
             entry["sha256"] = a.sha256
-        p = usermodels.add(entry)
-        print(f"✓ registered {mid} → {p}")
+        saved = usermodels.add(entry)
+        print(f"✓ registered {mid} → {saved}")
         if a.model_dir:
             folder = mid.split("/", 1)[-1]
             root = store.models_root()

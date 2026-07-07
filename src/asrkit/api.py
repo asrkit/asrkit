@@ -1,7 +1,7 @@
 """High-level API: transcribe / pull / run / list_models."""
 from __future__ import annotations
 
-from typing import List, Optional, Union
+from typing import List
 
 from . import registry
 from .types import AdapterMeta, AudioInput, TranscribeOptions, TranscribeResult

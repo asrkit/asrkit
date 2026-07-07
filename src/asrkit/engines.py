@@ -18,7 +18,7 @@ ENGINES = {
 
 def is_installed(name: str) -> bool:
     mod = ENGINES.get(name, (None, None))[0]
-    return bool(mod) and importlib.util.find_spec(mod) is not None
+    return mod is not None and importlib.util.find_spec(mod) is not None
 
 
 def extra_of(name: str):

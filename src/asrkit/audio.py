@@ -6,7 +6,7 @@ core 不解码；只有需要 PCM 的本地 adapter 才调这里的 load_samples
 """
 from __future__ import annotations
 
-from typing import Tuple
+from typing import Any, Tuple
 
 
 class AudioFormatError(Exception):
@@ -18,7 +18,7 @@ def load_samples(
     required_sr: int = 16000,
     required_channels: int = 1,
     convert: bool = False,
-) -> Tuple["object", int]:
+) -> Tuple[Any, int]:
     """读取音频为 float32 采样点，返回 (samples, sample_rate)。
 
     - convert=False（默认）：采样率/声道/格式与要求不符 → 抛 AudioFormatError（诚实报错）。

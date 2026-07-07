@@ -6,6 +6,19 @@ on:
   pull_request:
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff mypy
+      - name: ruff (lint)
+        run: ruff check src tests
+      - name: mypy (types)
+        run: mypy
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -16,6 +29,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      # 轻量：装云端 extras（numpy/soundfile/soxr/requests）+ pytest；不装 sherpa-onnx（端侧真机放 nightly/手动）
-      - run: pip install ".[cloud]" pytest
-      - run: pytest -q
+      # 装 cloud + serve extras + dev（httpx/pytest-cov）：让 serve 测试不再 skip、并出覆盖率。
+      # 不装 sherpa-onnx（端侧真机推理放 e2e.yml nightly / 手动）。
+      - run: pip install ".[cloud,serve,dev]"
+      - run: pytest --cov=asrkit --cov-report=term-missing
