@@ -164,6 +164,20 @@ source <(asrkit completion zsh)
 asrkit completion fish > ~/.config/fish/completions/asrkit.fish
 ```
 
+### Streaming (minimal): `asrkit stream`
+
+对一个 streaming（online）sherpa 模型逐块解码,live 进度打在 stderr、最终文本进 stdout(可管道)。
+
+```bash
+asrkit stream local/paraformer-online a.wav          # live 进度 stderr,最终文本 stdout
+asrkit stream local/paraformer-online a.wav > out.txt  # 只截获最终文本
+asrkit stream local/paraformer-online a.m4a --convert  # opt-in 解码/重采样
+```
+
+- live partial 只在 stderr 是 TTY 时覆盖同一行(`\r`);管道/重定向时不吐 ANSI,stdout 只落最终文本。
+- 仅 `modes` 含 `streaming` 的模型可用(`asrkit list --json` 看 modes);批处理模型会给出清晰报错。
+- 退出码:非流式/未配置/坏窗 = 2,模型未注册 = 3,引擎未装/格式错/运行时失败 = 4。
+
 ---
 
 ## 二、Python

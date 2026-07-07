@@ -110,3 +110,22 @@ csv 用逗号分隔、tsv 用 tab 分隔；写入用标准库 `csv.writer`（`li
 **批量模式退出码取"最严重"**（`emit.worst_code`），优先级 **`1 > 3 > 4`**：只要批次中有任意一条命中 `EXIT_ERROR`（意外异常），整体返回 `1`，即使同时也有 `3`/`4` 也不会被掩盖；其次是 `3`（模型不存在，通常整批同一模型，一旦命中会在建立 adapter 阶段就短路）；最后才是 `4`（个别文件转写失败，其余继续处理）。批次全部成功才返回 `0`。
 
 > 注：单文件模式下，行为变更前历史上失败只返回 `1`；现在 `result.error` 非空的转写失败返回 **`4`**，其它程序性异常仍返回 `1`（`cli._batch_code`）。详见 `CHANGELOG.md` 的 `Unreleased` 一节。
+
+---
+
+## 五、流式契约：`PartialResult`（W4 行使记录）
+
+`asrkit stream` / `api.transcribe_stream` 返回 `PartialResult` 迭代器（见 `src/asrkit/types.py`）。消费者**一律以 `text` 为准**（权威展示文本）。
+
+| 字段 | 类型 | 含义 | 本刀（W4）填充 |
+|---|---|---|---|
+| `text` | str | 当前完整假设 / 最终文本 | ✅ 每块给出 |
+| `is_final` | bool | 是否为定稿（迭代最后一个为 `True`） | ✅ |
+| `committed` | str | 可选优化：已定稿部分 | 留空（契约允许，端侧留空） |
+| `partial` | str | 可选优化：当前假设增量 | 留空 |
+| `ts_ms` | int? | 时间戳 | 未填（文件分块无稳定挂钟语义） |
+| `error` | str? | 运行时失败信息 | 随末尾 `is_final=True` 给出 |
+
+**语义**：每解码一块 yield 一个 `PartialResult(text=<增长假设>, is_final=False)`；喂完 flush 尾音后 yield 最终 `PartialResult(text=<最终文本>, is_final=True)`。`text` 每块**重发全量**（非增量）。仅 `modes` 含 `streaming` 的模型支持；批处理模型 `api.transcribe_stream` 抛 `ValueError`、adapter 直调抛 `NotImplementedError`。
+
+> **复盘（留给未来独立一刀）**：当前 `text` 每块重发全量，消费者需自行 diff 才知新增。若将来要"仅追加已定稿"，再引入 `committed`/`partial` 精细化——契约已预留字段，属**纯新增**、无需破坏性变更。麦克风/serve 流式端点、词级时间戳同为后续项。

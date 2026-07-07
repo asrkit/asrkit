@@ -20,6 +20,7 @@
 - **发现**：`asrkit list --lang <code>` / `--arch <config_type>` 筛选；`asrkit search <term>`（id/name 子串）。
 - **元数据修真**：广多语模型（whisper/dolphin/qwen3-asr/funasr-nano/omnilingual 等）标 `capabilities.multilingual`——`--lang X` 把它们作候选返回（覆盖因模型而异）；SenseVoice 语言补全为 zh/en/ja/ko/yue。`show` 显示 multilingual。
 - **shell 补全**：`asrkit completion <bash|zsh|fish>` 输出补全脚本(补子命令 + 动态 model 名 + 格式值);配套 `asrkit list --ids`(裸 id,一行一个)。
+- **流式(最小)**：新增 `asrkit stream <model> <audio>` 与 `api.transcribe_stream`,对 sherpa online 模型逐块解码、边喂边出增量文本(live→stderr 的 `\r` 覆盖行、final→stdout 可管道);首次行使 `PartialResult` 契约(只用 `text` + `is_final`)。零新依赖。仅 `modes` 含 `streaming` 的模型支持,批处理模型给出清晰报错。
 
 ### 说明
 - openai/whisper-1 的 `verbose_json` 路径待真机验证；sherpa/transformers segments 与 word-level 时间戳为后续项。
