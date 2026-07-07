@@ -142,6 +142,7 @@ def main(argv: Optional[list] = None) -> int:
     lp = sub.add_parser("list", help="list models (✓ = installed)")
     lp.add_argument("--json", action="store_true", help="machine-readable output")
     lp.add_argument("--installed", action="store_true", help="only installed local models")
+    lp.add_argument("--ids", action="store_true", help="print bare model ids (one per line, for scripts/completion)")
     lp.add_argument("--source", default=None, choices=("cloud", "local"), help="filter by source")
     lp.add_argument("--lang", default=None, help="only models supporting this language (e.g. ja)")
     lp.add_argument("--arch", default=None, help="only models of this architecture (e.g. senseVoice)")
@@ -227,9 +228,6 @@ def main(argv: Optional[list] = None) -> int:
         for m in api.list_models():
             if a.source and m.source != a.source:
                 continue
-            inst = _installed(m) if m.source == "local" else None
-            if a.installed and not inst:
-                continue
             if a.lang:
                 want = a.lang.strip().lower()
                 langs = {x.strip().lower() for x in (m.langs or [])}
@@ -237,7 +235,17 @@ def main(argv: Optional[list] = None) -> int:
                     continue
             if a.arch and (m.config_type or "").strip().lower() != a.arch.strip().lower():
                 continue
+            inst = None
+            if a.installed or not a.ids:                 # 懒算:补全时不做 71 次文件系统检查
+                inst = _installed(m) if m.source == "local" else None
+            if a.installed and not inst:
+                continue
+            if a.ids:
+                print(m.id)
+                continue
             rows.append((m, inst))
+        if a.ids:
+            return 0
         return _emit_model_rows(rows, a.json)
 
     if a.cmd == "search":
