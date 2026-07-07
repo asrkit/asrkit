@@ -62,6 +62,41 @@ def _print_result(r, fmt="txt", output=None) -> int:
     return 0
 
 
+def _emit_model_rows(rows, as_json) -> int:
+    """渲染 [(AdapterMeta, inst)] 列表。list 与 search 共用。格式与既有 list 逐字一致。"""
+    from . import store
+
+    def _human(n):
+        size = float(n)
+        for unit in ("B", "KB", "MB", "GB"):
+            if size < 1024 or unit == "GB":
+                return f"{int(size)}{unit}" if unit == "B" else f"{size:.1f}{unit}"
+            size /= 1024
+
+    if as_json:
+        import json as _json
+        out = []
+        for m, inst in rows:
+            d: dict = {"id": m.id, "name": m.name, "source": m.source,
+                       "provider": m.provider, "vendor": m.vendor, "langs": m.langs,
+                       "model_kind": m.model_kind}
+            if m.source == "local":
+                d["installed"] = bool(inst)
+                d["size_bytes"] = store.dir_size(m) if inst else 0
+            out.append(d)
+        print(_json.dumps(out, ensure_ascii=False, indent=2))
+        return 0
+    for m, inst in rows:
+        if m.source == "cloud":
+            mark, flag, size = " ", "☁️ ", ""
+        else:
+            mark = "✓" if inst else " "
+            flag = "💻"
+            size = _human(store.dir_size(m)) if inst else ""
+        print(f"{mark} {flag} {m.id:26s} {size:>9s}  {m.name}")
+    return 0
+
+
 def _batch_code(rc: int, r) -> int:
     """单文件:把 _print_result 的 0/1 细化为分级退出码(D9)。"""
     from . import emit
@@ -108,6 +143,8 @@ def main(argv: Optional[list] = None) -> int:
     lp.add_argument("--json", action="store_true", help="machine-readable output")
     lp.add_argument("--installed", action="store_true", help="only installed local models")
     lp.add_argument("--source", default=None, choices=("cloud", "local"), help="filter by source")
+    lp.add_argument("--lang", default=None, help="only models supporting this language (e.g. ja)")
+    lp.add_argument("--arch", default=None, help="only models of this architecture (e.g. senseVoice)")
 
     sh = sub.add_parser("show", help="show model details")
     sh.add_argument("model")
@@ -182,13 +219,6 @@ def main(argv: Optional[list] = None) -> int:
             return False
 
     if a.cmd == "list":
-        from . import store
-        def _human(n):
-            size = float(n)
-            for unit in ("B", "KB", "MB", "GB"):
-                if size < 1024 or unit == "GB":
-                    return f"{int(size)}{unit}" if unit == "B" else f"{size:.1f}{unit}"
-                size /= 1024
         rows = []
         for m in api.list_models():
             if a.source and m.source != a.source:
@@ -196,29 +226,15 @@ def main(argv: Optional[list] = None) -> int:
             inst = _installed(m) if m.source == "local" else None
             if a.installed and not inst:
                 continue
+            if a.lang:
+                want = a.lang.strip().lower()
+                langs = {x.strip().lower() for x in (m.langs or [])}
+                if want not in langs and not (m.capabilities or {}).get("multilingual"):
+                    continue
+            if a.arch and (m.config_type or "").strip().lower() != a.arch.strip().lower():
+                continue
             rows.append((m, inst))
-        if a.json:
-            import json as _json
-            out = []
-            for m, inst in rows:
-                d: dict = {"id": m.id, "name": m.name, "source": m.source,
-                           "provider": m.provider, "vendor": m.vendor, "langs": m.langs,
-                           "model_kind": m.model_kind}
-                if m.source == "local":
-                    d["installed"] = bool(inst)
-                    d["size_bytes"] = store.dir_size(m) if inst else 0
-                out.append(d)
-            print(_json.dumps(out, ensure_ascii=False, indent=2))
-            return 0
-        for m, inst in rows:
-            if m.source == "cloud":
-                mark, flag, size = " ", "☁️ ", ""
-            else:
-                mark = "✓" if inst else " "
-                flag = "💻"
-                size = _human(store.dir_size(m)) if inst else ""
-            print(f"{mark} {flag} {m.id:26s} {size:>9s}  {m.name}")
-        return 0
+        return _emit_model_rows(rows, a.json)
 
     if a.cmd == "show":
         from . import registry
