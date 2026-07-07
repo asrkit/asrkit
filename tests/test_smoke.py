@@ -119,6 +119,56 @@ def test_safe_extract_rejects_traversal(tmp_path):
             store._safe_extract(tf, str(tmp_path / "out"))
 
 
+def _tar_with(path, members, mode):
+    with tarfile.open(path, mode) as tf:
+        for name, data in members:
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            tf.addfile(info, io.BytesIO(data))
+
+
+def test_extract_archive_targz(tmp_path):
+    # 用户 add-model --url 给 .tar.gz：应能识别并解压（不再限死 bz2）
+    src = tmp_path / "m.tar.gz"
+    _tar_with(str(src), [("model.onnx", b"x")], "w:gz")
+    out = tmp_path / "out"
+    out.mkdir()
+    store._extract_archive(str(src), str(out))
+    assert (out / "model.onnx").exists()
+
+
+def test_extract_archive_zip(tmp_path):
+    import zipfile
+    src = tmp_path / "m.zip"
+    with zipfile.ZipFile(src, "w") as zf:
+        zf.writestr("model.onnx", b"x")
+    out = tmp_path / "out"
+    out.mkdir()
+    store._extract_archive(str(src), str(out))
+    assert (out / "model.onnx").exists()
+
+
+def test_extract_zip_rejects_traversal(tmp_path):
+    import zipfile
+    src = tmp_path / "evil.zip"
+    with zipfile.ZipFile(src, "w") as zf:
+        zf.writestr("../evil.txt", b"x")
+    out = tmp_path / "out"
+    out.mkdir()
+    with pytest.raises(ValueError):
+        store._extract_archive(str(src), str(out))
+
+
+def test_extract_archive_unsupported_format(tmp_path):
+    # 既非 tar.* 也非 zip → 诚实报错，不静默
+    src = tmp_path / "not-an-archive.bin"
+    src.write_bytes(b"this is not a tar or zip archive")
+    out = tmp_path / "out"
+    out.mkdir()
+    with pytest.raises(ValueError):
+        store._extract_archive(str(src), str(out))
+
+
 def test_sha256_mismatch_rejected(tmp_path):
     f = tmp_path / "x.bin"
     f.write_bytes(b"hello")

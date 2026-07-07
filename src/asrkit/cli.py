@@ -129,7 +129,8 @@ def main(argv: Optional[list] = None) -> int:
 
     am = sub.add_parser("add-model", help="register a custom (sherpa) model — no file editing")
     am.add_argument("id")
-    am.add_argument("--url", default=None, help="download URL (.tar.bz2)")
+    am.add_argument("--url", default=None,
+                    help="download URL (.tar.bz2/.gz/.xz or .zip; format detected by content)")
     am.add_argument("--arch", required=True,
                     help="config_type / architecture (e.g. senseVoice, whisper, offlineTransducer)")
     am.add_argument("--langs", default="", help="comma-separated, e.g. zh,en")

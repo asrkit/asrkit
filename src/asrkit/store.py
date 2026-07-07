@@ -1,7 +1,8 @@
 """本地模型存储与下载（Ollama 式 pull）。
 
-安全（H-01/03）：tar 路径穿越防护、下载超时、可选 sha256 校验。
+安全（H-01/03）：tar/zip 路径穿越防护、下载超时、可选 sha256 校验。
 原子（H-02）：解压到 `.partial` → 全部就位后 os.rename 换入；is_installed 只认完成的目录。
+格式：按内容（magic bytes）识别，支持 .tar.{bz2,gz,xz}、纯 .tar、.zip —— 不看 URL 扩展名。
 """
 from __future__ import annotations
 
@@ -12,8 +13,12 @@ import shutil
 import tarfile
 import tempfile
 import urllib.request
+import zipfile
 
 from .types import AdapterMeta
+
+# 下载落盘用的中性文件名；实际格式在解压时按 magic bytes 识别，与扩展名无关。
+_ARCHIVE_NAME = "download.archive"
 
 
 def models_root(config: dict | None = None) -> str:
@@ -136,6 +141,35 @@ def _safe_extract(tf: tarfile.TarFile, dest: str) -> None:
         tf.extractall(dest)                  # 旧版：已手工校验成员
 
 
+def _safe_extract_zip(zf: zipfile.ZipFile, dest: str) -> None:
+    """H-01（zip 版）：逐成员拒绝路径穿越/绝对路径逃逸。
+    注：Python 的 zipfile 不还原 symlink（按普通文件解出），故无 symlink 逃逸面，只需防穿越。"""
+    base = os.path.realpath(dest)
+    for name in zf.namelist():
+        tgt = os.path.realpath(os.path.join(dest, name))
+        if tgt != base and not tgt.startswith(base + os.sep):
+            raise ValueError(f"zip member escapes target dir ({name}); refusing")
+    zf.extractall(dest)
+
+
+def _extract_archive(path: str, dest: str) -> None:
+    """按内容识别压缩格式并安全解压到 dest。
+
+    支持 .tar.{bz2,gz,xz}、纯 .tar（`r:*` 自动识别压缩）与 .zip。识别只看 magic bytes，
+    不看扩展名 —— `pull` 的 download_url / `add-model --url` 给什么后缀都不影响。
+    """
+    if tarfile.is_tarfile(path):
+        with tarfile.open(path, "r:*") as tf:
+            _safe_extract(tf, dest)
+    elif zipfile.is_zipfile(path):
+        with zipfile.ZipFile(path) as zf:
+            _safe_extract_zip(zf, dest)
+    else:
+        raise ValueError(
+            "unsupported archive format (not a recognizable tar.* or zip); "
+            "asrkit expects a .tar.bz2/.gz/.xz or .zip model bundle")
+
+
 def pull(meta: AdapterMeta, config: dict | None = None, log=print) -> str:
     """下载并安装本地模型（原子）。已装则直接返回模型目录。"""
     if meta.source != "local":
@@ -153,15 +187,14 @@ def pull(meta: AdapterMeta, config: dict | None = None, log=print) -> str:
     staging = dest + ".partial"
     shutil.rmtree(staging, ignore_errors=True)
     try:
-        tar_path = os.path.join(tmp, "m.tar.bz2")
+        arc_path = os.path.join(tmp, _ARCHIVE_NAME)
         log(f"downloading {meta.download_url}")
-        _download(meta.download_url, tar_path, log)
-        _verify_sha256(tar_path, meta.sha256, log)
+        _download(meta.download_url, arc_path, log)
+        _verify_sha256(arc_path, meta.sha256, log)
         log("extracting ...")
-        with tarfile.open(tar_path, "r:bz2") as tf:
-            _safe_extract(tf, tmp)
+        _extract_archive(arc_path, tmp)     # 按内容识别 tar.*/zip，安全解压
 
-        entries = [os.path.join(tmp, n) for n in os.listdir(tmp) if n != "m.tar.bz2"]
+        entries = [os.path.join(tmp, n) for n in os.listdir(tmp) if n != _ARCHIVE_NAME]
         subdirs = [e for e in entries if os.path.isdir(e)]
         if len(entries) == 1 and len(subdirs) == 1:
             os.rename(subdirs[0], staging)                  # sherpa 常见：单顶层目录
