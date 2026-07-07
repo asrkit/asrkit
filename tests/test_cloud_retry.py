@@ -41,7 +41,6 @@ def test_doubao_uuid_and_policies(tmp_path, monkeypatch):
 
 
 def test_openai_uploads_bytes_and_idempotent_false(tmp_path, monkeypatch):
-    from asrkit.adapters import cloud_openai
     seen = {}
 
     def fake_post(url, **kw):
@@ -71,7 +70,6 @@ def test_openai_size_guard(tmp_path, monkeypatch):
 
 
 def test_dashscope_routes_through_http(tmp_path, monkeypatch):
-    from asrkit.adapters import cloud_dashscope
     seen = {}
 
     def fake_post(url, **kw):
