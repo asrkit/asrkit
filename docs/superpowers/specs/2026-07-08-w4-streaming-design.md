@@ -145,37 +145,45 @@ def transcribe_stream(model, audio, *, config=None, opts=None, window_s=0.1):
 
 ### 3.5 CLI `asrkit stream <model> <audio>`(`cli.py`)
 
+解析:`stp = sub.add_parser("stream", ...)`;`stp.add_argument("model")` + `stp.add_argument("audio")`(**单文件**,非 `nargs="+"`)+ `--language`/`--convert`/`--model-dir`(复用 `_opts`/`_cfg`,不引入 `-f/-o/--batch` 等批处理专属 flag)。退出码走项目既有 `emit.EXIT_*` 词汇,与 batch 一致。
+
 ```python
-# 解析:sp.add_parser("stream", ...); 参数 model, audio, --convert, --language
 if a.cmd == "stream":
-    import sys
+    from . import emit
     from .audio import AudioFormatError
-    opts = TranscribeOptions(convert=a.convert, lang_hint=a.language or "")
+    cfg, opts = _cfg(a), _opts(a)         # 复用:lang_hint/convert(segment 对流式无意义,忽略)
     live = sys.stderr.isatty()
     try:
-        for p in api.transcribe_stream(a.model, a.audio, config=cfg, opts=opts):
-            if p.error:
-                print(p.error, file=sys.stderr)
-                return 1
-            if p.is_final:
+        stream = api.transcribe_stream(a.model, a.audio, config=cfg, opts=opts)
+    except registry.ModelNotFoundError as e:
+        print(f"[error] {e}", file=sys.stderr)
+        return emit.EXIT_MODEL_NOT_FOUND          # 3
+    except ValueError as e:                        # 非流式模型 / 未配置 / window_s<=0
+        print(f"[error] {e}", file=sys.stderr)
+        return emit.EXIT_USAGE                     # 2
+    try:
+        for pr in stream:
+            if pr.error:
                 if live:
-                    sys.stderr.write("\r\x1b[K")   # 清 live 行
-                    sys.stderr.flush()
-                print(p.text)                       # 最终 → stdout(可管道)
+                    sys.stderr.write("\r\x1b[K"); sys.stderr.flush()
+                print(f"[error] {pr.error}", file=sys.stderr)
+                return emit.EXIT_FAILED           # 4:引擎未装 / streaming failed
+            if pr.is_final:
+                if live:
+                    sys.stderr.write("\r\x1b[K"); sys.stderr.flush()   # 清 live 行
+                print(pr.text)                      # 最终 → stdout(可管道)
             elif live:
-                sys.stderr.write("\r\x1b[K" + p.text)
-                sys.stderr.flush()
-    except ValueError as e:                          # 非流式模型 / 未配置
-        print(str(e), file=sys.stderr)
-        return 2
-    except AudioFormatError as e:                     # 格式不符且未 --convert
-        print(str(e), file=sys.stderr)
-        return 1
-    return 0
+                sys.stderr.write("\r\x1b[K" + pr.text); sys.stderr.flush()
+    except AudioFormatError as e:                   # 格式不符且未 --convert(穿透而来)
+        if live:
+            sys.stderr.write("\r\x1b[K"); sys.stderr.flush()
+        print(f"[error] {e}", file=sys.stderr)
+        return emit.EXIT_FAILED                     # 4:与 batch 对 AudioFormatError 的处理一致
+    return emit.EXIT_OK                             # 0
 ```
 
 - **live 仅在 stderr 是 tty 时**做 `\r` 覆盖;管道/重定向时不吐 ANSI 噪音,只在 stdout 落最终文本。
-- 退出码:非流式/未配置 = 2;格式错/模型未装 = 1;正常 = 0。
+- 退出码(项目 `emit.EXIT_*`):正常 0;非流式/未配置/坏窗 = 2;模型未注册 = 3;引擎未装/格式错/运行时失败 = 4(与 batch 对 `AudioFormatError` 归 `EXIT_FAILED` 一致)。
 
 ---
 
@@ -209,8 +217,9 @@ if a.cmd == "stream":
 - **`iter_file_chunks` 分块正确(无需 numpy)**:`monkeypatch audio.load_samples`→返回(长度 5000 的序列, 16000);断言产出 4 块(1600/1600/1600/200)、拼接等于原序列、窗口数 = ceil(5000/1600)。
 - **`iter_file_chunks` 格式守卫**:`monkeypatch load_samples`→抛 `AudioFormatError`;断言迭代首个即抛。
 - **`api.transcribe_stream` 及早守卫**:非流式 model → `pytest.raises(ValueError)`(不迭代即抛)。
-- **CLI `stream` 渲染**:`monkeypatch api.transcribe_stream`→产假 partials(`text="he"`, 然后 `text="hello", is_final=True`);`capsys` 断言 **stdout 含最终 "hello"**、返回 0。
-- **CLI `stream` 非流式**:`monkeypatch api.transcribe_stream`→抛 `ValueError`;断言 stderr 有提示、返回 2。
+- **CLI `stream` 渲染**:`monkeypatch api.transcribe_stream`→产假 partials(`text="he"`, 然后 `text="hello", is_final=True`);`capsys` 断言 **stdout 含最终 "hello"**、返回 `emit.EXIT_OK`(0)。
+- **CLI `stream` 非流式**:`monkeypatch api.transcribe_stream`→抛 `ValueError`;断言 stderr 有提示、返回 `emit.EXIT_USAGE`(2)。
+- **CLI `stream` 运行时失败**:`monkeypatch api.transcribe_stream`→产 `PartialResult(text="", is_final=True, error="streaming failed: x")`;断言 stderr 有 `[error]`、返回 `emit.EXIT_FAILED`(4)。
 - **回归**:不影响 `transcribe`/其它命令(现有 122 测试仍绿)。
 
 ---
