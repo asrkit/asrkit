@@ -54,3 +54,21 @@ def test_subtitle_without_segments_errors():
 def test_unknown_format_errors():
     with pytest.raises(formats.FormatError):
         formats.render(TranscribeResult(text="x"), "docx")
+
+
+def test_result_dict_always_includes_text():
+    d = formats.result_dict(TranscribeResult(text="", error="boom"))
+    assert d["text"] == ""          # 失败行也恒含 text
+    assert d["error"] == "boom"
+
+
+def test_result_dict_drops_other_empties_and_expands_segments():
+    d = formats.result_dict(TranscribeResult(text="hi", segments=[Segment(0.0, 1.0, "hi")]))
+    assert d["text"] == "hi"
+    assert "lang" not in d          # 空 lang 略去
+    assert d["segments"][0]["text"] == "hi"
+
+
+def test_single_json_still_drops_empty_text():
+    out = formats.render(TranscribeResult(text="", error="x"), "json")
+    assert '"text"' not in out       # 单文件 json 行为不变

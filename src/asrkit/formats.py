@@ -48,17 +48,29 @@ def _vtt(segs: List[Segment]) -> str:
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
-def _json_payload(r: TranscribeResult) -> str:
-    # 仅输出非空字段；dataclass（segments 等）转 dict。
+def result_dict(r: TranscribeResult) -> dict:
+    """每结果 → dict。text 恒含(即便空);其它空字段略去;segments 展开为 dict。
+    批量 NDJSON/csv 取数用(失败行也要有 text)。"""
     out = {}
     for f in dataclasses.fields(r):
         v = getattr(r, f.name)
+        if f.name == "text":
+            out["text"] = v or ""
+            continue
         if v in (None, "", [], {}):
             continue
         if f.name == "segments":
             v = [dataclasses.asdict(s) for s in v]
         out[f.name] = v
-    return _json.dumps(out, ensure_ascii=False, indent=2)
+    return out
+
+
+def _json_payload(r: TranscribeResult) -> str:
+    # 单文件 json:复用 result_dict,但保持"空 text 略去"的历史行为(输出不变)。
+    d = result_dict(r)
+    if not d.get("text"):
+        d.pop("text", None)
+    return _json.dumps(d, ensure_ascii=False, indent=2)
 
 
 def render(result: TranscribeResult, fmt: str) -> str:
