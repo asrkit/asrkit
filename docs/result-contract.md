@@ -11,7 +11,7 @@
 | 字段 | 类型 | 含义 | 空值规则 |
 |---|---|---|---|
 | `text` | `str` | 识别文字（唯一必填字段） | 失败时为 `""`，序列化时**恒含**（见下） |
-| `segments` | `list[Segment]` \| `None` | 分句时间戳（`start`/`end`/`text`），字幕（srt/vtt）依赖此字段 | 无则整字段略去；序列化时展开为 dict 列表 |
+| `segments` | `list[Segment]` \| `None` | 分句时间戳（`start`/`end`/`text`），字幕（srt/vtt）依赖此字段；目前由 whisper 家族（faster-whisper / whispercpp / openai/whisper-1）填充，sherpa 与 transformers 暂不填充（TODO） | 无则整字段略去；序列化时展开为 dict 列表 |
 | `word_timestamps` | `list[dict]` \| `None` | 逐词时间戳 `{word, start, end, conf?}` | 无则略去 |
 | `lang` | `str` \| `None` | 自动识别/指定的语言 | 无则略去 |
 | `latency_ms` | `int` \| `None` | 本次调用总耗时（毫秒） | 无则略去 |
@@ -22,6 +22,19 @@
 | `error` | `str` \| `None` | 出错信息；adapter 不抛异常，错误一律进此字段 | 成功时略去；失败时含 |
 
 > 序列化通用规则（`formats.result_dict`）：**`text` 恒含**（即便是空字符串，失败行也要有这个 key，方便脚本统一按 `text` 取值）；其它字段为空（`None`/`""`/`[]`/`{}`）时**整字段省略**，不会出现 `"lang": null` 这种噪音键。
+
+---
+
+## 一点五、能力位（capabilities）
+
+每个模型的 `AdapterMeta.capabilities` 包含一组三态字符串与布尔标记，描述该模型的特性与局限：
+
+| 能力位键 | 类型 | 含义 |
+|---|---|---|
+| `language_hint` | `"required"` / `"supported"` / `"none"` | 模型对语言提示的态度：`"required"` 必须指定、`"supported"` 支持但可选、`"none"` 忽略语言提示（如 SenseVoice 自动检测，不接受 `--language`） |
+| `segment_timestamps` | `bool` | 模型是否返回 `segments`（分句时间戳）；仅 whisper 家族的 capabilities 包含此字段（值为 `True`） |
+
+**选项诚实**：若模型的 `language_hint` 为 `"none"`（忽略语言提示），而用户传了 `--language`，`TranscribeResult.warnings` 会包含一条提示，例如 `"local/sensevoice auto-detects language; --language is ignored"`。单文件/批量模式下，warnings 会打到 stderr。
 
 ---
 

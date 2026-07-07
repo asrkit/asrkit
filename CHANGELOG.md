@@ -10,6 +10,16 @@
 > 2. 记 CHANGELOG —— 在下方加一节 `## [X.Y.Z] - YYYY-MM-DD`,分 `### 新增 / 变更 / 修复` 三段;**破坏性变更要醒目标出**。
 > 3. 打 tag 并推 —— `git tag -a vX.Y.Z -m "…" && git push origin main --tags`(tag 与 PyPI 版本一一对应)。
 
+## [Unreleased]
+
+### 新增
+- **字幕落地**：whisper 家族（faster-whisper / whispercpp / openai/whisper-1）现返回 `segments`，`srt/vtt` 对这些模型可用（此前对所有模型只报错）。
+- **选项诚实**：对显式声明"忽略语言提示"的模型（如 SenseVoice）传 `--language` 会给出 warning，而非静默丢弃；新增 `capabilities.language_hint` 三态判读。
+- whispercpp 现透传 `--language`（此前静默丢弃）。
+
+### 说明
+- openai/whisper-1 的 `verbose_json` 路径待真机验证；sherpa/transformers segments 与 word-level 时间戳为后续项。
+
 ## [0.5.2] - 2026-07-07
 
 主题：**批量 + 结果契约化 + 云端健壮性**（W0/W1/W2 三波累积;均向后兼容,唯退出码为醒目的行为微调）。
