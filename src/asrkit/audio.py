@@ -6,7 +6,7 @@ core 不解码；只有需要 PCM 的本地 adapter 才调这里的 load_samples
 """
 from __future__ import annotations
 
-from typing import Any, Tuple
+from typing import Any, Iterator, Tuple
 
 
 class AudioFormatError(Exception):
@@ -54,3 +54,22 @@ def load_samples(
             f"or pass --convert / opts.convert=True."
         )
     return np.ascontiguousarray(data, dtype=np.float32), sr
+
+
+def iter_file_chunks(
+    path: str,
+    sr: int = 16000,
+    channels: int = 1,
+    window_s: float = 0.1,
+    *,
+    convert: bool = False,
+) -> Iterator[Any]:
+    """解码文件为 sr/channels 后按固定窗切块,逐块 yield float32 采样。
+
+    格式守卫沿用 load_samples:convert=False 且不符 → AudioFormatError(懒抛,首次迭代)。
+    仅供流式 adapter 使用;window_s 由 api 层保证 > 0。
+    """
+    samples, actual_sr = load_samples(path, sr, channels, convert=convert)
+    win = max(1, int(actual_sr * window_s))
+    for i in range(0, len(samples), win):
+        yield samples[i:i + win]
