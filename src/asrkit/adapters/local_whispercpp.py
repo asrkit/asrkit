@@ -10,7 +10,7 @@ import time
 
 from ..audio import AudioFormatError, load_samples
 from ..registry import register_models, register_protocol
-from ..types import AdapterMeta, AudioInput, BaseAdapter, TranscribeOptions, TranscribeResult
+from ..types import AdapterMeta, AudioInput, BaseAdapter, Segment, TranscribeOptions, TranscribeResult
 
 _INSTALL_HINT = 'engine \'whispercpp\' not installed. Run: pip install "asrkit[whispercpp]"'
 
@@ -55,11 +55,14 @@ class WhisperCpp(BaseAdapter):
             load_ms = int((time.perf_counter() - t0) * 1000)
 
             t1 = time.perf_counter()
-            segs = self._model.transcribe(samples)
-            text = " ".join(getattr(s, "text", "") for s in segs).strip()
+            # 直接属性访问；显式中性 language 防 pywhispercpp 参数持久化
+            segs_raw = self._model.transcribe(samples, language=opts.lang_hint or "auto")
+            # t0/t1 为厘秒，需除以 100.0 转秒
+            out = [Segment(s.t0 / 100.0, s.t1 / 100.0, s.text.strip()) for s in segs_raw]
+            text = " ".join(x.text for x in out).strip()
             decode_ms = int((time.perf_counter() - t1) * 1000)
             return TranscribeResult(
-                text=text, latency_ms=load_ms + decode_ms,
+                text=text, segments=out or None, latency_ms=load_ms + decode_ms,
                 metrics={"load_ms": load_ms, "decode_ms": decode_ms})
         except Exception as e:
             return TranscribeResult(text="", error=f"{type(e).__name__}: {e}")
@@ -77,6 +80,7 @@ register_models([
     AdapterMeta(
         id=f"whispercpp/{name}", provider="whispercpp", vendor="whispercpp",
         name=disp, source="local", modes=["batch"], langs=langs,
-        model_kind="asr", config_type="whisper", model=name)
+        model_kind="asr", config_type="whisper", model=name,
+        capabilities={"language_hint": "supported", "segment_timestamps": True})
     for name, disp, langs in _WC
 ])
