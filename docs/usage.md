@@ -49,6 +49,21 @@ asrkit transcribe a.wav -m local/sensevoice --format json        # 全字段 JSO
 - 默认输出：第一行为识别文字；stderr 第二行为 `耗时、语言、rtf`。
 - 列表：`asrkit list --json`（脚本用）/ `--installed` / `--source cloud|local`。
 
+### 发现模型
+
+```bash
+asrkit list --lang ja                 # 支持日语的模型（含多语言候选）
+asrkit list --arch senseVoice         # 特定架构的模型（如 senseVoice、whisper）
+asrkit search whisper                 # 按 id/name 子串搜索（返回 id、name 中含 whisper 的模型）
+asrkit show local/whisper-tiny        # 显示模型详情（含 multilingual 标记）
+```
+
+**`--lang` 语义说明**：返回两类模型：
+1. **显式支持该语言** —— 模型的 `langs` 列表明确含该语言代码（如 SenseVoice 的 `ja` 代码）。
+2. **多语言候选** —— 标有 `capabilities.multilingual` 的广覆盖模型（whisper、dolphin、qwen3-asr、funasr-nano、omnilingual 等），它们被作为候选返回，但**实际覆盖因模型而异，请用 `asrkit show <model>` 验证语言支持清单**。
+
+例如 `asrkit list --lang ja` 会同时返回 `local/sensevoice`（显式 ja）与 `local/whisper-tiny`（多语言模型作为候选），但 whisper-tiny 是否真的支持 ja 需自行确认。
+
 例：
 
 ```

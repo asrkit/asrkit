@@ -16,6 +16,8 @@
 - **字幕落地**：whisper 家族（faster-whisper / whispercpp / openai/whisper-1）现返回 `segments`，`srt/vtt` 对这些模型可用（此前对所有模型只报错）。
 - **选项诚实**：对显式声明"忽略语言提示"的模型（如 SenseVoice）传 `--language` 会给出 warning，而非静默丢弃；新增 `capabilities.language_hint` 三态判读。
 - whispercpp 现透传 `--language`（此前静默丢弃）。
+- **发现**：`asrkit list --lang <code>` / `--arch <config_type>` 筛选；`asrkit search <term>`（id/name 子串）。
+- **元数据修真**：广多语模型（whisper/dolphin/qwen3-asr/funasr-nano/omnilingual 等）标 `capabilities.multilingual`——`--lang X` 把它们作候选返回（覆盖因模型而异）；SenseVoice 语言补全为 zh/en/ja/ko/yue。`show` 显示 multilingual。
 
 ### 说明
 - openai/whisper-1 的 `verbose_json` 路径待真机验证；sherpa/transformers segments 与 word-level 时间戳为后续项。
