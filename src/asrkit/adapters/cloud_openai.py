@@ -5,8 +5,10 @@
 """
 from __future__ import annotations
 
+import os
 import time
 
+from .. import _http
 from ..registry import register_model, register_protocol
 from ..types import AdapterMeta, AudioInput, BaseAdapter, TranscribeOptions, TranscribeResult
 
@@ -22,17 +24,22 @@ class OpenAICompatible(BaseAdapter):
             if not key:
                 return TranscribeResult(text="", error=f"missing api_key (vendor={self.meta.vendor})")
             base = self.config.get("base_url") or self.meta.default_base_url
-            import requests  # asrkit[cloud] 依赖
+            # 文件大小守卫(200MB)
+            sz = os.path.getsize(audio.original_path)
+            if sz > 200 * 1024 * 1024:
+                return TranscribeResult(
+                    text="", error=f"audio is {sz >> 20}MB, over the 200MB upload "
+                    "limit; segment the file first")
             t0 = time.perf_counter()
             # 透明原则：原始文件字节级原样上传，不解码/不重采样
             with open(audio.original_path, "rb") as f:
-                resp = requests.post(
-                    f"{base}/audio/transcriptions",
-                    headers={"Authorization": f"Bearer {key}"},
-                    data={"model": self.meta.model},
-                    files={"file": f},
-                    timeout=120,
-                )
+                data = f.read()
+            resp = _http.post(
+                f"{base}/audio/transcriptions",
+                headers={"Authorization": f"Bearer {key}"},
+                data={"model": self.meta.model},
+                files={"file": (os.path.basename(audio.original_path), data)},
+                timeout=120, idempotent=False)
             ms = int((time.perf_counter() - t0) * 1000)
             if resp.status_code >= 300:
                 return TranscribeResult(text="", latency_ms=ms,

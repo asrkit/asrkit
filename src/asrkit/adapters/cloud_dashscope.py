@@ -10,6 +10,7 @@ import base64
 import os
 import time
 
+from .. import _http
 from ..registry import register_model, register_protocol
 from ..types import AdapterMeta, BaseAdapter, TranscribeResult
 
@@ -30,9 +31,8 @@ def _data_uri(path: str) -> str:
 
 
 def _post(url, key, body):
-    import requests
-    r = requests.post(url, headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                      json=body, timeout=120)
+    r = _http.post(url, headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                   json=body, timeout=120, idempotent=False)
     if r.status_code >= 300:
         return None, f"HTTP {r.status_code}: {r.text[:200]}"
     return r.json(), None
