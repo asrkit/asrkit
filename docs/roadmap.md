@@ -40,7 +40,7 @@
 
 ## 生态方向(独立项目,非本仓库)
 
-- **asrbench —— 评测/选型工具(独立 repo,依赖 asrkit,单向)。** 让开发者在自己的音频上、端云一起横评 ASR 模型并选型。**定案:新开项目,不加进 asrkit 模块**(否则打脸"接口内核极小"的定位;依赖方向 asrbench→asrkit)。asrkit 只管跑模型出文本+延迟/RTF/成本;asrbench 管它不做的:归一化正确的 WER/CER、多维对比、数据集、报告。老的 `asr_bench`(Flutter/真机)是**只读参考**,新项目干净重构。待定三岔路:有参考 vs 无参考、输出形态(CLI 表/HTML/榜单)、面向个人选型 vs 公开榜。
+- **asrbench —— 评测/选型工具(独立 repo,依赖 asrkit,单向)。** 顶层设计见 [asrbench-blueprint.md](asrbench-blueprint.md)(定位/方法论/研究问题/论文路径)。 让开发者在自己的音频上、端云一起横评 ASR 模型并选型。**定案:新开项目,不加进 asrkit 模块**(否则打脸"接口内核极小"的定位;依赖方向 asrbench→asrkit)。asrkit 只管跑模型出文本+延迟/RTF/成本;asrbench 管它不做的:归一化正确的 WER/CER、多维对比、数据集、报告。老的 `asr_bench`(Flutter/真机)是**只读参考**,新项目干净重构。待定三岔路:有参考 vs 无参考、输出形态(CLI 表/HTML/榜单)、面向个人选型 vs 公开榜。
 
 ## 明确不做(已讨论定案,勿重复起意)
 
