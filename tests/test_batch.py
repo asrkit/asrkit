@@ -83,3 +83,56 @@ def test_mirror_failed_record_counts_but_continues(tmp_path):
     assert (tmp_path / "a.txt").exists()
     assert not (tmp_path / "b.txt").exists()       # 失败不写文件
     assert code == emit.EXIT_FAILED
+
+
+# ---- Task 8: cli 编排端到端(stub adapter) ----
+
+from asrkit import cli, registry
+from asrkit.types import AdapterMeta, BaseAdapter
+
+
+def _register_stub():
+    @registry.register_protocol("stub-batch")
+    class _Stub(BaseAdapter):
+        def transcribe(self, audio, opts):
+            import os
+            name = os.path.basename(audio.original_path)
+            if "bad" in name:
+                return TranscribeResult(text="", error="stub failure")
+            return TranscribeResult(text=f"T:{name}", lang="en", latency_ms=1)
+    registry.register_model(AdapterMeta(
+        id="stub/batch", provider="stub-batch", vendor="stub", name="Stub",
+        source="cloud", modes=["batch"], langs=["en"]))
+
+
+def test_cli_batch_ndjson_and_exit(tmp_path, capsys):
+    _register_stub()
+    (tmp_path / "a.wav").write_bytes(b"x")
+    (tmp_path / "bad.wav").write_bytes(b"x")
+    rc = cli.main(["transcribe", str(tmp_path), "-m", "stub/batch", "-f", "json"])
+    lines = [l for l in capsys.readouterr().out.splitlines() if l.strip()]
+    assert len(lines) == 2
+    assert rc == emit.EXIT_FAILED          # 有一个失败 → 非零
+
+
+def test_cli_batch_flag_forces_aggregate(tmp_path, capsys):
+    _register_stub()
+    (tmp_path / "a.wav").write_bytes(b"x")
+    rc = cli.main(["transcribe", str(tmp_path / "a.wav"), "-m", "stub/batch", "-f", "json", "--batch"])
+    assert len(capsys.readouterr().out.splitlines()) == 1 and rc == 0
+
+
+def test_cli_batch_srt_stdout_usage_error(tmp_path, capsys):
+    _register_stub()
+    (tmp_path / "a.wav").write_bytes(b"x")
+    (tmp_path / "b.wav").write_bytes(b"x")
+    rc = cli.main(["transcribe", str(tmp_path), "-m", "stub/batch", "-f", "srt"])
+    assert rc == emit.EXIT_USAGE
+
+
+def test_cli_single_unchanged(tmp_path, capsys):
+    _register_stub()
+    (tmp_path / "a.wav").write_bytes(b"x")
+    rc = cli.main(["transcribe", str(tmp_path / "a.wav"), "-m", "stub/batch"])
+    out = capsys.readouterr().out
+    assert out.strip() == "T:a.wav" and rc == 0    # 单文件 txt 到 stdout,不带 file 前缀

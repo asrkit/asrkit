@@ -62,6 +62,14 @@ def _print_result(r, fmt="txt", output=None) -> int:
     return 0
 
 
+def _batch_code(rc: int, r) -> int:
+    """单文件:把 _print_result 的 0/1 细化为分级退出码(D9)。"""
+    from . import emit
+    if rc == 0:
+        return emit.EXIT_OK
+    return emit.EXIT_FAILED if r.error else emit.EXIT_ERROR
+
+
 def _add_transcribe_flags(sp):
     sp.add_argument("--api-key", default=None)
     sp.add_argument("--base-url", default=None)
@@ -71,7 +79,8 @@ def _add_transcribe_flags(sp):
                     help="Volcengine/Doubao Access Key (X-Api-Access-Key)")
     sp.add_argument("--language", default=None,
                     help="language hint (e.g. zh, en) — helps Whisper-family models")
-    sp.add_argument("-f", "--format", default="txt", choices=("txt", "json", "srt", "vtt"),
+    sp.add_argument("-f", "--format", default="txt",
+                    choices=("txt", "json", "srt", "vtt", "csv", "tsv"),
                     dest="format", help="output format (default: txt)")
     sp.add_argument("-o", "--output", default=None, help="write result to file (default: stdout)")
     sp.add_argument("--convert", action="store_true",
@@ -79,6 +88,11 @@ def _add_transcribe_flags(sp):
                          "(off by default: on mismatch it errors)")
     sp.add_argument("--segment", action="store_true",
                     help="VAD-segment long audio (off by default: over-window only warns)")
+    sp.add_argument("--batch", action="store_true",
+                    help="force batch/aggregate output even for a single input "
+                         "(stable NDJSON/csv for scripts)")
+    sp.add_argument("--stdin-format", default="wav",
+                    help="assumed format for stdin '-' input (default: wav)")
 
 
 def main(argv: Optional[list] = None) -> int:
@@ -147,11 +161,11 @@ def main(argv: Optional[list] = None) -> int:
 
     rp = sub.add_parser("run", help="download if missing, then transcribe (Ollama-style)")
     rp.add_argument("model")
-    rp.add_argument("audio")
+    rp.add_argument("audio", nargs="+")
     _add_transcribe_flags(rp)
 
     tp = sub.add_parser("transcribe", help="transcribe only (no auto-download)")
-    tp.add_argument("audio")
+    tp.add_argument("audio", nargs="+")
     tp.add_argument("-m", "--model", required=True)
     tp.add_argument("--model-dir", default=None)
     _add_transcribe_flags(tp)
@@ -252,21 +266,68 @@ def main(argv: Optional[list] = None) -> int:
         print(f"✓ removed {m.id} → {d}" if d else f"{m.id} not installed; nothing to remove")
         return 0
 
-    if a.cmd == "run":
-        try:
-            r = api.run(a.model, a.audio, config=_cfg(a), opts=_opts(a))
-            return _print_result(r, fmt=a.format, output=a.output)
-        except Exception as e:
-            print(f"[error] {e}", file=sys.stderr)
-            return 1
+    if a.cmd in ("run", "transcribe"):
+        import os
 
-    if a.cmd == "transcribe":
+        from . import emit, inputs
         try:
-            r = api.transcribe(a.model, a.audio, config=_cfg(a), opts=_opts(a))
-            return _print_result(r, fmt=a.format, output=a.output)
-        except Exception as e:
+            files, cleanups = inputs.resolve(a.audio, stdin_format=a.stdin_format)
+        except inputs.InputError as e:
             print(f"[error] {e}", file=sys.stderr)
-            return 1
+            return emit.EXIT_USAGE
+        try:
+            raw = a.audio
+            forced = a.batch
+            multi = len(files) != 1 or any(
+                arg == "-" or os.path.isdir(arg) or any(c in arg for c in "*?[")
+                for arg in raw)
+            batch = forced or multi
+            cfg, opts = _cfg(a), _opts(a)
+
+            # 单文件模式:输出与今天完全一致
+            if not batch and a.format in ("txt", "json", "srt", "vtt"):
+                try:
+                    fn = api.run if a.cmd == "run" else api.transcribe
+                    r = fn(a.model, files[0], config=cfg, opts=opts)
+                except registry.ModelNotFoundError as e:
+                    print(f"[error] {e}", file=sys.stderr)
+                    return emit.EXIT_MODEL_NOT_FOUND
+                except Exception as e:
+                    print(f"[error] {e}", file=sys.stderr)
+                    return emit.EXIT_ERROR
+                return _batch_code(_print_result(r, fmt=a.format, output=a.output), r)
+
+            # 批量/表格:字幕聚合到 stdout 不成立 → 用法错(fail fast)
+            if not a.output and a.format in ("srt", "vtt"):
+                print(f"[error] batch {a.format} needs -o <dir> "
+                      f"(subtitles can't be aggregated to stdout)", file=sys.stderr)
+                return emit.EXIT_USAGE
+
+            # 复用同一 adapter(不每文件重载本地模型);模型不存在 → 3
+            try:
+                adapter = registry.make_adapter(a.model, cfg)
+            except registry.ModelNotFoundError as e:
+                print(f"[error] {e}", file=sys.stderr)
+                return emit.EXIT_MODEL_NOT_FOUND
+            if a.cmd == "run" and not adapter.is_installed():
+                adapter.install()
+
+            from .types import TranscribeResult
+
+            def _records():
+                for f in files:
+                    try:
+                        res = api._run_adapter(adapter, a.model, f, opts)
+                        code = emit.code_for(res)
+                    except Exception as e:  # 意外异常 → 1,不掩盖
+                        res = TranscribeResult(text="", error=f"{type(e).__name__}: {e}")
+                        code = emit.EXIT_ERROR
+                    yield {"file": f, "model": a.model, "result": res, "code": code}
+
+            return emit.emit_batch(_records(), fmt=a.format, output=a.output)
+        finally:
+            for c in cleanups:
+                c()
 
     if a.cmd == "add-model":
         import os
