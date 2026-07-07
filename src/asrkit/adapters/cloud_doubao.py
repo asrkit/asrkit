@@ -9,7 +9,9 @@ from __future__ import annotations
 import base64
 import os
 import time
+import uuid
 
+from .. import _http
 from ..registry import register_model, register_protocol
 from ..types import AdapterMeta, AudioInput, BaseAdapter, TranscribeOptions, TranscribeResult
 
@@ -35,7 +37,6 @@ class Doubao(BaseAdapter):
             if not (api_key or (app_key and access_key)):
                 return TranscribeResult(
                     text="", error="missing credentials (api_key, or app_key + access_key) for vendor=doubao")
-            import requests
             base = c.get("base_url") or self.meta.default_base_url
             sz = os.path.getsize(audio.original_path)
             if sz > 200 * 1024 * 1024:      # base64 内联,防超大文件内存尖峰
@@ -45,9 +46,10 @@ class Doubao(BaseAdapter):
             with open(audio.original_path, "rb") as f:
                 b64 = base64.b64encode(f.read()).decode()
 
+            req_id = str(uuid.uuid4())
             headers = {
                 "X-Api-Resource-Id": self.meta.resource_id or "volc.bigasr.auc",
-                "X-Api-Request-Id": str(int(time.time() * 1e6)),
+                "X-Api-Request-Id": req_id,
                 "X-Api-Sequence": "-1",
                 "Content-Type": "application/json",
             }
@@ -58,17 +60,17 @@ class Doubao(BaseAdapter):
                 headers["X-Api-Access-Key"] = access_key
 
             t0 = time.perf_counter()
-            sub = requests.post(f"{base}/submit", headers=headers, json={
+            sub = _http.post(f"{base}/submit", headers=headers, json={
                 "user": {"uid": "asrkit"},
                 "audio": {"format": "wav", "data": b64},
                 "request": {"model_name": self.meta.model},
-            }, timeout=60)
+            }, timeout=60, idempotent=False)
             if sub.status_code >= 300:
                 return TranscribeResult(text="", error=f"submit HTTP {sub.status_code}: {sub.text[:200]}")
 
             for _ in range(30):
                 time.sleep(1)
-                q = requests.post(f"{base}/query", headers=headers, data="{}", timeout=60)
+                q = _http.post(f"{base}/query", headers=headers, data="{}", timeout=60, idempotent=True)
                 code = q.headers.get("x-api-status-code", "")
                 if code == "20000000":
                     j = q.json()
