@@ -40,11 +40,25 @@ from asrkit import transcribe
 print(transcribe("dashscope/qwen3-asr-flash", "audio.wav", config={"api_key": "…"}).text)
 ```
 
+## Batch & scripting
+
+Transcribe many files, a directory, a glob, or stdin at once — structured tables for comparison and scripting:
+
+```bash
+asrkit transcribe *.wav        -m local/sensevoice          -f csv          # one row each: file,model,text,latency_ms,rtf…
+asrkit transcribe ./recordings -m dashscope/qwen3-asr-flash -f json --batch # recurse a dir → NDJSON
+cat a.wav | asrkit transcribe  -  -m local/sensevoice                       # stdin
+```
+
+- **NDJSON / csv / tsv** for batches (a single file is still one object); `srt/vtt` subtitles need model-provided timestamps, otherwise an honest error.
+- **Graded exit codes** `0/2/3/4` (ok / usage error / model not found / transcription failed; any failure in a batch → non-zero), so scripts can tell why.
+- **Cloud batches retry** transient failures (429/5xx) automatically — cost-safe: billable requests retry only on rate-limit/connection failure, never double-billing (`ASRKIT_HTTP_RETRIES` tunable).
+
 ## Why ASRKit
 
 - **The interface is the core; everything is pluggable.** `pip install asrkit` ships only the interface + cloud (tiny — just `requests`); engines, models, and the server are all add-ons. No torch for things you don't use.
 - **Same interface, local or cloud.** On-device `local/sensevoice` and cloud `siliconflow/sensevoice` — swap the string, not your code.
-- **Curated *and* open.** 47 on-device models + 5 cloud vendors out of the box; custom models are one JSON line, new engines are a plugin — no fork required.
+- **Curated *and* open.** 47 on-device models + 5 cloud vendors (including China's DashScope / Doubao / SiliconFlow) out of the box; custom models are one JSON line, new engines are a plugin — no fork required.
 - **Transparent by design.** It doesn't touch your audio or change a model's native behavior by default. Wrong format? An honest error — never silent garbage. Conversion and long-audio chunking are opt-in.
 - **Private.** Your audio and API keys never leave your machine — it's a library/tool, not a hosted service.
 
@@ -70,8 +84,8 @@ Use an engine you haven't installed → **a friendly error with the install comm
 |---|---|
 | `asrkit list` | list all models (✓ = installed) |
 | `asrkit run <model> <audio>` | download if missing, then transcribe |
-| `asrkit transcribe <audio> -m <model>` | transcribe only; `--format txt/json/srt/vtt`, `-o`, `--language` |
-| `asrkit pull <model>` / `rm <model>` | download / remove an on-device model |
+| `asrkit transcribe <audio…> -m <model>` | transcribe only; multiple files / dir / glob / `-` (stdin), `--batch`; `--format txt/json/srt/vtt/csv/tsv`, `-o`, `--language` |
+| `asrkit pull <model> [--url …]` / `rm <model>` | download (`--url` overrides the source) / remove an on-device model |
 | `asrkit show <model>` | model details |
 | `asrkit engine list` / `install <name>` / `default <name>` | manage engines |
 | `asrkit config set-key <vendor> <KEY>` / `list` | store keys / default engine / models dir |
@@ -114,7 +128,7 @@ from openai import OpenAI
 c = OpenAI(base_url="http://localhost:11435/v1", api_key="unused")
 c.audio.transcriptions.create(model="local/sensevoice", file=open("a.wav", "rb"))
 ```
-- Endpoints: `POST /v1/audio/transcriptions` (`response_format`: json/text/srt/vtt), `GET /v1/models`, `GET /health`.
+- Endpoints: `POST /v1/audio/transcriptions` (`response_format`: json/verbose_json/text/srt/vtt), `GET /v1/models`, `GET /health`.
 - Cloud keys come from the `asrkit config` keystore — no per-request key needed. Transparent: raw bytes uploaded, no decoding.
 
 ## Extend it
