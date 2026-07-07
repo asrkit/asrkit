@@ -111,6 +111,6 @@ register_model(AdapterMeta(
     pricing={"unit": "hour", "cny": 2.6},
     default_base_url="https://api.openai.com/v1",
     model="whisper-1",
-    capabilities={"language_hint": "supported", "segment_timestamps": True},
+    capabilities={"language_hint": "supported", "segment_timestamps": True, "multilingual": True},
     config_schema={"api_key": {"type": "secret", "required": True, "label": "OpenAI API Key"}},
 ))

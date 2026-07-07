@@ -9,6 +9,7 @@ import importlib.util
 import time
 
 from ..audio import AudioFormatError, load_samples
+from ..capabilities import is_english_only
 from ..registry import register_models, register_protocol
 from ..types import AdapterMeta, AudioInput, BaseAdapter, Segment, TranscribeOptions, TranscribeResult
 
@@ -81,6 +82,7 @@ register_models([
         id=f"whispercpp/{name}", provider="whispercpp", vendor="whispercpp",
         name=disp, source="local", modes=["batch"], langs=langs,
         model_kind="asr", config_type="whisper", model=name,
-        capabilities={"language_hint": "supported", "segment_timestamps": True})
+        capabilities={"language_hint": "supported", "segment_timestamps": True,
+                      **({"multilingual": True} if not is_english_only(langs) else {})})
     for name, disp, langs in _WC
 ])

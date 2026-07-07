@@ -7,10 +7,14 @@ id = "local/<folder>"；下载地址来自 sherpa-onnx 的 GitHub releases。
 """
 from __future__ import annotations
 
+from ..capabilities import is_english_only
 from ..registry import register_models
 from ..types import AdapterMeta
 
 _BASE = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models"
+
+# 广多语架构：这些模型支持多语言，需要标 multilingual（除英语专用版本外）
+MULTI_ARCHS = {"whisper", "dolphin", "omnilingualCtc", "qwen3Asr", "funasrNano"}
 
 # (folder, 显示名, config_type, streaming, langs, tarball 资产名)
 _TABLE = [
@@ -76,8 +80,11 @@ def _metas():
             caps = {"max_input_duration_s": 30, "language_hint": "supported"}
         elif ctype == "senseVoice":
             caps = {"language_hint": "none"}
+            langs = ["zh", "en", "ja", "ko", "yue"]   # SenseVoice 真实支持(精确;不打 flag)
         else:
             caps = {}
+        if ctype in MULTI_ARCHS and not is_english_only(langs):
+            caps["multilingual"] = True
         out.append(AdapterMeta(
             id=f"local/{folder}",
             provider="sherpa-onnx",

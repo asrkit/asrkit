@@ -9,6 +9,7 @@ from __future__ import annotations
 import importlib.util
 import time
 
+from ..capabilities import is_english_only
 from ..registry import register_models, register_protocol
 from ..types import AdapterMeta, AudioInput, BaseAdapter, Segment, TranscribeOptions, TranscribeResult
 
@@ -86,7 +87,8 @@ register_models([
         model_kind="asr",
         config_type="whisper",
         model=name,
-        capabilities={"language_hint": "supported", "segment_timestamps": True},
+        capabilities={"language_hint": "supported", "segment_timestamps": True,
+                      **({"multilingual": True} if not is_english_only(langs) else {})},
         # faster-whisper 自带长音频分块，无 30s 窗口限制，故不设 max_input_duration_s
     )
     for name, disp, langs in _FW

@@ -24,3 +24,8 @@ def warnings_for(opts, meta) -> list:
     if getattr(opts, "lang_hint", None) and language_ignored(meta):
         out.append(f"{meta.id} auto-detects language; --language is ignored")
     return out
+
+
+def is_english_only(langs) -> bool:
+    """langs 只含 'en'(归一化)→ 英语专用检查点。用于排除 whisper-*-en/distil-en。"""
+    return [str(x).strip().lower() for x in (langs or [])] == ["en"]
