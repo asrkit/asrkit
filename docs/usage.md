@@ -114,6 +114,30 @@ export HF_ENDPOINT=https://hf-mirror.com
 asrkit engine install faster-whisper
 ```
 
+### Shell Completion
+
+Enable command-line completion for bash, zsh, or fish. Model names are fetched dynamically via `asrkit list --ids`, so newly installed models complete immediately.
+
+**bash:**
+```bash
+asrkit completion bash | sudo tee /etc/bash_completion.d/asrkit
+# Or for local shell session only:
+source <(asrkit completion bash)
+```
+
+**zsh:**
+```bash
+# Option 1: Install to fpath (permanent, requires shell restart)
+asrkit completion zsh > "${fpath[1]}/_asrkit"
+# Option 2: Source in this shell session only
+source <(asrkit completion zsh)
+```
+
+**fish:**
+```bash
+asrkit completion fish > ~/.config/fish/completions/asrkit.fish
+```
+
 ---
 
 ## 二、Python

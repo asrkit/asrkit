@@ -18,6 +18,7 @@
 - whispercpp 现透传 `--language`（此前静默丢弃）。
 - **发现**：`asrkit list --lang <code>` / `--arch <config_type>` 筛选；`asrkit search <term>`（id/name 子串）。
 - **元数据修真**：广多语模型（whisper/dolphin/qwen3-asr/funasr-nano/omnilingual 等）标 `capabilities.multilingual`——`--lang X` 把它们作候选返回（覆盖因模型而异）；SenseVoice 语言补全为 zh/en/ja/ko/yue。`show` 显示 multilingual。
+- **shell 补全**：`asrkit completion <bash|zsh|fish>` 输出补全脚本(补子命令 + 动态 model 名 + 格式值);配套 `asrkit list --ids`(裸 id,一行一个)。
 
 ### 说明
 - openai/whisper-1 的 `verbose_json` 路径待真机验证；sherpa/transformers segments 与 word-level 时间戳为后续项。
