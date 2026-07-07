@@ -14,7 +14,7 @@ import time
 from .. import store
 from ..audio import AudioFormatError, load_samples
 from ..registry import register_protocol
-from ..types import AudioInput, BaseAdapter, TranscribeOptions, TranscribeResult
+from ..types import AudioInput, BaseAdapter, PartialResult, TranscribeOptions, TranscribeResult
 
 # sherpa-onnx 是可选引擎（不在基础安装内）；含端侧解码所需的音频 io。
 _INSTALL_HINT = 'engine \'sherpa-onnx\' not installed. Run: pip install "asrkit[local]"'
@@ -145,6 +145,11 @@ def _decode_online(rec, samples, sr):
     return rec.get_result(st)
 
 
+def _result_text(r) -> str:
+    """归一 sherpa get_result 的返回(str 或带 .text 的对象)。"""
+    return r if isinstance(r, str) else getattr(r, "text", str(r))
+
+
 def _vad_segments(samples, sr, vad_model):
     """opt-in 长音频分段：silero-VAD 按停顿切段。移植自 worker.py:vad_segments。"""
     import numpy as np
@@ -243,3 +248,45 @@ class SherpaLocal(BaseAdapter):
                 warnings=warnings or None)
         except Exception as e:
             return TranscribeResult(text="", error=f"{type(e).__name__}: {e}")
+
+    def transcribe_stream(self, chunks, opts):
+        # 能力守卫:非流式模型不支持 —— 立即抛(外壳非生成器,保持基类 call-time 语义)
+        if "streaming" not in self.meta.modes:
+            raise NotImplementedError(
+                f"{self.meta.id} is a batch model; streaming needs a streaming model")
+        return self._stream(chunks, opts)
+
+    def _stream(self, chunks, opts):
+        if not _available():
+            yield PartialResult(text="", is_final=True, error=_INSTALL_HINT)
+            return
+        import numpy as np
+        d = store.model_dir(self.meta, self.config)
+        if not os.path.isdir(d):
+            yield PartialResult(
+                text="", is_final=True,
+                error=f"model not installed: {self.meta.id}. "
+                      f"Run `asrkit pull {self.meta.id}` first.")
+            return
+        prefer = self.meta.tag or "int8"
+        try:
+            if self._rec is None:
+                self._rec = _build(self.meta.config_type, d, 4,
+                                   opts.lang_hint or "", True, opts.enable_itn, prefer)
+            rec = self._rec
+            st = rec.create_stream()
+            sr = 16000                       # chunks 已是 16k 单声道 float32
+            for chunk in chunks:
+                st.accept_waveform(sr, chunk)
+                while rec.is_ready(st):
+                    rec.decode_stream(st)
+                yield PartialResult(text=_result_text(rec.get_result(st)), is_final=False)
+            st.accept_waveform(sr, np.zeros(sr // 2, dtype=np.float32))
+            st.input_finished()
+            while rec.is_ready(st):
+                rec.decode_stream(st)
+            yield PartialResult(text=_result_text(rec.get_result(st)), is_final=True)
+        except AudioFormatError:
+            raise                            # 交 CLI 格式错误分支,不吞
+        except Exception as e:               # _build/缺文件/运行时/解码 → 对称收进 error
+            yield PartialResult(text="", is_final=True, error=f"streaming failed: {e}")
