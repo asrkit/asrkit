@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import glob as _glob
 import os
+import sys
+import tempfile
 from typing import Callable, List, Tuple
 
 AUDIO_EXTS = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".opus", ".aac", ".wma", ".webm", ".amr"}
@@ -34,7 +36,20 @@ def resolve(raw_args: List[str], *, stdin_format: str = "wav") -> Tuple[List[str
     """返回 (有序去重文件路径, 清理回调)。本函数会为 stdin 产生副作用(见后续任务)。"""
     paths: List[str] = []
     cleanups: List[Callable] = []
+    seen_stdin = False
     for arg in raw_args:
+        if arg == "-":
+            if seen_stdin:
+                raise InputError("stdin '-' can appear at most once")
+            seen_stdin = True
+            data = sys.stdin.buffer.read() if hasattr(sys.stdin, "buffer") \
+                else sys.stdin.read().encode()
+            fd, tmp = tempfile.mkstemp(suffix="." + stdin_format.lstrip("."), prefix="asrkit_stdin_")
+            with os.fdopen(fd, "wb") as f:
+                f.write(data)
+            paths.append(tmp)
+            cleanups.append(lambda p=tmp: os.path.exists(p) and os.unlink(p))
+            continue
         if os.path.isdir(arg):
             hits = _collect_dir(arg)
             if not hits:
