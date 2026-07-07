@@ -2,8 +2,8 @@
 import csv
 import io
 import json
-from asrkit import emit
-from asrkit.types import TranscribeResult
+from asrkit import cli, emit, registry
+from asrkit.types import AdapterMeta, BaseAdapter, TranscribeResult
 
 
 def _rec(file, text="", error=None, raw=None):
@@ -21,7 +21,7 @@ def test_worst_code_priority():
 def test_ndjson_batch(capsys):
     recs = [_rec("a.wav", text="hello", raw={"x": 1}), _rec("b.wav", error="boom")]
     code = emit.emit_batch(iter(recs), fmt="json", output=None)
-    lines = [l for l in capsys.readouterr().out.splitlines() if l.strip()]
+    lines = [ln for ln in capsys.readouterr().out.splitlines() if ln.strip()]
     assert len(lines) == 2
     d0 = json.loads(lines[0])
     assert d0["file"] == "a.wav" and d0["model"] == "m/x"
@@ -87,9 +87,6 @@ def test_mirror_failed_record_counts_but_continues(tmp_path):
 
 # ---- Task 8: cli 编排端到端(stub adapter) ----
 
-from asrkit import cli, registry
-from asrkit.types import AdapterMeta, BaseAdapter
-
 
 def _register_stub():
     @registry.register_protocol("stub-batch")
@@ -110,7 +107,7 @@ def test_cli_batch_ndjson_and_exit(tmp_path, capsys):
     (tmp_path / "a.wav").write_bytes(b"x")
     (tmp_path / "bad.wav").write_bytes(b"x")
     rc = cli.main(["transcribe", str(tmp_path), "-m", "stub/batch", "-f", "json"])
-    lines = [l for l in capsys.readouterr().out.splitlines() if l.strip()]
+    lines = [ln for ln in capsys.readouterr().out.splitlines() if ln.strip()]
     assert len(lines) == 2
     assert rc == emit.EXIT_FAILED          # 有一个失败 → 非零
 

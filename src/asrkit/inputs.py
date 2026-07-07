@@ -23,6 +23,12 @@ def _is_glob(s: str) -> bool:
     return any(c in s for c in _GLOB_CHARS)
 
 
+def _rm(p: str) -> None:
+    """stdin 临时文件清理回调用;不返回值(避免在表达式里误用 unlink 返回值)。"""
+    if os.path.exists(p):
+        os.unlink(p)
+
+
 def _collect_dir(d: str) -> List[str]:
     hits = []
     for root, _dirs, files in os.walk(d):
@@ -48,7 +54,7 @@ def resolve(raw_args: List[str], *, stdin_format: str = "wav") -> Tuple[List[str
             with os.fdopen(fd, "wb") as f:
                 f.write(data)
             paths.append(tmp)
-            cleanups.append(lambda p=tmp: os.path.exists(p) and os.unlink(p))
+            cleanups.append(lambda p=tmp: _rm(p))
             continue
         if os.path.isdir(arg):
             hits = _collect_dir(arg)
