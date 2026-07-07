@@ -202,6 +202,10 @@ def main(argv: Optional[list] = None) -> int:
     am.add_argument("--model-dir", default=None,
                     help="use already-downloaded files (symlinked into place)")
 
+    dp = sub.add_parser("doctor", help="diagnose install/config/engines/keys (add --net for reachability)")
+    dp.add_argument("--net", action="store_true",
+                    help="also check network reachability (download source / cloud)")
+
     svp = sub.add_parser("serve", help="run an OpenAI-compatible transcription server")
     svp.add_argument("--host", default="127.0.0.1", help="bind host (default: 127.0.0.1, local only)")
     svp.add_argument("--port", type=int, default=11435, help="port (default: 11435)")
@@ -455,6 +459,14 @@ def main(argv: Optional[list] = None) -> int:
             return 0
         ep.print_help()
         return 0
+
+    if a.cmd == "doctor":
+        from . import doctor
+        marks = {"ok": "✓", "info": "○", "fail": "✗"}
+        checks = doctor.diagnose(net=a.net)
+        for c in checks:
+            print(f"{marks.get(c.status, ' ')} {c.name}: {c.detail}")
+        return 1 if any(c.status == "fail" for c in checks) else 0
 
     if a.cmd == "serve":
         from . import server

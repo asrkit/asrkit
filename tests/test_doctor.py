@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-from asrkit import doctor
+from asrkit import cli, doctor
 
 
 def _by(checks, name):
@@ -69,3 +69,23 @@ def test_writable_chmod_posix(tmp_path):
         assert doctor._writable(str(ro)) is False
     finally:
         os.chmod(ro, 0o700)
+
+
+def test_cli_doctor_ok(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr("asrkit.doctor._writable", lambda p: True)
+    monkeypatch.setenv("ASRKIT_CONFIG", str(tmp_path / "none.json"))   # 不存在 → info
+    rc = cli.main(["doctor"])
+    out = capsys.readouterr().out
+    assert rc == 0 and "asrkit:" in out
+
+
+def test_cli_doctor_nonzero_on_fail(monkeypatch):
+    monkeypatch.setattr("asrkit.doctor._writable", lambda p: False)
+    assert cli.main(["doctor"]) == 1
+
+
+def test_cli_doctor_net(monkeypatch, capsys):
+    monkeypatch.setattr("asrkit.doctor._probe", lambda url, timeout=2.0: True)
+    rc = cli.main(["doctor", "--net"])
+    assert rc in (0, 1)
+    assert "net:" in capsys.readouterr().out
