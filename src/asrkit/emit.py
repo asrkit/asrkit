@@ -64,6 +64,12 @@ def _ndjson_line(rec) -> str:
     return _json.dumps(d, ensure_ascii=False)
 
 
+def _emit_warnings(rec) -> None:
+    """把记录的 warnings 逐条打到 stderr,带文件名前缀。"""
+    for w in (rec["result"].warnings or []):
+        print(f'[warn] {rec["file"]}: {w}', file=sys.stderr)
+
+
 def emit_batch(records: Iterable[dict], *, fmt: str, output) -> int:
     # 镜像模式:如果指定 -o 目录,转向目录镜像处理
     if output:
@@ -71,6 +77,7 @@ def emit_batch(records: Iterable[dict], *, fmt: str, output) -> int:
     if fmt == "json":
         codes = []
         for rec in records:
+            _emit_warnings(rec)
             print(_ndjson_line(rec))
             if rec["result"].error:
                 print(f'[error] {rec["file"]}: {rec["result"].error}', file=sys.stderr)
@@ -82,12 +89,14 @@ def emit_batch(records: Iterable[dict], *, fmt: str, output) -> int:
         w.writerow(COLUMNS)
         codes = []
         for rec in records:
+            _emit_warnings(rec)
             w.writerow(_row(rec))
             codes.append(rec["code"])
         return worst_code(codes)
     if fmt == "txt":
         codes = []
         for rec in records:
+            _emit_warnings(rec)
             print(f'{rec["file"]}\t{rec["result"].text or ""}')
             if rec["result"].error:
                 print(f'[error] {rec["file"]}: {rec["result"].error}', file=sys.stderr)
@@ -102,6 +111,7 @@ def _mirror(records: Iterable[dict], fmt: str, outdir: str) -> int:
     used = set()
     codes = []
     for rec in records:
+        _emit_warnings(rec)
         r = rec["result"]
         # 结果有错 → 不写文件,计数并继续
         if r.error:

@@ -162,3 +162,12 @@ def test_cli_batch_run_install_failure_no_traceback(tmp_path):
     (tmp_path / "b.wav").write_bytes(b"x")
     rc = cli.main(["run", "stub/badinstall", str(tmp_path / "a.wav"), str(tmp_path / "b.wav")])
     assert rc == emit.EXIT_ERROR   # 捕获,不抛 traceback
+
+
+def test_emit_prints_warnings_to_stderr(capsys):
+    rec = {"file": "a.wav", "model": "m/x",
+           "result": TranscribeResult(text="hi", warnings=["m/x auto-detects language; --language is ignored"]),
+           "code": 0}
+    emit.emit_batch(iter([rec]), fmt="csv", output=None)
+    err = capsys.readouterr().err
+    assert "[warn] a.wav:" in err and "ignored" in err
