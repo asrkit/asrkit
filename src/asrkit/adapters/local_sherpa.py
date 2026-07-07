@@ -238,6 +238,7 @@ class SherpaLocal(BaseAdapter):
             return TranscribeResult(
                 text=(text or "").strip(), lang=lang, latency_ms=load_ms + decode_ms,
                 metrics={"load_ms": load_ms, "decode_ms": decode_ms,
+                         "duration_s": round(dur, 3) if dur else None,
                          "rtf": round((decode_ms / 1000) / dur, 4) if dur else None},
                 warnings=warnings or None)
         except Exception as e:
