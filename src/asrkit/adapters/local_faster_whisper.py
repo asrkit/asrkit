@@ -10,7 +10,7 @@ import importlib.util
 import time
 
 from ..registry import register_models, register_protocol
-from ..types import AdapterMeta, AudioInput, BaseAdapter, TranscribeOptions, TranscribeResult
+from ..types import AdapterMeta, AudioInput, BaseAdapter, Segment, TranscribeOptions, TranscribeResult
 
 _INSTALL_HINT = 'engine \'faster-whisper\' not installed. Run: pip install "asrkit[faster-whisper]"'
 
@@ -51,10 +51,12 @@ class FasterWhisper(BaseAdapter):
             # 引擎自带解码 + 长音频分块，原始文件直接给它（透明）
             segments, info = self._model.transcribe(
                 audio.original_path, language=opts.lang_hint or None)
-            text = "".join(s.text for s in segments).strip()
+            seg_list = list(segments)                  # 物化:生成器单次消耗,真正解码在此
             decode_ms = int((time.perf_counter() - t1) * 1000)
+            text = "".join(s.text for s in seg_list).strip()
+            segs = [Segment(s.start, s.end, s.text.strip()) for s in seg_list] or None
             return TranscribeResult(
-                text=text, lang=getattr(info, "language", None),
+                text=text, segments=segs, lang=getattr(info, "language", None),
                 latency_ms=load_ms + decode_ms,
                 metrics={"load_ms": load_ms, "decode_ms": decode_ms})
         except Exception as e:
@@ -84,6 +86,7 @@ register_models([
         model_kind="asr",
         config_type="whisper",
         model=name,
+        capabilities={"language_hint": "supported", "segment_timestamps": True},
         # faster-whisper 自带长音频分块，无 30s 窗口限制，故不设 max_input_duration_s
     )
     for name, disp, langs in _FW
