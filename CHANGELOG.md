@@ -13,6 +13,7 @@
 ## [Unreleased]
 
 ### 新增
+- **`asrkit doctor`**：一条命令体检安装/配置——引擎装没装、密钥配没配(只报有无,不泄露)、`~/.asrkit/models` 可写否、config 完整否;`--net` 加下载源/云端可达检查。硬问题(目录不可写/config 损坏)退出非零。
 - **字幕落地**：whisper 家族（faster-whisper / whispercpp / openai/whisper-1）现返回 `segments`，`srt/vtt` 对这些模型可用（此前对所有模型只报错）。
 - **选项诚实**：对显式声明"忽略语言提示"的模型（如 SenseVoice）传 `--language` 会给出 warning，而非静默丢弃；新增 `capabilities.language_hint` 三态判读。
 - whispercpp 现透传 `--language`（此前静默丢弃）。

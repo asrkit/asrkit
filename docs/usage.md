@@ -114,6 +114,32 @@ export HF_ENDPOINT=https://hf-mirror.com
 asrkit engine install faster-whisper
 ```
 
+### Diagnose: `asrkit doctor`
+
+Run a health check on your ASRKit setup with no side effects:
+
+```bash
+asrkit doctor                 # offline: version / python / engines / keys / models-dir / config
+asrkit doctor --net          # add network reachability checks (download source / cloud APIs)
+```
+
+**What it checks:**
+- **asrkit version** — your installed version.
+- **python** — Python version you're running.
+- **engines** — which ASR engines are installed (e.g., `engine:sherpa-onnx`, `engine:faster-whisper`). Missing engines show as `info` (not an error) with an install hint.
+- **keys** — whether API keys are configured for cloud vendors (e.g., `key:dashscope`, `key:doubao`). Shows presence only (vendor name + source: keystore/env), **never prints secret values**.
+- **models-dir** — whether `~/.asrkit/models/` (or `$ASRKIT_MODELS_ROOT`) is writable; counts installed models and their total size. Non-existent directory is `info` (created on first pull); unwritable directory is a hard failure.
+- **config** — whether `~/.asrkit/config.json` is valid JSON; shows default engine and models-root setting. Corrupt config is a hard failure.
+- **network** (with `--net`) — reachability of the model download source and cloud APIs (e.g., dashscope); checks via short timeout (2s), no retry. Unreachable is `info` (not a failure).
+
+**Exit code:**
+- `0` — all checks passed (or only informational warnings).
+- `1` — hard failures: models directory not writable, or config file corrupt.
+
+**Read-only, no side effects:** doctor never modifies files or creates directories. It uses a temporary write probe (creates and cleans a temp file in the target directory) to check writability; this probe is always cleaned up, even if the process is interrupted.
+
+**No secret leakage:** the doctor command reports only vendor names and credential sources (e.g., "present (keystore+env)"), never the actual key values.
+
 ### Shell Completion
 
 Enable command-line completion for bash, zsh, or fish. Model names are fetched dynamically via `asrkit list --ids`, so newly installed models complete immediately.
