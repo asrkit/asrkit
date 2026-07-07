@@ -10,6 +10,10 @@
 
 - **0.5.0** 接口内核极简化(base 只留接口+云端,引擎全 opt-in)。
 - **0.5.1** 加固(一轮 fresh-eyes 评审后):serve 不再卡死 + **按 model id 缓存 adapter**(本地模型不再每请求重载)、原子写 models.json、路径穿越防御、裸文件名不崩、插件告警、云端大文件守卫。
+- **W0 · 安全网(未发版,待下个 PATCH)**:
+  - **`pull` 多格式**:`store.pull` 按内容(magic bytes)识别 tar.{bz2,gz,xz}/纯 tar/zip,不再硬编码 bz2;`add-model --url` 给任意压缩包都能解(zip 加同款防穿越)。
+  - **CI 加固(已完成)**:`ruff`(lint)+ `mypy` 入 CI(与 test 并行);`test` job 装 `.[cloud,serve,dev]` 让 **serve 测试不再 skip** + 出覆盖率;新增 `dev` extra。顺带修 2 个真·潜在 bug(transformers `None.strip()` 崩、cli 变量遮蔽 ArgumentParser)。
+  - **最小真实 E2E(已完成)**:`tests/test_e2e.py` + `.github/workflows/e2e.yml` nightly——`pull whisper-tiny` → 用其自带 test_wavs 做真实推理 → 断言无 error 且非空。默认 skip,`ASRKIT_E2E=1` 才跑。
 
 ---
 
@@ -18,9 +22,7 @@
 ### P2 · 值得做
 
 - **`asrkit doctor`(体检命令)** —— 一条命令查:哪些引擎装了、哪些密钥配了、`~/.asrkit/models` 可写否、能否连通模型下载源/云端。降低"装不上/跑不了"的支持成本。
-- **CI 加固** —— 纳入 `ruff`(lint)+ `mypy`(有了 `py.typed`);装 `asrkit[serve]` 让 serve 测试不 skip;确认覆盖 config/formats。
 - **云端 HTTP 健壮性** —— 每个云端 adapter 现在是一次性 `requests.post`,无重试/退避/共享 Session。加:共享 `requests.Session`、统一超时、瞬时错误(429/5xx/超时)指数退避重试;doubao 轮询同理。serve 高频调云端时收益明显。
-- **最小真实 E2E 回归** —— 从 [asr_bench](../../Documents/AI-Lab/asr_bench)(真机端到端所在,**只读参考**)挑一小段音频 + 一个小端侧模型(如 whisper-tiny)做一条端到端 CI,让 repo 内也有真实推理覆盖(现在只有冒烟)。
 
 ### P3 · 功能补全(按需)
 
