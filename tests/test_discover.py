@@ -61,3 +61,22 @@ def test_list_no_filter_json_shape(capsys):
     pz = next(d for d in data if d["id"] == "local/paraformer-zh")
     assert set(pz) >= {"id", "name", "source", "provider", "vendor", "langs",
                        "model_kind", "installed", "size_bytes"}
+
+
+def test_search_matches_id_name(capsys):
+    _, out = _run(["search", "whisper", "--json"], capsys)
+    ids = {d["id"] for d in _json.loads(out)}
+    assert "openai/whisper-1" in ids and "faster-whisper/large-v3" in ids
+    assert any(i.startswith("local/whisper") for i in ids)
+
+
+def test_search_empty(capsys):
+    _, out = _run(["search", "zzznomatch", "--json"], capsys)
+    assert _json.loads(out) == []
+
+
+def test_show_multilingual_line(capsys):
+    _, out = _run(["show", "local/whisper-tiny"], capsys)
+    assert "multilingual: yes" in out
+    _, out2 = _run(["show", "local/paraformer-zh"], capsys)
+    assert "multilingual: no" in out2

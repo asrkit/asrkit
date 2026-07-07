@@ -146,6 +146,10 @@ def main(argv: Optional[list] = None) -> int:
     lp.add_argument("--lang", default=None, help="only models supporting this language (e.g. ja)")
     lp.add_argument("--arch", default=None, help="only models of this architecture (e.g. senseVoice)")
 
+    sp = sub.add_parser("search", help="search models by id/name substring")
+    sp.add_argument("term")
+    sp.add_argument("--json", action="store_true", help="machine-readable output")
+
     sh = sub.add_parser("show", help="show model details")
     sh.add_argument("model")
 
@@ -236,6 +240,15 @@ def main(argv: Optional[list] = None) -> int:
             rows.append((m, inst))
         return _emit_model_rows(rows, a.json)
 
+    if a.cmd == "search":
+        term = a.term.strip().lower()
+        rows = []
+        for m in api.list_models():
+            if term in (m.id + " " + m.name).lower():
+                inst = _installed(m) if m.source == "local" else None
+                rows.append((m, inst))
+        return _emit_model_rows(rows, a.json)
+
     if a.cmd == "show":
         from . import registry
         try:
@@ -247,6 +260,7 @@ def main(argv: Optional[list] = None) -> int:
         print(f"name:     {m.name}")
         print(f"source:   {m.source}  (provider={m.provider}, vendor={m.vendor})")
         print(f"langs:    {', '.join(m.langs)}")
+        print(f"multilingual: {'yes' if (m.capabilities or {}).get('multilingual') else 'no'}")
         print(f"modes:    {', '.join(m.modes)}")
         if m.source == "local":
             print(f"arch:     {m.config_type}")
