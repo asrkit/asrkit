@@ -10,6 +10,17 @@
 > 2. 记 CHANGELOG —— 在下方加一节 `## [X.Y.Z] - YYYY-MM-DD`,分 `### 新增 / 变更 / 修复` 三段;**破坏性变更要醒目标出**。
 > 3. 打 tag 并推 —— `git tag -a vX.Y.Z -m "…" && git push origin main --tags`(tag 与 PyPI 版本一一对应)。
 
+## [Unreleased]
+
+### 新增
+- **批量 / 目录 / glob / stdin 输入**：`asrkit run/transcribe` 接受多个路径、目录（递归按扩展名收音频）、glob、`-`（stdin，`--stdin-format` 指定格式）。
+- **`--batch`**：强制聚合输出（即便单文件），给脚本/评测稳定 NDJSON/csv。
+- **结果契约化**：批量 `-f json` 出 **NDJSON**（每行加 `file`/`model`/`schema_version`）；新增 **csv/tsv**（11 列）；契约文档 `docs/result-contract.md`。
+- 批量 `-o <dir>` 逐文件镜像；sherpa `metrics` 补 `duration_s`。
+
+### 变更（行为）
+- **退出码分级**（醒目）：从"几乎都 1"改为 `0` 成功 / `1` 意外 / `2` 用法错 / `3` 模型不存在 / `4` 转写失败。批量取最严（优先级 `1>3>4`）。单文件转写失败退出码可能由 `1` 变 `4`。
+
 ## [0.5.1] - 2026-07-07
 
 主题：**加固**（一轮 fresh-eyes 代码评审后的缺陷修复,纯修复、无破坏性）。

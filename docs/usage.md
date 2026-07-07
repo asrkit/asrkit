@@ -60,6 +60,30 @@ So that just raises a point I wonder what our design people think.
   (387ms, lang=en, rtf=0.048)
 ```
 
+### 批量输入：多文件 / glob / 目录 / stdin
+
+`run`/`transcribe` 的位置参数支持多个，可混用普通文件、glob 通配符、目录（递归按扩展名收音频）、或 `-`（stdin）。一旦触发批量（多输入 / glob / 目录 / stdin / 显式 `--batch`），输出会切换为**聚合契约**（NDJSON / csv / tsv），字段与退出码规则见 `docs/result-contract.md`。
+
+```bash
+# glob：多个 wav 转写，csv 输出到 stdout
+asrkit transcribe *.wav -m local/sensevoice -f csv
+
+# 目录：递归收集音频文件，NDJSON 输出（每行一个 JSON 对象）
+asrkit transcribe ./meetings -m local/sensevoice -f json --batch
+
+# stdin：管道喂音频字节，--stdin-format 指定字节的实际格式（默认 wav）
+cat a.wav | asrkit transcribe - -m local/sensevoice --stdin-format wav
+
+# -o <dir>：逐文件镜像输出（每个输入对应一个同名结果文件，重名自动加 -1/-2 后缀）
+asrkit transcribe ./meetings -m local/sensevoice -f txt -o ./out
+```
+
+- `--batch`：即使只给了一个文件，也强制走聚合输出（NDJSON/csv 稳定契约），给脚本/评测用。
+- `--stdin-format`：`-` 输入落地临时文件时使用的扩展名（默认 `wav`），转写完自动清理临时文件。
+- 批量字幕（`srt`/`vtt`）无法聚合到 stdout（多份字幕拼一起没有意义），必须配合 `-o <dir>`，否则报**用法错误**（退出码 2）。
+- **argparse 限制**：位置输入（音频路径/glob/目录/`-`）必须**连续**给出，不能被 `-m`/`-f` 等选项打断——例如 `asrkit transcribe a.wav b.wav -m X` 可以，但 `asrkit transcribe a.wav -m X b.wav` 里 `nargs="+"` 只会吞到第一个非选项片段，`b.wav` 不会被当作音频输入。把所有音频路径放在一起、其它 flag 放前面或后面。
+- **退出码**：`0` 成功 / `1` 意外异常 / `2` 用法错误 / `3` 模型不存在 / `4` 转写失败；批量取批次内最严重（优先级 `1 > 3 > 4`）。完整字段与列定义见 `docs/result-contract.md`。
+
 ---
 
 ## 二、Python
