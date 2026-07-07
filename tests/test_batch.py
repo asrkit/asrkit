@@ -133,3 +133,32 @@ def test_cli_single_unchanged(tmp_path, capsys):
     rc = cli.main(["transcribe", str(tmp_path / "a.wav"), "-m", "stub/batch"])
     out = capsys.readouterr().out
     assert out.strip() == "T:a.wav" and rc == 0    # 单文件 txt 到 stdout,不带 file 前缀
+
+
+def test_cli_csv_with_output_dir_usage_error(tmp_path):
+    _register_stub()
+    (tmp_path / "a.wav").write_bytes(b"x")
+    (tmp_path / "b.wav").write_bytes(b"x")
+    outdir = tmp_path / "out"
+    rc = cli.main(["transcribe", str(tmp_path / "a.wav"), str(tmp_path / "b.wav"),
+                   "-m", "stub/batch", "-f", "csv", "-o", str(outdir)])
+    assert rc == emit.EXIT_USAGE
+    assert not outdir.exists() or not any(outdir.iterdir())   # 不静默写空目录
+
+
+def test_cli_batch_run_install_failure_no_traceback(tmp_path):
+    @registry.register_protocol("stub-badinstall")
+    class _BadInstall(BaseAdapter):
+        def is_installed(self):
+            return False
+        def install(self, log=print):
+            raise RuntimeError("boom install")
+        def transcribe(self, audio, opts):
+            return TranscribeResult(text="x")
+    registry.register_model(AdapterMeta(
+        id="stub/badinstall", provider="stub-badinstall", vendor="stub", name="Bad",
+        source="local", modes=["batch"], langs=["en"]))
+    (tmp_path / "a.wav").write_bytes(b"x")
+    (tmp_path / "b.wav").write_bytes(b"x")
+    rc = cli.main(["run", "stub/badinstall", str(tmp_path / "a.wav"), str(tmp_path / "b.wav")])
+    assert rc == emit.EXIT_ERROR   # 捕获,不抛 traceback

@@ -303,6 +303,13 @@ def main(argv: Optional[list] = None) -> int:
                       f"(subtitles can't be aggregated to stdout)", file=sys.stderr)
                 return emit.EXIT_USAGE
 
+            # csv/tsv 是聚合/表格格式,-o 目录逐文件镜像不成立(formats.render 不渲染 csv/tsv);
+            # 让用户改用 stdout 重定向(asrkit ... -f csv > out.csv)。
+            if a.output and a.format in ("csv", "tsv"):
+                print(f"[error] {a.format} is an aggregate format; write it to stdout "
+                      f"(e.g. -f {a.format} > out.{a.format}), not -o <dir>", file=sys.stderr)
+                return emit.EXIT_USAGE
+
             # 复用同一 adapter(不每文件重载本地模型);模型不存在 → 3
             try:
                 adapter = registry.make_adapter(a.model, cfg)
@@ -310,7 +317,11 @@ def main(argv: Optional[list] = None) -> int:
                 print(f"[error] {e}", file=sys.stderr)
                 return emit.EXIT_MODEL_NOT_FOUND
             if a.cmd == "run" and not adapter.is_installed():
-                adapter.install()
+                try:
+                    adapter.install()
+                except Exception as e:
+                    print(f"[error] {e}", file=sys.stderr)
+                    return emit.EXIT_ERROR
 
             from .types import TranscribeResult
 
