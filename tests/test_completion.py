@@ -1,4 +1,9 @@
 """Tests for shell completion feature (list --ids + completion subcommand)."""
+import shutil
+import subprocess
+
+import pytest
+
 from asrkit import cli
 
 
@@ -22,12 +27,6 @@ def test_list_ids_respects_source(capsys):
     _, out = _run(["list", "--ids", "--source", "cloud"], capsys)
     ids = {x.strip() for x in out.splitlines() if x.strip()}
     assert "openai/whisper-1" in ids and "local/sensevoice" not in ids
-
-
-import shutil
-import subprocess
-
-import pytest
 
 
 def test_completion_tokens(capsys):
