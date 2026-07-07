@@ -213,3 +213,35 @@ def test_audio_guard(tmp_path):
     samples, sr = audio.load_samples(str(p), 16000, 1, convert=True)
     assert sr == 16000
     assert getattr(samples, "ndim", 1) == 1
+
+
+def test_pull_url_override(tmp_path, monkeypatch):
+    import io
+    import os
+    import shutil
+    import tarfile
+
+    from asrkit import store
+    from asrkit.types import AdapterMeta
+    monkeypatch.setenv("ASRKIT_MODELS_ROOT", str(tmp_path / "models"))
+    tar = tmp_path / "src.tar.bz2"
+    with tarfile.open(tar, "w:bz2") as tf:
+        info = tarfile.TarInfo("model.onnx")
+        info.size = 1
+        tf.addfile(info, io.BytesIO(b"x"))
+    monkeypatch.setattr(store, "_download",
+                        lambda url, path, log, timeout=30: shutil.copy(str(tar), path))
+    meta = AdapterMeta(id="local/urltest", provider="sherpa-onnx", vendor="local",
+                       name="x", source="local", modes=["batch"], langs=[], download_url="")
+    d = store.pull(meta, {}, url="http://example.com/whatever.tar.bz2")
+    assert os.path.exists(os.path.join(d, "model.onnx"))   # 用了覆盖 URL
+
+
+def test_pull_url_rejects_non_http(tmp_path, monkeypatch):
+    from asrkit import store
+    from asrkit.types import AdapterMeta
+    monkeypatch.setenv("ASRKIT_MODELS_ROOT", str(tmp_path / "models"))
+    meta = AdapterMeta(id="local/x2", provider="sherpa-onnx", vendor="local",
+                       name="x", source="local", modes=["batch"], langs=[], download_url="")
+    with pytest.raises(ValueError):
+        store.pull(meta, {}, url="file:///etc/passwd")

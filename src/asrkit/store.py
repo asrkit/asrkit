@@ -170,16 +170,19 @@ def _extract_archive(path: str, dest: str) -> None:
             "asrkit expects a .tar.bz2/.gz/.xz or .zip model bundle")
 
 
-def pull(meta: AdapterMeta, config: dict | None = None, log=print) -> str:
-    """下载并安装本地模型（原子）。已装则直接返回模型目录。"""
+def pull(meta: AdapterMeta, config: dict | None = None, log=print, *, url: str | None = None) -> str:
+    """下载并安装本地模型（原子）。已装则直接返回模型目录。url 覆盖 meta.download_url（限 http/https）。"""
     if meta.source != "local":
         raise ValueError(f"{meta.id} is not a local model; no pull needed")
     dest = model_dir(meta, config)
     if is_installed(meta, config):
         log(f"already installed: {dest}")
         return dest
-    if not meta.download_url:
+    effective_url = url or meta.download_url
+    if not effective_url:
         raise ValueError(f"{meta.id} has no download URL")
+    if not effective_url.startswith(("http://", "https://")):
+        raise ValueError(f"refusing non-http(s) download URL: {effective_url}")
 
     parent = os.path.dirname(os.path.abspath(dest))
     os.makedirs(parent, exist_ok=True)
@@ -188,8 +191,8 @@ def pull(meta: AdapterMeta, config: dict | None = None, log=print) -> str:
     shutil.rmtree(staging, ignore_errors=True)
     try:
         arc_path = os.path.join(tmp, _ARCHIVE_NAME)
-        log(f"downloading {meta.download_url}")
-        _download(meta.download_url, arc_path, log)
+        log(f"downloading {effective_url}")
+        _download(effective_url, arc_path, log)
         _verify_sha256(arc_path, meta.sha256, log)
         log("extracting ...")
         _extract_archive(arc_path, tmp)     # 按内容识别 tar.*/zip，安全解压

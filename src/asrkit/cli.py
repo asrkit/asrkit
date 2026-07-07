@@ -114,6 +114,8 @@ def main(argv: Optional[list] = None) -> int:
 
     pp = sub.add_parser("pull", help="download a local model")
     pp.add_argument("model")
+    pp.add_argument("--url", default=None,
+                    help="download from this URL instead of the model's default (http/https)")
 
     rmp = sub.add_parser("rm", help="remove a downloaded local model")
     rmp.add_argument("model")
@@ -245,7 +247,7 @@ def main(argv: Optional[list] = None) -> int:
 
     if a.cmd == "pull":
         try:
-            d = api.pull(a.model)
+            d = api.pull(a.model, url=a.url)
             print(f"✓ {a.model} → {d}")
             return 0
         except Exception as e:

@@ -28,7 +28,7 @@ class WhisperCpp(BaseAdapter):
     def is_installed(self) -> bool:
         return _available()
 
-    def install(self, log=print) -> str:
+    def install(self, log=print, url=None) -> str:
         if not _available():
             raise RuntimeError(_INSTALL_HINT)
         from pywhispercpp.model import Model

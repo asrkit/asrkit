@@ -176,8 +176,8 @@ class SherpaLocal(BaseAdapter):
     def is_installed(self):
         return store.is_installed(self.meta, self.config)
 
-    def install(self, log=print):
-        return store.pull(self.meta, self.config, log=log)
+    def install(self, log=print, url=None):
+        return store.pull(self.meta, self.config, log=log, url=url)
 
     def transcribe(self, audio: AudioInput, opts: TranscribeOptions) -> TranscribeResult:
         if not _available():

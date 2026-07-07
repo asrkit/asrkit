@@ -101,8 +101,8 @@ class BaseAdapter:
         """本地引擎覆盖：模型/引擎是否就绪。云端/自管理默认 True。"""
         return True
 
-    def install(self, log=print) -> str:
-        """本地引擎覆盖：下载/安装模型或引擎，返回位置。默认无需安装。"""
+    def install(self, log=print, url=None) -> str:
+        """本地引擎覆盖：下载/安装模型或引擎，返回位置。url 可覆盖默认下载地址（仅 sherpa 用）。默认无需安装。"""
         raise ValueError(f"{self.meta.id} needs no install")
 
     def transcribe(self, audio: AudioInput, opts: TranscribeOptions) -> TranscribeResult:

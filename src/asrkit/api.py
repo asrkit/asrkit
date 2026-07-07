@@ -21,9 +21,9 @@ def transcribe(model, audio, *, config=None, opts=None):
     return _run_adapter(registry.make_adapter(model, config or {}), model, audio, opts)
 
 
-def pull(model, *, config=None, log=print):
-    """安装一个模型/引擎（本地下载权重或引擎；云端无需）。返回位置。"""
-    return registry.make_adapter(model, config or {}).install(log=log)
+def pull(model, *, config=None, url=None, log=print):
+    """安装一个模型/引擎（本地下载权重或引擎；云端无需）。url 可覆盖默认下载地址。返回位置。"""
+    return registry.make_adapter(model, config or {}).install(log=log, url=url)
 
 
 def run(model, audio, *, config=None, opts=None, log=print):
