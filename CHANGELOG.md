@@ -17,6 +17,9 @@
 - **`--batch`**：强制聚合输出（即便单文件），给脚本/评测稳定 NDJSON/csv。
 - **结果契约化**：批量 `-f json` 出 **NDJSON**（每行加 `file`/`model`/`schema_version`）；新增 **csv/tsv**（11 列）；契约文档 `docs/result-contract.md`。
 - 批量 `-o <dir>` 逐文件镜像；sherpa `metrics` 补 `duration_s`。
+- **云端重试**：云端 adapter 走共享 Session + 分级重试/退避（`asrkit/_http.py`）。计费转写请求只重试 429/连接未建立（读超时/5xx 不重，避免重复计费）；doubao 轮询（只读）重试全部。`ASRKIT_HTTP_RETRIES` 可调（默认 3）。doubao 改用 uuid 幂等 `X-Api-Request-Id`。
+- **`asrkit pull --url`**：从自定义地址下载（限 http/https；格式按内容识别）。HF 系引擎镜像用 `HF_ENDPOINT`（零配置）。
+- openai/elevenlabs 上传补 200MB 大小守卫（与 dashscope/doubao 对齐）。
 
 ### 变更（行为）
 - **退出码分级**（醒目）：从"几乎都 1"改为 `0` 成功 / `1` 意外 / `2` 用法错 / `3` 模型不存在 / `4` 转写失败。批量取最严（优先级 `1>3>4`）。单文件转写失败退出码可能由 `1` 变 `4`。

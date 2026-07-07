@@ -84,6 +84,21 @@ asrkit transcribe ./meetings -m local/sensevoice -f txt -o ./out
 - **argparse 限制**：位置输入（音频路径/glob/目录/`-`）必须**连续**给出，不能被 `-m`/`-f` 等选项打断——例如 `asrkit transcribe a.wav b.wav -m X` 可以，但 `asrkit transcribe a.wav -m X b.wav` 里 `nargs="+"` 只会吞到第一个非选项片段，`b.wav` 不会被当作音频输入。把所有音频路径放在一起、其它 flag 放前面或后面。
 - **退出码**：`0` 成功 / `1` 意外异常 / `2` 用法错误 / `3` 模型不存在 / `4` 转写失败；批量取批次内最严重（优先级 `1 > 3 > 4`）。完整字段与列定义见 `docs/result-contract.md`。
 
+### 自定义下载源 / 镜像
+
+```bash
+asrkit pull local/sensevoice --url https://your-mirror.example.com/sensevoice.tar.bz2
+```
+
+- `--url` 一次性覆盖该模型的默认下载地址，仅限 `http://`/`https://`；其它 scheme（如 `file://`）拒绝执行。
+- 格式按**内容**（magic bytes）自动识别，支持 `.tar.{bz2,gz,xz}`、纯 `.tar`、`.zip`——不看 URL 扩展名，换源换后缀都不受影响。
+- **HF 系引擎镜像**：`faster-whisper`/`transformers`/`whispercpp` 走的是 HuggingFace Hub 下载，不经 `asrkit pull`；设环境变量 `HF_ENDPOINT=https://hf-mirror.com` 即可让底层库（`huggingface_hub`）自动走镜像，asrkit 本身无需任何配置。
+
+```bash
+export HF_ENDPOINT=https://hf-mirror.com
+asrkit engine install faster-whisper
+```
+
 ---
 
 ## 二、Python
@@ -133,6 +148,16 @@ asrkit transcribe a.wav -m dashscope/qwen3-asr-flash        # 自动带上密钥
 凭据解析优先级：**显式 `--api-key` > 环境变量 `<VENDOR>_API_KEY` > `asrkit config` 存的 keystore**。
 密钥明文存 `~/.asrkit/config.json`（权限 0600）；不放心就只用环境变量。
 另可 `asrkit config set default-engine <name>`（裸名落到该引擎）、`set models-root <path>`。
+
+### 云端调用自动重试
+
+所有云端 adapter 走共享 HTTP 层，遇到瞬时故障会自动重试 + 指数退避（尊重 `Retry-After`），无需自己写重试逻辑。重试次数可调：
+
+```bash
+export ASRKIT_HTTP_RETRIES=5   # 默认 3；0 表示不重试
+```
+
+> **成本安全（重要）**：计费的转写请求（OpenAI/ElevenLabs/DashScope 的转写、豆包 `submit`）**只在限流（HTTP 429）或连接从未建立（connect timeout）时重试**；读超时、5xx 等"请求可能已被服务端处理"的情况**不重试**，避免同一段音频被重复计费。豆包的轮询查询（`query`，只读、不计费）则会重试全部瞬时错误（429/5xx/超时/连接失败）。
 
 ---
 
