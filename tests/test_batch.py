@@ -61,3 +61,25 @@ def test_txt_batch_tab_separated(capsys):
              "result": TranscribeResult(text="hello"), "code": 0}]
     emit.emit_batch(iter(recs), fmt="txt", output=None)
     assert capsys.readouterr().out.splitlines()[0] == "a.wav\thello"
+
+
+def test_mirror_writes_per_file(tmp_path):
+    recs = [
+        {"file": "/x/a.wav", "model": "m", "result": TranscribeResult(text="AAA"), "code": 0},
+        {"file": "/y/a.wav", "model": "m", "result": TranscribeResult(text="BBB"), "code": 0},
+    ]
+    code = emit.emit_batch(iter(recs), fmt="txt", output=str(tmp_path))
+    names = sorted(p.name for p in tmp_path.iterdir())
+    assert names == ["a-1.txt", "a.txt"] or names == ["a.txt", "a-1.txt"]  # 同名去重
+    assert code == 0
+
+
+def test_mirror_failed_record_counts_but_continues(tmp_path):
+    recs = [
+        {"file": "a.wav", "model": "m", "result": TranscribeResult(text="ok"), "code": 0},
+        {"file": "b.wav", "model": "m", "result": TranscribeResult(text="", error="boom"), "code": 4},
+    ]
+    code = emit.emit_batch(iter(recs), fmt="txt", output=str(tmp_path))
+    assert (tmp_path / "a.txt").exists()
+    assert not (tmp_path / "b.txt").exists()       # 失败不写文件
+    assert code == emit.EXIT_FAILED

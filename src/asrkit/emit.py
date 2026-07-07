@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import csv
 import json as _json
+import os
 import sys
 from typing import Iterable
 
@@ -64,6 +65,9 @@ def _ndjson_line(rec) -> str:
 
 
 def emit_batch(records: Iterable[dict], *, fmt: str, output) -> int:
+    # 镜像模式:如果指定 -o 目录,转向目录镜像处理
+    if output:
+        return _mirror(records, fmt, output)
     if fmt == "json":
         codes = []
         for rec in records:
@@ -90,3 +94,39 @@ def emit_batch(records: Iterable[dict], *, fmt: str, output) -> int:
             codes.append(rec["code"])
         return worst_code(codes)
     raise NotImplementedError(fmt)   # 其它格式在后续任务补
+
+
+def _mirror(records: Iterable[dict], fmt: str, outdir: str) -> int:
+    """镜像模式:把每条记录逐文件写入输出目录。失败记录计数但不写文件,继续处理。"""
+    os.makedirs(outdir, exist_ok=True)
+    used = set()
+    codes = []
+    for rec in records:
+        r = rec["result"]
+        # 结果有错 → 不写文件,计数并继续
+        if r.error:
+            print(f'[error] {rec["file"]}: {r.error}', file=sys.stderr)
+            codes.append(EXIT_FAILED)
+            continue
+        # 尝试渲染该格式
+        try:
+            text = formats.render(r, fmt)
+        except formats.FormatError as e:
+            # 渲染失败(如无 segments 却要字幕) → 不写文件,计数并继续
+            print(f'[error] {rec["file"]}: {e}', file=sys.stderr)
+            codes.append(EXIT_FAILED)
+            continue
+        # 提取文件 stem,处理同名去重
+        stem = os.path.splitext(os.path.basename(rec["file"]))[0]
+        name = stem
+        i = 1
+        while name in used:
+            name = f"{stem}-{i}"
+            i += 1
+        used.add(name)
+        # 写入文件,保证尾部换行
+        dest = os.path.join(outdir, f"{name}.{fmt}")
+        with open(dest, "w", encoding="utf-8") as f:
+            f.write(text if text.endswith("\n") else text + "\n")
+        codes.append(rec["code"])
+    return worst_code(codes)
