@@ -25,20 +25,28 @@
   - **元数据修真**:广多语模型标 `capabilities.multilingual`(`--lang X` 作候选返回);SenseVoice 语言补全为 zh/en/ja/ko/yue。
   - **shell 补全(已完成)**:`asrkit completion <bash|zsh|fish>` 输出补全脚本(子命令 + 动态 model 名 + 格式值)。
   - **`asrkit doctor`(已完成)**:一条命令体检引擎/密钥(只报有无)/models 目录可写/config 完整;`--net` 加下载源/云端可达。硬问题(目录不可写/config 损坏)退非零;纯只读、零新依赖、网络 opt-in。
-- **W4 · 最小流式(未发版,待下个 PATCH)**:`asrkit stream <model> <audio>` + `api.transcribe_stream` —— 对 sherpa online 模型逐块解码、边喂边出增量文本(live→stderr 覆盖行、final→stdout 可管道);**首次行使 `PartialResult` 契约**(只用 text+is_final,committed/partial 按契约留空)——1.0 前"契约行使一次"的关卡。文件分块、零新依赖。麦克风/serve 流式/词级时间戳明确留后续。
+- **W4 · 最小流式(未发版,待下个 PATCH)**:`asrkit stream <model> <audio>` + `api.transcribe_stream` —— 对 sherpa online 模型逐块解码、边喂边出增量文本(live→stderr 覆盖行、final→stdout 可管道);**首次行使 `PartialResult` 契约**(只用 text+is_final,committed/partial 按契约留空)——1.0 前"契约行使一次"的关卡。文件分块、零新依赖。
+- **长跑健壮性(未发版)**:doubao 录音文件识别轮询从硬编码 30s 上限改为 wall-clock deadline + 退避(默认 300s,`ASRKIT_DOUBAO_POLL_TIMEOUT_S` 可配),长音频不再必然超时;`asrkit serve` 的 adapter 缓存从无界 dict 改为有界 LRU(默认 8,`ASRKIT_SERVE_CACHE` 可配),防长跑内存无界。
+- **可观测性 + 命令面(未发版)**:
+  - **`--verbose` / 日志(P3,已完成)**:引入标准 `logging`,run/transcribe/stream/serve 支持 `-v`(INFO)/`-vv`(DEBUG);点亮 `_http` 重试、serve 请求、转写 metrics。默认静默、作为库 import 零副作用。
+  - **`asrkit engine rm`(劝告版)(P4,已完成)**:打印手动 `pip uninstall <包>` + 共享依赖警告 + 重置默认引擎(若指向它);**绝不代跑 uninstall**。命令面对称(install ↔ rm)。
+- **流式弧线完成(P3 流式扩面,未发版)**:
+  - **E · 端点检测**:sherpa online 开 `enable_endpoint_detection`(rule3=300 防连续说话硬切),`PartialResult` 的 `committed`(已定稿段)/`partial`(当前假设)由静音端点填实、长会话自动分段。
+  - **C · 麦克风**:`asrkit stream <model> --mic` 实时转写(opt-in `asrkit[mic]`,Ctrl-C 停打印最终稿);新增 `api.transcribe_stream_mic`。
+  - **D · serve 流式端点(SSE)**:`POST /v1/audio/transcriptions` 加 `stream=true` → `text/event-stream`,OpenAI 兼容 `transcript.text.delta`/`.done` 事件(delta 由端点定稿驱动);客户端断连保证清理临时文件。
+  - 四种入口(文件 W4 / 分段 E / 麦克风 C / HTTP D)共用同一条 `transcribe_stream` + `PartialResult` 契约。**剩余留后续**:词级时间戳、serve WebSocket。
 
 ---
 
 ## 待办(按优先级)
 
-### P3 · 功能补全(按需)
+> P3(流式扩面 + `--verbose`)、P4(`engine rm`)已全部完成并归档到上方"已完成"。当前无未认领的核心待办。
 
-- **流式扩面** —— 最小文件流式已落地(W4)。后续:**麦克风输入**(需 sounddevice)、**serve 流式端点**(SSE/WebSocket)、**`committed`/`partial` 精细化**(仅追加已定稿,契约已预留字段)、词级时间戳。均为独立后续刀。
-- **`--verbose` / 日志** —— serve 与调试用;现在信息只进 `result.error`,服务端不好排障。
+### 后续候选(按需,均非紧要)
 
-### P4 · 打磨
-
-- **`asrkit engine rm`(劝告版)** —— 打印手动 `pip uninstall <包>` + 提醒(可能被别的项目共享),并重置默认引擎若指向它;**绝不代跑 uninstall**。让命令面完整而不越权。
+- **词级时间戳** —— 流式/批量的 word-level timestamps(sherpa/whisper 部分支持);有明确消费者再做。
+- **serve WebSocket 流式** —— SSE 已覆盖单向流式;双向/低延迟场景才需要 WS。
+- **专家评审遗留的打磨项** —— 见 `docs/expert-review-2026-07.md`(已修的两颗炸弹除外)。
 
 ---
 
