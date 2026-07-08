@@ -25,7 +25,7 @@ The base install needs only `requests` (cloud is built in); engines/models/`serv
 | **Not even install (run once)** | `uvx asrkit transcribe audio.wav -m siliconflow/sensevoice --api-key <KEY>` — pulled from PyPI and run, nothing left behind |
 | **Regular Python user** | `pip install asrkit` |
 | **Global command, don't touch current env** | `pipx install asrkit` |
-| **On-device engines (sherpa, 47 models)** | `pip install "asrkit[local]"` — local engines run in your Python env |
+| **On-device engines (sherpa, 47 models)** | once asrkit is installed, `asrkit engine install sherpa-onnx` (into your Python env; no shell-quoting to fight) |
 
 > Install `uv`: `curl -LsSf https://astral.sh/uv/install.sh | sh` (one line on macOS/Linux, single binary, zero runtime).
 > After installing, run `asrkit doctor` for a one-command health check (engines / keys / dirs / config; `--net` adds connectivity checks).
@@ -34,7 +34,7 @@ The base install needs only `requests` (cloud is built in); engines/models/`serv
 
 ```bash
 asrkit transcribe audio.wav -m siliconflow/sensevoice --api-key <KEY>   # free cloud model, works instantly
-asrkit run sherpa/sensevoice audio.wav                     # on-device: downloads on first run, then transcribes (needs asrkit[local])
+asrkit run sherpa/sensevoice audio.wav                     # on-device: downloads on first run, then transcribes (needs asrkit engine install sherpa-onnx first)
 ```
 
 ## The model string is the only thing that changes
@@ -112,11 +112,13 @@ asrkit completion zsh        # bash/zsh/fish completion (model names complete dy
 | You want | Install |
 |---|---|
 | Cloud + CLI + a client for `serve` | `pip install asrkit` |
-| Default on-device engine (sherpa, 47 models) | `pip install "asrkit[local]"` |
-| Other engines | `asrkit[faster-whisper]` / `asrkit[whispercpp]` / `asrkit[transformers]` |
-| Local server | `asrkit[serve]` |
-| Live microphone streaming | `asrkit[mic]` |
-| Everything | `asrkit[all]` |
+| Default on-device engine (sherpa, 47 models) | `asrkit engine install sherpa-onnx` |
+| Other engines | `asrkit engine install faster-whisper` / `whispercpp` / `transformers` |
+| Local server | extra `asrkit[serve]` |
+| Live microphone streaming | extra `asrkit[mic]` |
+| Everything | extra `asrkit[all]` |
+
+> Prefer `asrkit engine install <name>` for engines (runs the right `pip install` for you, no quoting). When installing an extra with pip directly, zsh needs quotes around `asrkit[serve]` and friends: `pip install 'asrkit[serve]'`.
 
 > **Ownership model:** engines are **shared pip packages** — `asrkit engine install <name>` installs into the right environment for you; uninstall with your own `pip uninstall` (shared packages, your env, your call). Models are **asrkit-owned** — `pull` to download, `rm` to delete, clean and symmetric.
 
@@ -142,7 +144,7 @@ asrkit completion zsh        # bash/zsh/fish completion (model names complete dy
 
 | Engine | Install | Address | Covers |
 |---|---|---|---|
-| **sherpa-onnx** (default on-device) | `asrkit[local]` | `sherpa/<model>` or bare `<model>` | 47 on-device models, 17 architectures |
+| **sherpa-onnx** (default on-device) | `asrkit[sherpa]` | `sherpa/<model>` or bare `<model>` | 47 on-device models, 17 architectures |
 | **faster-whisper** | `asrkit[faster-whisper]` | `faster-whisper/<model>` | fast Whisper, native long-audio |
 | **whisper.cpp** | `asrkit[whispercpp]` | `whispercpp/<model>` | ultra-light Whisper (no torch/onnx) |
 | **transformers** | `asrkit[transformers]` | `transformers/<any-hf-id>` | the whole HuggingFace ASR hub + LLM-arch SOTA |
@@ -165,7 +167,7 @@ Three ways to supply a key (highest priority first): `--api-key` > env var `<VEN
 `asrkit serve` starts a local server; any app on the OpenAI SDK (or an agent, or any language) reaches every model behind it by changing one `base_url` — this is the "LiteLLM proxy" half. **The caller needs zero asrkit deps, just HTTP.**
 
 ```bash
-pip install "asrkit[serve]"
+pip install 'asrkit[serve]'
 asrkit config set-key dashscope <KEY>     # store a key once (only for cloud)
 asrkit serve                              # 127.0.0.1:11435 by default, local only
 ```
