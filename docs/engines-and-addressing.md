@@ -53,39 +53,40 @@
 | 裸名（= 默认引擎简写） | `sensevoice`、`whisper-small` | `现状` |
 | 精度 tag | `sensevoice:fp32` | `现状` |
 | 本地默认引擎全名 | `local/sensevoice` | `现状` |
-| **具体本地引擎** | `sherpa/whisper-small`、`whispercpp/whisper-small`、`faster-whisper/whisper-small` | `路线` |
+| **具体本地引擎** | `whispercpp/small`、`faster-whisper/small` | `现状` |
+| sherpa 引擎（无独立前缀） | `local/whisper-small` | `现状`（sherpa-onnx 模型走 `local/<folder>` 寻址，没有单独的 `sherpa/` 前缀；见下方说明） |
 | 云厂商 | `siliconflow/sensevoice`、`openai/gpt-4o-transcribe` | `现状`（OpenAI 兼容已接） |
 
 **解析优先级**：带 `/` 按全名解析；不带 `/` 当默认引擎的简写（自动补默认前缀）。云端因需指明厂商+密钥，始终带 `/`，故裸名永远只落到本地默认引擎，无歧义。
 
 ---
 
-## 四、多引擎将来的命令形态（路线）
+## 四、多引擎命令形态（现状）
 
-规则不变，只是前缀从"默认引擎"扩展到"指定引擎"：
+规则不变，前缀从"默认引擎"扩展到"指定引擎"，已随 faster-whisper / whisper.cpp 两个引擎落地：
 
 ```bash
-# 裸名 = 默认引擎(现在是 sherpa)——老命令永远不变
+# 裸名 = 默认引擎(现在是 sherpa-onnx，寻址前缀 local/)——老命令永远不变
 asrkit run whisper-small a.wav
 
-# 指定引擎
-asrkit run sherpa/whisper-small a.wav
-asrkit run whispercpp/whisper-small a.wav
-asrkit run faster-whisper/whisper-small:int8 a.wav
+# 指定引擎（sherpa 走 local/ 前缀，无独立 sherpa/ 前缀）
+asrkit run local/whisper-small a.wav
+asrkit run whispercpp/small a.wav
+asrkit run faster-whisper/small:int8 a.wav
 
 # pull / rm / show / 云端 同一套 来源/模型
-asrkit pull whispercpp/whisper-small
-asrkit rm   faster-whisper/whisper-large-v3
+asrkit pull whispercpp/small
+asrkit rm   faster-whisper/large-v3
 asrkit run  siliconflow/sensevoice a.wav --api-key <KEY>
 ```
 
-`asrkit list` 按来源分组：
+`asrkit list` 按来源分组（示意）：
 
 ```
-💻 sherpa/            (本地引擎 · 默认)
-   ✓ sherpa/whisper-small
+💻 local/             (本地引擎 · 默认 · sherpa-onnx)
+   ✓ local/whisper-small
 💻 whispercpp/        (本地引擎)
-     whispercpp/whisper-small
+     whispercpp/small
 ☁️ siliconflow/       (云端)
      siliconflow/sensevoice
 ```
@@ -156,24 +157,31 @@ pip install asrkit-vosk    # 独立包，启动时被 asrkit 自动发现注册
 ```
 外部贡献者写新引擎无需改主仓。
 
+**功能性 opt-in extra（非引擎）**：`mic`、`serve` 不装模型/引擎，而是给某个 CLI 能力开关所需的依赖：
+```bash
+pip install "asrkit[mic]"    # 麦克风实时输入依赖（sounddevice + numpy），配合 asrkit stream <model> --mic
+pip install "asrkit[serve]"  # HTTP 网关依赖（fastapi/uvicorn 等），配合 asrkit serve
+```
+和上面"引擎" extra（sherpa/faster-whisper/whispercpp/transformers）不是一类：引擎 extra 决定"能跑哪个模型"，`mic`/`serve` 决定"能不能用某个 CLI 功能"。
+
 **③ `asrkit engine` 命令 —— Ollama 式封装（对 pip 的糖）**
 ```bash
 asrkit engine list                    # 引擎列表：装没装 / 谁是默认   （现状）
 asrkit engine install faster-whisper  # 底层 = pip 装对应 extra/插件  （现状）
 asrkit engine default whispercpp      # 设默认引擎（裸名落到它）       （现状，0.4.2）
-asrkit engine rm faster-whisper       # 卸载引擎                      （路线）
+asrkit engine rm faster-whisper       # 卸载引擎                      （现状，劝告版，不代跑卸载）
 ```
-> 现状：`engine` 实现 `list` / `install` / `default`（0.4.2 起，`default` 写入 `~/.asrkit/config.json`，裸名解析改读配置，缺省仍 `local`/sherpa）。`rm`（安全卸载，需处理 torch 等共享包）仍为路线。
+> 现状：`engine` 实现 `list` / `install` / `default` / **`rm`**（0.4.2 起，`default` 写入 `~/.asrkit/config.json`，裸名解析改读配置，缺省仍 `local`/sherpa）。`rm` 为劝告版：打印手动 `pip uninstall` 指引 + 共享依赖警告（torch 等可能被其它引擎/项目共用）+ 若默认引擎指向它则重置为 `local`，**绝不代跑 `pip uninstall`**。此功能尚未随任何 tag 发布（CHANGELOG `[Unreleased]`），具体版本号待发版时补充。
 
 ### 跑起来什么样
 
 ```bash
 asrkit engine install faster-whisper
-asrkit pull faster-whisper/whisper-large-v3
-asrkit run  faster-whisper/whisper-large-v3 a.wav
+asrkit pull faster-whisper/large-v3
+asrkit run  faster-whisper/large-v3 a.wav
 
 # 没装该引擎就用它 → 友好报错（带安装命令），不是 ModuleNotFoundError
-asrkit run faster-whisper/whisper-small a.wav
+asrkit run faster-whisper/small a.wav
 # [error] engine 'faster-whisper' not installed. Run: pip install "asrkit[faster-whisper]"
 ```
 

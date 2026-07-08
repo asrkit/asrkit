@@ -35,14 +35,22 @@
 ## 三、CLI 动词（对齐 Ollama）
 
 ```bash
-asrkit pull  model[:tag]          # ✅ 下载 + 解压 + 原子安装
-asrkit run   model[:tag] 音频     # ✅ = pull（若缺）+ transcribe，Ollama 式一步到位
-asrkit list                        # ✅ 列出全部（✓=已安装）
-asrkit show  model                 # ✅ 详情：架构/精度/许可证/语言（许可证数据待核实填充）
-asrkit transcribe 音频 -m model    # ✅ 只转写（不自动下载）
+asrkit pull  model[:tag] [--url URL]   # ✅ 下载（按内容识别 tar.bz2/gz/xz/纯tar/zip）+ 解压 + 原子安装；--url 覆盖默认下载地址
+asrkit run   model[:tag] 音频          # ✅ = pull（若缺）+ transcribe，Ollama 式一步到位
+asrkit list                             # ✅ 列出全部（✓=已安装）；支持 --json/--installed/--ids/--source/--lang/--arch 过滤
+asrkit show  model                      # ✅ 详情：架构/精度/许可证/语言/multilingual（许可证数据待核实填充）
+asrkit transcribe 音频 -m model         # ✅ 只转写（不自动下载）
+asrkit rm    model[:tag]                # ✅ 删除已下载的本地模型
+asrkit search term                      # ✅ 按 id/名称子串搜索模型
+asrkit stream model 音频 [--mic]        # ✅ 流式转写（文件分块或麦克风实时输入，见 result-contract.md §五）
+asrkit serve                            # ✅ 启动 OpenAI 兼容 HTTP 转写网关
+asrkit doctor [--net]                   # ✅ 体检安装/密钥/models 目录/config
+asrkit completion <bash|zsh|fish>       # ✅ 打印 shell 补全脚本
+asrkit engine list/install/default/rm   # ✅ 引擎管理（见 engines-and-addressing.md §八）
+asrkit config set-key/get-key/set/list/path   # ✅ 密钥与配置管理（见 §七）
+asrkit add-model <id> [--url ...] [--sha256 ...] [--model-dir ...]   # ✅ 注册自定义模型，见 engines-and-addressing.md §九
 # —— 以下为路线项，尚未实现 ——
-asrkit list --available            # 🔜 仅列可拉的
-asrkit rm    model[:tag]           # 🔜 删除
+asrkit list --available            # 🔜 目前没有"仅列可远程获取"的过滤开关；list 总是列出全部内置+已注册模型（可配合 --installed 反向过滤已装的）
 ```
 
 `transcribe` 保留（编程/明确语义）；`run` 是 Ollama 式的傻瓜入口。
@@ -68,13 +76,15 @@ sensevoice:
 - **独立包** → 不同 `download_url`。
 - **只有一种** → 只登记一个 tag。
 - **无需自建服务器**：`download_url` 直连 sherpa-onnx 的 GitHub releases。数据源：你已有的 `models.dart` / `registry.json` / 下载脚本。
-- **用户自定义模型（模型开放）**：不在内置表里的 sherpa 模型，写进 `~/.asrkit/models.json`（或 `$ASRKIT_MODELS_JSON`）即 `pull` 即用，无需改包。字段与实操见 `engines-and-addressing.md §九`。
+- **下载格式自动识别**：`pull` 不依赖 URL 后缀，而是按文件内容（magic bytes）识别压缩格式——支持 `.tar.bz2`/`.tar.gz`/`.tar.xz`、纯 `.tar`、`.zip`；解压时对 tar 与 zip 均有路径穿越防护（`store.py` 的 `_safe_extract`/`_safe_extract_zip`），不会因恶意压缩包写到目标目录之外。
+- **自定义下载地址**：`asrkit pull <model> --url <URL>` 可覆盖模型的默认 `download_url`，从任意地址下载（同样按内容识别格式）。
+- **用户自定义模型（模型开放）**：不在内置表里的 sherpa 模型，写进 `~/.asrkit/models.json`（或 `$ASRKIT_MODELS_JSON`）即 `pull` 即用，无需改包。也可用 `asrkit add-model <id> --url <URL> --arch <config_type> --langs zh,en` 一条命令注册（免手写 JSON）；`--sha256` 校验下载文件；已有模型文件时 `--model-dir <path>` 直接软链到位，免下载、立即可用。字段与实操见 `engines-and-addressing.md §九`。
 
 ---
 
 ## 五、云端约定（LiteLLM 式）
 
-- **key 解析顺序**（✅ 已实现 env 兜底）：显式 `config["api_key"]` > 环境变量 `<VENDOR>_API_KEY`（如 `SILICONFLOW_API_KEY`）。配置文件为路线项。
+- **key 解析顺序**（✅ 已实现）：显式 `config["api_key"]` > 环境变量 `<VENDOR>_API_KEY`（如 `SILICONFLOW_API_KEY`）> `~/.asrkit/config.json` 密钥库（`asrkit config set-key <vendor>` 写入，见 §七）。
 - **`provider/model` 路由**：已实现（协议 adapter 按 provider 分派）。
 - **密钥按 vendor 共享**：同厂商多模型共用一个 key（已在契约体现）。
 - **后期（阶段 4，抄 LiteLLM Router）**：兜底（端侧失败切云端）、重试、超时、多 key 轮换。现在不做。
@@ -83,8 +93,20 @@ sensevoice:
 
 ## 六、v0.x 落地范围
 
-**做**：`模型:精度` 命名 + `models/<model>/<tag>/` 存储 + `pull` / `run` / `list` / `show`；精度只填 `int8`(默认) / `fp32`；云端加"环境变量 key"约定。
+**已完成**：`模型:精度` 命名 + 平铺 `models/<model>/` 存储 + `pull`（支持 `--url`、多压缩格式自动识别）/ `run` / `list` / `show` / `rm` / `search` / `add-model`；精度 `int8`(默认) / `fp32`；云端 `provider/model` 路由 + 环境变量/配置文件 key 解析。
 
-**不做**：blob 去重、Router 兜底、评测/横评。
+**不做**：blob 去重、Router 兜底、评测/横评（见 `roadmap.md` 的独立项目决定）。
 
-**顺序**：先按本设计**重构注册表**（平铺 47 条 → 模型 + 精度 tag），再做 `pull`（有了命名/存储地基才能下对、放对）。
+## 七、配置与体检
+
+模型管理离不开密钥存储、模型根目录配置、装机自检，三者都由独立子命令承担：
+
+```bash
+asrkit config set-key <vendor>          # 存储云端厂商密钥（写入 ~/.asrkit/config.json）
+asrkit config get-key <vendor>          # 查看已存密钥（掩码显示）
+asrkit config set models-root <path>    # 等价于设置 ASRKIT_MODELS_ROOT；优先级：显式 config > env > config.json > 默认 ~/.asrkit/models
+asrkit config set default-engine <name> # 设默认引擎（裸名解析依据）
+asrkit config list                       # 显示全部配置（密钥掩码）
+asrkit config path                       # 打印配置文件路径
+asrkit doctor [--net]                    # 体检：引擎安装状态 / 密钥是否配置 / models 目录 / config 内容
+```

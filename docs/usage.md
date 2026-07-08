@@ -1,6 +1,7 @@
 # ASRKit 使用说明
 
-> 现状（v0.x 内核）：端侧 47 个模型可一键下载即用（Ollama 式）；云端 OpenAI 兼容接口已接。
+> 现状（v0.x 内核）：端侧 47 个模型可一键下载即用（Ollama 式）；云端 OpenAI 兼容接口已接；
+> 流式转写（文件/麦克风/serve SSE）已支持，见下方"Streaming"节。
 > 一个接口跑遍端云，换模型只换字符串。
 
 ## 核心概念：一个接口，两种用法
@@ -14,6 +15,7 @@
 pipx install asrkit           # 当工具用（隔离/全局命令，推荐）；或 pip install asrkit（当库 import）
 pip install "asrkit[local]"   # 端侧默认引擎（sherpa，47 模型）；base 不含引擎
 pip install "asrkit[all]"     # 引擎全家桶 + serve
+pip install "asrkit[mic]"     # 麦克风实时流式输入（stream --mic）
 pip install -e .              # 开发模式（改代码即时生效）
 ```
 
@@ -48,6 +50,14 @@ asrkit transcribe a.wav -m local/sensevoice --format json        # 全字段 JSO
   字幕（srt/vtt）需模型返回时间戳，否则诚实报错。
 - 默认输出：第一行为识别文字；stderr 第二行为 `耗时、语言、rtf`。
 - 列表：`asrkit list --json`（脚本用）/ `--installed` / `--source cloud|local`。
+
+删除已下载的模型权重（仅本地模型；云端模型报错）：
+
+```bash
+asrkit rm local/sensevoice     # 删除已下载的模型权重目录
+```
+
+注意与 `engine rm`（劝告卸载引擎 pip 包，见下文）不是一回事——`asrkit rm` 删的是模型权重，`engine rm` 从不代跑卸载。
 
 ### 发现模型
 
@@ -95,6 +105,12 @@ asrkit transcribe ./meetings -m local/sensevoice -f txt -o ./out
 
 - `--batch`：即使只给了一个文件，也强制走聚合输出（NDJSON/csv 稳定契约），给脚本/评测用。
 - `--stdin-format`：`-` 输入落地临时文件时使用的扩展名（默认 `wav`），转写完自动清理临时文件。
+- `--segment`：超窗长音频用 VAD 自动切分（默认关闭：不加此 flag 时超过模型窗口只警告，不报错、不自动切分）。需要设置环境变量 `ASRKIT_VAD_MODEL` 指向一个 VAD 模型文件（如 `silero_vad.onnx`），否则报错提示设置该变量。
+
+  ```bash
+  export ASRKIT_VAD_MODEL=/path/to/silero_vad.onnx
+  asrkit transcribe long.wav -m local/sensevoice --segment   # 超窗长音频自动切分
+  ```
 - 批量字幕（`srt`/`vtt`）无法聚合到 stdout（多份字幕拼一起没有意义），必须配合 `-o <dir>`，否则报**用法错误**（退出码 2）。
 - **argparse 限制**：位置输入（音频路径/glob/目录/`-`）必须**连续**给出，不能被 `-m`/`-f` 等选项打断——例如 `asrkit transcribe a.wav b.wav -m X` 可以，但 `asrkit transcribe a.wav -m X b.wav` 里 `nargs="+"` 只会吞到第一个非选项片段，`b.wav` 不会被当作音频输入。把所有音频路径放在一起、其它 flag 放前面或后面。
 - **退出码**：`0` 成功 / `1` 意外异常 / `2` 用法错误 / `3` 模型不存在 / `4` 转写失败；批量取批次内最严重（优先级 `1 > 3 > 4`）。完整字段与列定义见 `docs/result-contract.md`。
@@ -113,6 +129,14 @@ asrkit pull local/sensevoice --url https://your-mirror.example.com/sensevoice.ta
 export HF_ENDPOINT=https://hf-mirror.com
 asrkit engine install faster-whisper
 ```
+
+### 设置默认引擎：`asrkit engine default`
+
+```bash
+asrkit engine default faster-whisper   # 裸模型名（不带厂商前缀）解析到的默认引擎
+```
+
+等价于 `asrkit config set default-engine faster-whisper`（见下文"密钥存一次"小节），两种写法二选一即可。
 
 ### 卸载引擎（劝告版）：`asrkit engine rm`
 
@@ -189,6 +213,7 @@ asrkit stream local/paraformer-online a.m4a --convert  # opt-in 解码/重采样
 - 仅 `modes` 含 `streaming` 的模型可用(`asrkit list --json` 看 modes);批处理模型会给出清晰报错。
 - 退出码:非流式/未配置/坏窗 = 2,模型未注册 = 3,引擎未装/格式错/运行时失败 = 4。
 - 流式对 sherpa online 模型做端点检测,长音频/长会话自动分段(`committed` 逐段增长)。
+- **partial vs committed**:live 阶段吐出的是 `partial`(当前假设文本,可能被后续修正);一旦端点检测判定该段结束,转为 `committed`(已定稿,不再变化)。最终 stdout 只输出全部 `committed` + 收尾文本。
 
 #### 麦克风实时输入:`--mic`
 
@@ -268,7 +293,7 @@ asrkit transcribe a.wav -m dashscope/qwen3-asr-flash        # 自动带上密钥
 ```
 
 凭据解析优先级：**显式 `--api-key` > 环境变量 `<VENDOR>_API_KEY` > `asrkit config` 存的 keystore**。
-密钥明文存 `~/.asrkit/config.json`（权限 0600）；不放心就只用环境变量。
+密钥明文存 `~/.asrkit/config.json`（权限 0600）；不放心就只用环境变量。想换配置文件位置：`export ASRKIT_CONFIG=/path/to/config.json`（默认 `~/.asrkit/config.json`）。
 另可 `asrkit config set default-engine <name>`（裸名落到该引擎）、`set models-root <path>`。
 
 ### 云端调用自动重试
@@ -337,9 +362,10 @@ data: [DONE]
 
 ## 五、支持范围（当前）
 
-- **端侧 47 个模型 / 14 种架构**：paraformer、senseVoice、whisper、moonshine(v1/v2)、
-  transducer(离线/流式/NeMo)、telespeech、fireRed(CTC/AED)、qwen3-asr、funasr-nano、
-  dolphin、omnilingual —— 统一由一个 sherpa-onnx adapter 处理，全部可 `pull` 即用。
+- **端侧 47 个模型 / 17 种架构**：paraformer(离线)、onlineParaformer(流式)、senseVoice、whisper、
+  moonshine(v1/v2)、transducer(离线/流式 offlineTransducer/transducer/流式 NeMo nemoTransducer)、
+  telespeechCtc、fireRed(CTC fireRedAsrCtc / AED fireRedAed)、qwen3Asr、funasrNano、
+  dolphin、omnilingualCtc、hf-asr(HuggingFace 开放寻址条目) —— 统一由一个 sherpa-onnx adapter 处理，全部可 `pull` 即用。
 - **云端**：硅基流动（SenseVoice 免费 / TeleSpeech）、OpenAI（whisper-1）、阿里云百炼
   （Qwen3-ASR / Fun-ASR-Flash / Qwen-Omni）、火山引擎豆包（录音文件识别 1.0 / 2.0，
   submit+poll）、ElevenLabs（Scribe）均已接入。密钥自带，寻址 `<厂商>/<模型>`。

@@ -108,7 +108,10 @@ class AdapterMeta:
     capabilities: dict = field(default_factory=dict)
     # 例：{"punctuation": True, "itn": True, "word_timestamps": False,
     #      "language_hint": "required"|"supported"|"none", "diarization": False,
-    #      "max_input_duration_s": 30}   # 超此时长会截断/需分段，引擎据此发 warnings
+    #      "max_input_duration_s": 30,   # 超此时长会截断/需分段，引擎据此发 warnings
+    #      "multilingual": True,         # 广多语架构（whisper/dolphin/qwen3Asr/funasrNano/omnilingualCtc 等）
+    #                                    # 非英语专用版本标注；list --lang 据此纳入候选、show 显示该字段
+    #      "segment_timestamps": True}   # 模型是否返回 segments（分句时间戳）；仅 whisper 家族标注
 
     pricing: dict | None = None   # {"unit":"hour","cny":4.5}
     license: str | None = None    # 模型许可证（本地模型必填，非商用需显著标注）

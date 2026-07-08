@@ -10,7 +10,7 @@
 
 - **0.5.0** 接口内核极简化(base 只留接口+云端,引擎全 opt-in)。
 - **0.5.1** 加固(一轮 fresh-eyes 评审后):serve 不再卡死 + **按 model id 缓存 adapter**(本地模型不再每请求重载)、原子写 models.json、路径穿越防御、裸文件名不崩、插件告警、云端大文件守卫。
-- **W0 · 安全网(未发版,待下个 PATCH)**:
+- **W0 · 安全网(0.5.2 已发布)**:
   - **`pull` 多格式**:`store.pull` 按内容(magic bytes)识别 tar.{bz2,gz,xz}/纯 tar/zip,不再硬编码 bz2;`add-model --url` 给任意压缩包都能解(zip 加同款防穿越)。
   - **CI 加固(已完成)**:`ruff`(lint)+ `mypy` 入 CI(与 test 并行);`test` job 装 `.[cloud,serve,dev]` 让 **serve 测试不再 skip** + 出覆盖率;新增 `dev` extra。顺带修 2 个真·潜在 bug(transformers `None.strip()` 崩、cli 变量遮蔽 ArgumentParser)。
   - **最小真实 E2E(已完成)**:`tests/test_e2e.py` + `.github/workflows/e2e.yml` nightly——`pull whisper-tiny` → 用其自带 test_wavs 做真实推理 → 断言无 error 且非空。默认 skip,`ASRKIT_E2E=1` 才跑。
@@ -18,14 +18,14 @@
 - **W2 · 云端重试 + 下载源可自定义(未发版)**:
   - **云端 HTTP 健壮性(已完成)**:新 `asrkit/_http.py`——线程局部 `Session` + 分级重试/退避。**成本安全**:计费转写只重 `429`+`ConnectTimeout`,不重 5xx/读超时(避免重复计费);只读 doubao 轮询重全部。`ASRKIT_HTTP_RETRIES` 可调(默认 3);429 认 `Retry-After`。doubao 改用 uuid 幂等 `X-Api-Request-Id` 并 submit/query 复用;openai/elevenlabs 补 200MB 守卫。
   - **下载源可自定义(已完成)**:`asrkit pull <model> --url <tarball>` 一次性覆盖(限 http/https,经 install 边界透传);HF 系引擎镜像用 `HF_ENDPOINT`(底层库自理,零代码)。**不做**持久 `download-base`/镜像配置(YAGNI)。
-- **W3 · 发现 + 元数据 + 体检(未发版,待下个 PATCH)**:
+- **W3 · 发现 + 元数据 + 体检(0.5.3 已发布)**:
   - **字幕落地**:whisper 家族(faster-whisper / whispercpp / openai/whisper-1)返回 `segments`,`srt/vtt` 对这些模型可用(此前全模型只报错)。
   - **选项诚实**:显式"忽略语言提示"的模型(如 SenseVoice)传 `--language` 给 warning 而非静默丢弃;`capabilities.language_hint` 三态判读;whispercpp 现透传 `--language`。
   - **发现**:`asrkit list --lang/--arch` 筛选、`asrkit search <term>`、`asrkit list --ids`(裸 id,供补全)。
   - **元数据修真**:广多语模型标 `capabilities.multilingual`(`--lang X` 作候选返回);SenseVoice 语言补全为 zh/en/ja/ko/yue。
   - **shell 补全(已完成)**:`asrkit completion <bash|zsh|fish>` 输出补全脚本(子命令 + 动态 model 名 + 格式值)。
   - **`asrkit doctor`(已完成)**:一条命令体检引擎/密钥(只报有无)/models 目录可写/config 完整;`--net` 加下载源/云端可达。硬问题(目录不可写/config 损坏)退非零;纯只读、零新依赖、网络 opt-in。
-- **W4 · 最小流式(未发版,待下个 PATCH)**:`asrkit stream <model> <audio>` + `api.transcribe_stream` —— 对 sherpa online 模型逐块解码、边喂边出增量文本(live→stderr 覆盖行、final→stdout 可管道);**首次行使 `PartialResult` 契约**(只用 text+is_final,committed/partial 按契约留空)——1.0 前"契约行使一次"的关卡。文件分块、零新依赖。
+- **W4 · 最小流式(0.5.3 已发布)**:`asrkit stream <model> <audio>` + `api.transcribe_stream` —— 对 sherpa online 模型逐块解码、边喂边出增量文本(live→stderr 覆盖行、final→stdout 可管道);**首次行使 `PartialResult` 契约**(只用 text+is_final,committed/partial 按契约留空)——1.0 前"契约行使一次"的关卡。文件分块、零新依赖。
 - **长跑健壮性(未发版)**:doubao 录音文件识别轮询从硬编码 30s 上限改为 wall-clock deadline + 退避(默认 300s,`ASRKIT_DOUBAO_POLL_TIMEOUT_S` 可配),长音频不再必然超时;`asrkit serve` 的 adapter 缓存从无界 dict 改为有界 LRU(默认 8,`ASRKIT_SERVE_CACHE` 可配),防长跑内存无界。
 - **可观测性 + 命令面(未发版)**:
   - **`--verbose` / 日志(P3,已完成)**:引入标准 `logging`,run/transcribe/stream/serve 支持 `-v`(INFO)/`-vv`(DEBUG);点亮 `_http` 重试、serve 请求、转写 metrics。默认静默、作为库 import 零副作用。

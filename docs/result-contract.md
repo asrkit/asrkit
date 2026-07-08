@@ -33,6 +33,7 @@
 |---|---|---|
 | `language_hint` | `"required"` / `"supported"` / `"none"` | 模型对语言提示的态度：`"required"` 必须指定、`"supported"` 支持但可选、`"none"` 忽略语言提示（如 SenseVoice 自动检测，不接受 `--language`） |
 | `segment_timestamps` | `bool` | 模型是否返回 `segments`（分句时间戳）；仅 whisper 家族的 capabilities 包含此字段（值为 `True`） |
+| `multilingual` | `bool` | 该模型是否支持多语言（广多语架构如 whisper/dolphin/qwen3Asr/funasrNano/omnilingualCtc 的非英语专用版本标注）；`asrkit list --lang X` 据此把它们纳入候选、`show` 显示该字段 |
 
 **选项诚实**：若模型的 `language_hint` 为 `"none"`（忽略语言提示），而用户传了 `--language`，`TranscribeResult.warnings` 会包含一条提示，例如 `"local/sensevoice auto-detects language; --language is ignored"`。单文件/批量模式下，warnings 会打到 stderr。
 

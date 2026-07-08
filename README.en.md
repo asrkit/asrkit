@@ -77,9 +77,10 @@ Decode sherpa online (streaming) models chunk by chunk, emitting incremental tex
 ```bash
 asrkit stream local/paraformer-online meeting.wav             # live partials → stderr, final text → stdout
 asrkit stream local/paraformer-online meeting.wav > out.txt   # pipe-friendly: capture final text only
+asrkit stream local/sensevoice --mic                          # live microphone transcription, Ctrl-C to stop (needs asrkit[mic])
 ```
 
-Only models with `streaming` in `modes` are supported (batch models get a clear error); microphone input and a streaming serve endpoint are on the roadmap.
+Only models with `streaming` in `modes` are supported (batch models get a clear error). `serve` also supports streaming: see "Run it as a server" below.
 
 ## Discovery & diagnostics
 
@@ -91,6 +92,8 @@ asrkit doctor --net          # add download-source / cloud reachability checks
 asrkit completion zsh        # bash/zsh/fish completion (model names complete dynamically)
 ```
 
+`run`/`transcribe`/`stream`/`serve` all support `-v` (INFO) / `-vv` (DEBUG) for more log detail; silent by default, doesn't affect stdout consumed by scripts.
+
 ## Install: a tiny interface core, everything pluggable
 
 **The base install is just the interface + cloud (only `requests` — installs in seconds, runs anywhere).** Add local engines on demand:
@@ -101,6 +104,7 @@ asrkit completion zsh        # bash/zsh/fish completion (model names complete dy
 | Default on-device engine (sherpa, 47 models) | `pip install "asrkit[local]"` |
 | Other engines | `asrkit[faster-whisper]` / `asrkit[whispercpp]` / `asrkit[transformers]` |
 | Local server | `asrkit[serve]` |
+| Live microphone streaming | `asrkit[mic]` |
 | Everything | `asrkit[all]` |
 
 > **Ownership model:** engines are **shared pip packages** — `asrkit engine install <name>` installs into the right environment for you; uninstall with your own `pip uninstall` (shared packages, your env, your call). Models are **asrkit-owned** — `pull` to download, `rm` to delete, clean and symmetric.
@@ -116,7 +120,7 @@ asrkit completion zsh        # bash/zsh/fish completion (model names complete dy
 | `asrkit stream <model> <audio>` | streaming transcription (sherpa online models) |
 | `asrkit pull <model> [--url …]` / `rm <model>` | download (`--url` overrides the source) / remove an on-device model |
 | `asrkit show <model>` | model details |
-| `asrkit engine list` / `install <name>` / `default <name>` | manage engines |
+| `asrkit engine list` / `install <name>` / `default <name>` / `rm <name>` | manage engines (`rm` is advisory: prints uninstall instructions, never runs `pip uninstall`) |
 | `asrkit config set-key <vendor> <KEY>` / `list` | store keys / default engine / models dir |
 | `asrkit doctor [--net]` | health-check the install and config |
 | `asrkit serve` | run an OpenAI-compatible local server |
@@ -127,7 +131,7 @@ asrkit completion zsh        # bash/zsh/fish completion (model names complete dy
 
 | Engine | Install | Address | Covers |
 |---|---|---|---|
-| **sherpa-onnx** (default on-device) | `asrkit[local]` | `local/<model>` or bare `<model>` | 47 on-device models, 14 architectures |
+| **sherpa-onnx** (default on-device) | `asrkit[local]` | `local/<model>` or bare `<model>` | 47 on-device models, 17 architectures |
 | **faster-whisper** | `asrkit[faster-whisper]` | `faster-whisper/<model>` | fast Whisper, native long-audio |
 | **whisper.cpp** | `asrkit[whispercpp]` | `whispercpp/<model>` | ultra-light Whisper (no torch/onnx) |
 | **transformers** | `asrkit[transformers]` | `transformers/<any-hf-id>` | the whole HuggingFace ASR hub + LLM-arch SOTA |
@@ -160,6 +164,7 @@ c = OpenAI(base_url="http://localhost:11435/v1", api_key="unused")
 c.audio.transcriptions.create(model="local/sensevoice", file=open("a.wav", "rb"))
 ```
 - Endpoints: `POST /v1/audio/transcriptions` (`response_format`: json/verbose_json/text/srt/vtt), `GET /v1/models`, `GET /health`.
+- Streaming: add `stream=true` to the same endpoint → `text/event-stream`, OpenAI-compatible `transcript.text.delta` (partial) / `transcript.text.done` (final) events; temp files are cleaned up automatically on disconnect. Only streaming models are supported — requesting `stream=true` on a non-streaming model errors out.
 - Cloud keys come from the `asrkit config` keystore — no per-request key needed. Transparent: raw bytes uploaded, no decoding.
 
 ## Extend it

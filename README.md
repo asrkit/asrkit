@@ -77,9 +77,10 @@ cat a.wav | asrkit transcribe  -  -m local/sensevoice                       # st
 ```bash
 asrkit stream local/paraformer-online meeting.wav             # live 增量 → stderr,最终文本 → stdout
 asrkit stream local/paraformer-online meeting.wav > out.txt   # 管道友好:只截获最终文本
+asrkit stream local/sensevoice --mic                          # 麦克风实时转写,Ctrl-C 停止(需 asrkit[mic])
 ```
 
-仅 `modes` 含 `streaming` 的模型可用(批处理模型给清晰报错);麦克风输入与 serve 流式端点在路线图上。
+仅 `modes` 含 `streaming` 的模型可用(批处理模型给清晰报错)。`serve` 也支持流式:见下方"当服务跑"一节。
 
 ## 发现与体检
 
@@ -91,6 +92,8 @@ asrkit doctor --net          # 加下载源 / 云端可达检查
 asrkit completion zsh        # bash/zsh/fish 补全脚本(动态补全模型名)
 ```
 
+`run`/`transcribe`/`stream`/`serve` 均支持 `-v`(INFO)/`-vv`(DEBUG)提高日志详细度;默认静默,不影响脚本消费的 stdout。
+
 ## 安装:接口内核极小,一切可插拔
 
 **基础安装只有接口 + 云端(仅依赖 `requests`,秒装、随处可跑)。** 本地引擎按需加:
@@ -101,6 +104,7 @@ asrkit completion zsh        # bash/zsh/fish 补全脚本(动态补全模型名)
 | 端侧默认引擎(sherpa,47 模型) | `pip install "asrkit[local]"` |
 | 其它引擎 | `asrkit[faster-whisper]` / `asrkit[whispercpp]` / `asrkit[transformers]` |
 | 本地服务 | `asrkit[serve]` |
+| 麦克风流式输入 | `asrkit[mic]` |
 | 全都要 | `asrkit[all]` |
 
 > **所有权模型:** 引擎是**共享 pip 包** —— `asrkit engine install <名>` 帮你装到对的环境,卸载用你自己的 `pip uninstall`(共享包,你的环境你做主)。模型是 **asrkit 独占** —— `pull` 下载、`rm` 删除,干净对称。
@@ -116,7 +120,7 @@ asrkit completion zsh        # bash/zsh/fish 补全脚本(动态补全模型名)
 | `asrkit stream <模型> <音频>` | 流式转写(sherpa online 模型) |
 | `asrkit pull <模型> [--url …]` / `rm <模型>` | 下载(可 `--url` 换源) / 删除端侧模型 |
 | `asrkit show <模型>` | 模型详情 |
-| `asrkit engine list` / `install <名>` / `default <名>` | 管理引擎 |
+| `asrkit engine list` / `install <名>` / `default <名>` / `rm <名>` | 管理引擎(`rm` 为劝告版:打印卸载指引,绝不代跑 `pip uninstall`) |
 | `asrkit config set-key <厂商> <KEY>` / `list` | 存密钥 / 默认引擎 / models 目录 |
 | `asrkit doctor [--net]` | 体检安装与配置 |
 | `asrkit serve` | 起 OpenAI 兼容的本地转写服务 |
@@ -127,7 +131,7 @@ asrkit completion zsh        # bash/zsh/fish 补全脚本(动态补全模型名)
 
 | 引擎 | 安装 | 寻址 | 覆盖 |
 |---|---|---|---|
-| **sherpa-onnx**(默认端侧) | `asrkit[local]` | `local/<模型>` 或裸名 `<模型>` | 47 端侧模型,14 架构 |
+| **sherpa-onnx**(默认端侧) | `asrkit[local]` | `local/<模型>` 或裸名 `<模型>` | 47 端侧模型,17 架构 |
 | **faster-whisper** | `asrkit[faster-whisper]` | `faster-whisper/<模型>` | 快速 Whisper,自带长音频分块 |
 | **whisper.cpp** | `asrkit[whispercpp]` | `whispercpp/<模型>` | 超轻量 Whisper(无 torch/onnx) |
 | **transformers** | `asrkit[transformers]` | `transformers/<任意 HF id>` | 整个 HuggingFace ASR 生态 + LLM 架构 SOTA |
@@ -160,6 +164,7 @@ c = OpenAI(base_url="http://localhost:11435/v1", api_key="unused")
 c.audio.transcriptions.create(model="local/sensevoice", file=open("a.wav", "rb"))
 ```
 - 端点:`POST /v1/audio/transcriptions`(`response_format` 支持 json/verbose_json/text/srt/vtt)、`GET /v1/models`、`GET /health`。
+- 流式:同一端点加 `stream=true` → `text/event-stream`,OpenAI 兼容 `transcript.text.delta`(增量)/ `transcript.text.done`(定稿)事件;断连自动清理临时文件。仅 streaming 模型支持,非流式模型请求 `stream=true` 会报错。
 - 云端密钥走 `asrkit config` 的库,无需每次传;透明原则:原始字节上传,不解码。
 
 ## 扩展
