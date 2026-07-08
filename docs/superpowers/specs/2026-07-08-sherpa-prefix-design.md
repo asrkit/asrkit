@@ -1,6 +1,12 @@
 # 设计 — 寻址前缀正名 `local/` → `sherpa/`(方案 A,向后兼容)
 
-> 状态:设计已与用户充分讨论并批准(方案 A);待 Codex 评审 → 实现。
+> 状态:设计已与用户充分讨论并批准(方案 A)、**Codex(gpt-5.5)评审采纳 3 项 + 1 项 defer → v2**,待实现。
+>
+> **v2 修订**(Codex;确认了 catch-all 单跳无递归、`local/<base>:<tag>` 别名有效、**磁盘兼容 OK**——`store.model_dir` 用 `id.split("/",1)[-1]` 取斜杠后部分,`local/x` 与 `sherpa/x` 同一 `models/x` 目录,已 pull 的权重不用重下):
+> 1. **已存在的用户模型**(`~/.asrkit/models.json`,`add-model` 存的 `local/foo`)加载时按原样 id 直接命中 `_MODELS`、不会被 catch-all 规范化,且 `sherpa/foo` 解析不到。→ `_load_user_models` 加载时把 `local/…` 的 id 归一为 `sherpa/…`(catch-all 仍保旧调用可用)。
+> 2. **用户模型 vendor** 仍默认 `"local"`(registry.py:176)→ 默认 `"sherpa"`(与内建一致;影响 `show`/`/v1/models` owned_by)。
+> 3. **doctor** 把隐式默认引擎报成 `"local"`(doctor.py:113 `or "local"`)→ `"sherpa"`。
+> 4. **(defer,不在本刀)** serve adapter 缓存按原始 model 串做 key,`local/x` 与 `sherpa/x` 会各占一槽、双载适配器(server.py:53)。**此为既有问题**(裸名 `sensevoice` 与 `local/sensevoice` 今天就双载),非本次改名引入;按 `meta.id` 归一 key 会动到刚评审过的 serve LRU 且破坏其测试。→ **记为独立后续项**(roadmap/CHANGELOG follow-up),不塞进本契约改名刀。
 > 定位约束:**寻址是"项目宪法"之一**(CLAUDE.md R5)。本刀在 0.x 窗口修掉宪法级瑕疵,**但不破坏公开地址**(R6):`local/` 永久保留为别名。**版本口径留发版时人类拍板**(向后兼容,倾向 PATCH;不碰 `__version__`)。
 
 ---
@@ -40,6 +46,21 @@
   ```
 - 模块 docstring 里 `别名:local/<base>...` → 更新为 `sherpa/<base>...`(并注明 `local/` 为历史别名)。
 - `_rebuild_aliases()` **无需改**:它用 `m.id.split("/")[0]` 自动取前缀,改名后自动建 `sherpa/base:tag` 别名。
+- **`_load_user_models()`(v2 新增)**:加载 `~/.asrkit/models.json` 时归一历史条目——
+  ```python
+      uid = e["id"]
+      if uid.startswith("local/"):
+          uid = "sherpa/" + uid[len("local/"):]     # 历史用户模型规范化
+      vendor = e.get("vendor", "sherpa")
+      if vendor == "local":
+          vendor = "sherpa"
+      metas.append(AdapterMeta(id=uid, provider=e.get("provider", "sherpa-onnx"),
+                               vendor=vendor, ...其余不变...))
+  ```
+  (磁盘目录 = `uid.split("/")[-1]` = 原 folder,不变;旧 `local/foo` 调用经 catch-all 仍解析到 `sherpa/foo`。)
+
+### 3.2b `doctor.py`(v2)
+- 约第 113 行 `... or "local"`(隐式默认引擎显示)→ `... or "sherpa"`。
 
 ### 3.3 `cli.py`
 - `add-model`(约第 492 行):`mid = a.id if "/" in a.id else "local/" + a.id` → `"sherpa/" + a.id`。
@@ -60,8 +81,9 @@
 | 文件 | 改动 |
 |---|---|
 | `src/asrkit/adapters/models_local.py` | id/vendor `local`→`sherpa`;注释示例 |
-| `src/asrkit/registry.py` | `local/`→`sherpa/` catch-all 别名;`_default_prefix` 归一 sherpa;docstring |
+| `src/asrkit/registry.py` | `local/`→`sherpa/` catch-all 别名;`_default_prefix` 归一 sherpa;`_load_user_models` 归一 id/vendor;docstring |
 | `src/asrkit/cli.py` | `add-model` 前缀;engine rm 文案 |
+| `src/asrkit/doctor.py` | 默认引擎显示 `local`→`sherpa` |
 | `tests/*`(~13 文件引用 local/) | `local/`→`sherpa/`;**新增回归**:`local/` 别名仍解析 |
 | 文档(~10) + CHANGELOG | 示例改 `sherpa/` + 别名说明 + `[Unreleased]` |
 
@@ -72,6 +94,8 @@
 - **裸名默认**:`resolve("sensevoice")` 解析到 `sherpa/sensevoice`(默认引擎缺省)。
 - **default-engine 归一**:`_default_prefix()` 在 eng 为 None/"sherpa-onnx"/"local"/"sherpa" 时都返回 `"sherpa"`;为 "faster-whisper" 时返回 "faster-whisper"。
 - **add-model**:`add-model foo --arch senseVoice`(裸 id)→ 注册 id 为 `sherpa/foo`(非 `local/foo`);带 `/` 的 id 原样。
+- **历史用户模型归一(v2)**:构造一个 `models.json` 里 id=`local/foo`、vendor 缺省的条目(monkeypatch `usermodels.load`),断言加载后 `resolve("sherpa/foo")` 命中、其 `vendor=="sherpa"`;`resolve("local/foo")` 经 catch-all 仍命中同一 meta。
+- **doctor 默认引擎显示(v2)**:无 config 时 doctor 的默认引擎项显示 `sherpa`(不再 `local`)。
 - **其它引擎不受影响**:`faster-whisper/tiny`、`whispercpp/base`、`transformers/<hf>`、云端寻址回归全绿。
 - **全量**:现有测试改 `local/`→`sherpa/` 后全绿 + 新回归;ruff+mypy。
 
