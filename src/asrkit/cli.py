@@ -174,6 +174,8 @@ def main(argv: Optional[list] = None) -> int:
     ei.add_argument("name")
     ed = esub.add_parser("default", help="set the default engine (bare names resolve to it)")
     ed.add_argument("name")
+    er = esub.add_parser("rm", help="show how to remove an engine (advisory; never uninstalls)")
+    er.add_argument("name")
 
     cp = sub.add_parser("config", help="persistent config: keys, default engine, models root")
     csub = cp.add_subparsers(dest="ccmd")
@@ -505,6 +507,26 @@ def main(argv: Optional[list] = None) -> int:
                 return 1
             config.set_default("engine", a.name)
             print(f"✓ default engine → {a.name} (bare model names now resolve to it)")
+            return 0
+        if a.ecmd == "rm":
+            from . import config
+            if a.name not in engines.ENGINES:
+                print(f"[error] unknown engine '{a.name}' (see: asrkit engine list)", file=sys.stderr)
+                return 1
+            if not engines.is_installed(a.name):
+                print(f"engine '{a.name}' is not installed; nothing to remove")
+            else:
+                pkg = engines.pip_package(a.name) or a.name
+                print("asrkit does not uninstall engines — they are shared pip packages "
+                      "other projects may depend on.")
+                print(f"To remove '{a.name}' yourself, run:")
+                print(f"    pip uninstall {pkg}")
+                print("Its dependencies (e.g. numpy / torch / onnxruntime) may be shared; "
+                      "uninstall only what you are sure nothing else needs.")
+            if config.get_default("engine") == a.name:
+                config.set_default("engine", "")
+                print(f"note: default engine was '{a.name}'; reset to built-in default (local/sherpa). "
+                      "Set another with: asrkit engine default <name>")
             return 0
         ep.print_help()
         return 0

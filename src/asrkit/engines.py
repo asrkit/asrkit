@@ -23,3 +23,17 @@ def is_installed(name: str) -> bool:
 
 def extra_of(name: str):
     return ENGINES.get(name, (None, None))[1]
+
+
+# 引擎主 pip 发行包名(供 engine rm 劝告卸载;真卸载归用户)。
+_PIP_PACKAGE = {
+    "sherpa-onnx": "sherpa-onnx",
+    "faster-whisper": "faster-whisper",
+    "transformers": "transformers",
+    "whispercpp": "pywhispercpp",
+}
+
+
+def pip_package(name: str):
+    """引擎的主 pip 发行包名(用于 engine rm 劝告);未知引擎返回 None。"""
+    return _PIP_PACKAGE.get(name)

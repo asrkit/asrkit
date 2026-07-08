@@ -114,6 +114,17 @@ export HF_ENDPOINT=https://hf-mirror.com
 asrkit engine install faster-whisper
 ```
 
+### 卸载引擎（劝告版）：`asrkit engine rm`
+
+引擎是共享的 pip 包，其它项目可能也在用，asrkit **不会代跑卸载**——`engine rm` 只打印手动卸载指引、依赖警告，并在默认引擎正指向它时重置默认引擎。
+
+```bash
+asrkit engine rm faster-whisper
+# → asrkit does not uninstall engines — they are shared pip packages...
+# → To remove 'faster-whisper' yourself, run:
+# →     pip uninstall faster-whisper
+```
+
 ### Diagnose: `asrkit doctor`
 
 Run a health check on your ASRKit setup with no side effects:
