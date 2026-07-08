@@ -12,6 +12,10 @@
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-07-08
+
+主题：**流式弧线收口 + 寻址正名 + 长跑健壮性 + 云端透明修复**（v0.5.3 后累积;全部向后兼容——`local/` 仍为永久别名，无破坏性变更）。
+
 ### 新增
 - **寻址正名**：sherpa 端侧模型规范前缀从 local/ 改为 sherpa/（与 faster-whisper/whispercpp/transformers 等引擎前缀一致）；旧 local/ 前缀永久保留为别名，向后兼容不破坏（含已 pull 的模型、存量脚本、add-model 历史条目自动归一）。
 - **serve 流式(SSE)**：POST /v1/audio/transcriptions 加 stream=true → text/event-stream，OpenAI 兼容 transcript.text.delta/done 事件（delta 由端点定稿驱动）；断连保证清理临时文件。
@@ -21,6 +25,7 @@
 - **流式分段**：sherpa online 流式开启端点检测,PartialResult 的 committed(已定稿段)/partial(当前假设)现由静音端点填实、长会话自动分段(rule3=300 防连续说话被硬切)。
 
 ### 修复
+- **云端格式如实上报(透明原则)**:doubao / dashscope(fun-asr)此前对上传音频**硬编码 `format: "wav"`**——传 mp3/flac 时字节透明上传、元数据却谎称 wav,云端可能解出乱码(违反"格式不符诚实报错"铁律)。现按文件扩展名如实声明容器格式;未知扩展名**诚实报错、绝不谎报**。fun-asr 一并去掉硬编码 `sample_rate: "16000"`(容器自描述采样率)。dashscope data-URI 的 MIME 也同步:未知扩展名不再默认 `audio/wav`。
 - **doubao 长音频**:录音文件识别轮询从硬编码 30s 上限改为 wall-clock deadline + 退避(1s→5s),默认 300s(`ASRKIT_DOUBAO_POLL_TIMEOUT_S` 可配);长音频不再必然超时。只读轮询,不涉重复计费。
 - **serve 内存**:`asrkit serve` 的 adapter 缓存从无界 dict 改为有界 LRU(默认 8,`ASRKIT_SERVE_CACHE` 可配),防长跑内存无界增长;并发同模型双建会收敛为一个。
 
