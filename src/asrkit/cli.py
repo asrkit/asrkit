@@ -489,7 +489,7 @@ def main(argv: Optional[list] = None) -> int:
     if a.cmd == "add-model":
         import os
         from . import store, usermodels
-        mid = a.id if "/" in a.id else "local/" + a.id
+        mid = a.id if "/" in a.id else "sherpa/" + a.id
         entry = {"id": mid, "config_type": a.arch, "provider": a.provider}
         if a.url:
             entry["download_url"] = a.url
@@ -568,7 +568,7 @@ def main(argv: Optional[list] = None) -> int:
                       "uninstall only what you are sure nothing else needs.")
             if config.get_default("engine") == a.name:
                 config.set_default("engine", "")
-                print(f"note: default engine was '{a.name}'; reset to built-in default (local/sherpa). "
+                print(f"note: default engine was '{a.name}'; reset to built-in default (sherpa). "
                       "Set another with: asrkit engine default <name>")
             return 0
         ep.print_help()

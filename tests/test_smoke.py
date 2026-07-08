@@ -5,7 +5,7 @@ import tarfile
 import pytest
 
 import asrkit
-from asrkit import audio, registry, store
+from asrkit import audio, cli, registry, store
 
 
 def test_version():
@@ -16,7 +16,8 @@ def test_list_models():
     metas = asrkit.list_models()
     ids = {m.id for m in metas}
     assert len(metas) >= 47
-    assert "local/sensevoice" in ids
+    assert "sherpa/sensevoice" in ids
+    assert not any(i.startswith("local/") for i in ids)   # local/ 已正名为 sherpa/,不应再出现
     assert "siliconflow/sensevoice" in ids
     assert "faster-whisper/tiny" in ids   # 第二个引擎已注册（可选,懒加载）
     assert "whispercpp/tiny" in ids       # 第三个引擎
@@ -41,24 +42,48 @@ def test_user_models(tmp_path, monkeypatch):
     # 用户自定义模型注册表（~/.asrkit/models.json）——sherpa 模型开放
     import json
     p = tmp_path / "models.json"
-    p.write_text(json.dumps([{"id": "local/mytest", "config_type": "senseVoice",
+    p.write_text(json.dumps([{"id": "sherpa/mytest", "config_type": "senseVoice",
                               "langs": ["zh"], "download_url": "http://x/y.tar.bz2"}]))
     monkeypatch.setenv("ASRKIT_MODELS_JSON", str(p))
     registry._loaded = False   # 强制重载以吃到 env
     registry.load_builtin()
-    m = registry.resolve("local/mytest")
-    assert m.id == "local/mytest" and m.config_type == "senseVoice" and m.provider == "sherpa-onnx"
+    m = registry.resolve("sherpa/mytest")
+    assert m.id == "sherpa/mytest" and m.config_type == "senseVoice" and m.provider == "sherpa-onnx"
+
+
+def test_user_models_legacy_local_normalized(tmp_path, monkeypatch):
+    # 历史用户模型条目用旧 local/ 前缀写入 —— 加载时应归一为 sherpa/,且 local/ 仍可解析同一 meta。
+    import json
+    p = tmp_path / "models.json"
+    p.write_text(json.dumps([{"id": "local/foo", "config_type": "senseVoice",
+                              "provider": "sherpa-onnx", "vendor": "local",
+                              "langs": ["zh"]}]))
+    monkeypatch.setenv("ASRKIT_MODELS_JSON", str(p))
+    registry._loaded = False   # 强制重载以吃到 env,触发 _load_user_models 归一逻辑
+    registry.load_builtin()
+    m = registry.resolve("sherpa/foo")
+    assert m.id == "sherpa/foo" and m.vendor == "sherpa"
+    assert registry.resolve("local/foo").id == m.id
 
 
 def test_add_model(tmp_path, monkeypatch):
     # asrkit add-model 写的注册表能被读回并解析
     from asrkit import usermodels
     monkeypatch.setenv("ASRKIT_MODELS_JSON", str(tmp_path / "models.json"))
-    usermodels.add({"id": "local/added", "config_type": "senseVoice", "langs": ["zh"]})
-    assert any(e["id"] == "local/added" for e in usermodels.load())
+    usermodels.add({"id": "sherpa/added", "config_type": "senseVoice", "langs": ["zh"]})
+    assert any(e["id"] == "sherpa/added" for e in usermodels.load())
     registry._loaded = False
     registry.load_builtin()
-    assert registry.resolve("local/added").config_type == "senseVoice"
+    assert registry.resolve("sherpa/added").config_type == "senseVoice"
+
+
+def test_add_model_cli_bare_id_gets_sherpa_prefix(tmp_path, monkeypatch):
+    # add-model 裸 id(不含 '/')应落到 sherpa/ 前缀,而非旧 local/
+    from asrkit import usermodels
+    monkeypatch.setenv("ASRKIT_MODELS_JSON", str(tmp_path / "models.json"))
+    rc = cli.main(["add-model", "foo", "--arch", "senseVoice"])
+    assert rc == 0
+    assert any(e["id"] == "sherpa/foo" for e in usermodels.load())
 
 
 def test_transformers_open_provider():
@@ -70,30 +95,39 @@ def test_transformers_open_provider():
 
 
 def test_resolve_and_alias():
-    assert registry.resolve("local/sensevoice").id == "local/sensevoice"
+    assert registry.resolve("sherpa/sensevoice").id == "sherpa/sensevoice"
     # Ollama 式精度寻址
-    assert registry.resolve("local/sensevoice:fp32").id == "local/sensevoice-fp32"
-    assert registry.resolve("local/sensevoice:int8").id == "local/sensevoice"
-    # 裸名简写（省略 local/）
-    assert registry.resolve("sensevoice").id == "local/sensevoice"
-    assert registry.resolve("sensevoice:fp32").id == "local/sensevoice-fp32"
+    assert registry.resolve("sherpa/sensevoice:fp32").id == "sherpa/sensevoice-fp32"
+    assert registry.resolve("sherpa/sensevoice:int8").id == "sherpa/sensevoice"
+    # 裸名简写（省略 sherpa/）
+    assert registry.resolve("sensevoice").id == "sherpa/sensevoice"
+    assert registry.resolve("sensevoice:fp32").id == "sherpa/sensevoice-fp32"
 
 
 def test_unknown_model_raises():
     with pytest.raises(registry.ModelNotFoundError):
-        registry.resolve("local/does-not-exist")
+        registry.resolve("sherpa/does-not-exist")
+
+
+def test_local_prefix_is_permanent_alias():
+    # 历史别名回归(R6,永久保留):local/ 与 sherpa/ 解析到同一 meta。
+    assert registry.resolve("local/sensevoice").id == registry.resolve("sherpa/sensevoice").id
+    assert registry.resolve("local/sensevoice:int8").id == "sherpa/sensevoice"
+    assert registry.resolve("local/sensevoice:fp32").id == "sherpa/sensevoice-fp32"
+    a = registry.make_adapter("local/sensevoice")
+    assert a.meta.id == "sherpa/sensevoice"
 
 
 def test_model_dir_rejects_path_traversal(tmp_path, monkeypatch):
     # 0.5.1 加固：model id 里的路径穿越必须被拒(否则 rm/symlink 越界)
     from asrkit.types import AdapterMeta
     monkeypatch.setenv("ASRKIT_MODELS_ROOT", str(tmp_path))
-    evil = AdapterMeta(id="local/../../evil", provider="sherpa-onnx", vendor="local",
+    evil = AdapterMeta(id="sherpa/../../evil", provider="sherpa-onnx", vendor="sherpa",
                        name="evil", source="local", modes=["batch"], langs=[])
     with pytest.raises(ValueError):
         store.model_dir(evil)
     # 正常 id 不受影响
-    ok = AdapterMeta(id="local/good", provider="sherpa-onnx", vendor="local",
+    ok = AdapterMeta(id="sherpa/good", provider="sherpa-onnx", vendor="sherpa",
                      name="good", source="local", modes=["batch"], langs=[])
     assert store.model_dir(ok).endswith("good")
 
@@ -103,8 +137,8 @@ def test_usermodels_bare_filename_no_crash(tmp_path, monkeypatch):
     from asrkit import usermodels
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ASRKIT_MODELS_JSON", "models.json")
-    usermodels.add({"id": "local/x", "config_type": "senseVoice", "langs": ["zh"]})
-    assert any(e["id"] == "local/x" for e in usermodels.load())
+    usermodels.add({"id": "sherpa/x", "config_type": "senseVoice", "langs": ["zh"]})
+    assert any(e["id"] == "sherpa/x" for e in usermodels.load())
 
 
 def test_safe_extract_rejects_traversal(tmp_path):
@@ -182,7 +216,7 @@ def test_sherpa_missing_engine_friendly_error(monkeypatch):
     from asrkit.adapters import local_sherpa
     from asrkit.types import AudioInput, TranscribeOptions
     monkeypatch.setattr(local_sherpa, "_available", lambda: False)
-    a = registry.make_adapter("local/sensevoice")
+    a = registry.make_adapter("sherpa/sensevoice")
     r = a.transcribe(AudioInput(original_path="/nope.wav"), TranscribeOptions())
     assert r.text == "" and "asrkit[local]" in (r.error or "")
 
@@ -231,7 +265,7 @@ def test_pull_url_override(tmp_path, monkeypatch):
         tf.addfile(info, io.BytesIO(b"x"))
     monkeypatch.setattr(store, "_download",
                         lambda url, path, log, timeout=30: shutil.copy(str(tar), path))
-    meta = AdapterMeta(id="local/urltest", provider="sherpa-onnx", vendor="local",
+    meta = AdapterMeta(id="sherpa/urltest", provider="sherpa-onnx", vendor="sherpa",
                        name="x", source="local", modes=["batch"], langs=[], download_url="")
     d = store.pull(meta, {}, url="http://example.com/whatever.tar.bz2")
     assert os.path.exists(os.path.join(d, "model.onnx"))   # 用了覆盖 URL
@@ -241,7 +275,7 @@ def test_pull_url_rejects_non_http(tmp_path, monkeypatch):
     from asrkit import store
     from asrkit.types import AdapterMeta
     monkeypatch.setenv("ASRKIT_MODELS_ROOT", str(tmp_path / "models"))
-    meta = AdapterMeta(id="local/x2", provider="sherpa-onnx", vendor="local",
+    meta = AdapterMeta(id="sherpa/x2", provider="sherpa-onnx", vendor="sherpa",
                        name="x", source="local", modes=["batch"], langs=[], download_url="")
     with pytest.raises(ValueError):
         store.pull(meta, {}, url="file:///etc/passwd")

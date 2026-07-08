@@ -110,7 +110,7 @@ def diagnose(net: bool = False) -> List[Check]:
                 d = json.load(f)
             if not isinstance(d, dict):
                 raise ValueError("not an object")
-            de = (d.get("defaults") or {}).get("engine") or "local"
+            de = (d.get("defaults") or {}).get("engine") or "sherpa"
             mr = (d.get("settings") or {}).get("models_root") or "(default)"
             out.append(Check("config", "ok", f"{p} (default-engine={de}, models-root={mr})"))
         except Exception as e:

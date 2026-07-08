@@ -53,6 +53,15 @@ def test_config_corrupt_fail(tmp_path, monkeypatch):
     assert c and c.status == "fail"
 
 
+def test_config_default_engine_shows_sherpa_not_local(tmp_path, monkeypatch):
+    # 无 defaults.engine 时,隐式默认引擎展示应为 "sherpa"(正名后),不再是旧 "local"。
+    cfg = tmp_path / "config.json"
+    cfg.write_text(json.dumps({"keys": {}, "defaults": {}, "settings": {}}))
+    monkeypatch.setenv("ASRKIT_CONFIG", str(cfg))
+    c = _by(doctor.diagnose(), "config")
+    assert c and "default-engine=sherpa" in c.detail and "default-engine=local" not in c.detail
+
+
 def test_net_probe_monkeypatched(monkeypatch):
     monkeypatch.setattr(doctor, "_probe", lambda url, timeout=2.0: False)
     net = [c for c in doctor.diagnose(net=True) if c.name.startswith("net:")]

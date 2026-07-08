@@ -68,11 +68,23 @@ def test_env_beats_keystore(cfg_path, monkeypatch):
 
 
 def test_default_engine_changes_bare_resolution(cfg_path):
-    # 缺省：裸名落到 local(sherpa)
+    # 缺省：裸名落到 sherpa
     registry._loaded = False
-    assert registry.resolve("sensevoice").id == "local/sensevoice"
+    assert registry.resolve("sensevoice").id == "sherpa/sensevoice"
     # 切默认引擎为 whispercpp 后，裸名落到 whispercpp/
     config.set_default("engine", "whispercpp")
     assert registry.resolve("tiny").id == "whispercpp/tiny"
-    # 显式 local/ 不受影响
-    assert registry.resolve("local/sensevoice").id == "local/sensevoice"
+    # 显式 sherpa/ 不受影响
+    assert registry.resolve("sherpa/sensevoice").id == "sherpa/sensevoice"
+    # 显式 local/ 别名仍解析同一 meta(向后兼容)
+    assert registry.resolve("local/sensevoice").id == "sherpa/sensevoice"
+
+
+def test_default_prefix_normalizes_legacy_engine_names(cfg_path, monkeypatch):
+    # _default_prefix():eng 为 None/"sherpa-onnx"/"local"/"sherpa" 均归一到 "sherpa"
+    from asrkit import registry as _registry
+    for eng in (None, "sherpa-onnx", "local", "sherpa"):
+        monkeypatch.setattr(config, "get_default", lambda key, _eng=eng: _eng)
+        assert _registry._default_prefix() == "sherpa"
+    monkeypatch.setattr(config, "get_default", lambda key: "faster-whisper")
+    assert _registry._default_prefix() == "faster-whisper"

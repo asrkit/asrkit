@@ -28,10 +28,10 @@ def test_warnings_only_when_ignored_and_lang_passed():
 
 
 def test_sherpa_capabilities_by_arch():
-    assert registry.resolve("local/sensevoice").capabilities.get("language_hint") == "none"
-    assert registry.resolve("local/whisper-tiny").capabilities.get("language_hint") == "supported"
+    assert registry.resolve("sherpa/sensevoice").capabilities.get("language_hint") == "none"
+    assert registry.resolve("sherpa/whisper-tiny").capabilities.get("language_hint") == "supported"
     # sherpa whisper 不标 segment_timestamps(不填 sherpa segments)
-    assert "segment_timestamps" not in registry.resolve("local/whisper-tiny").capabilities
+    assert "segment_timestamps" not in registry.resolve("sherpa/whisper-tiny").capabilities
 
 
 def test_api_appends_language_warning():

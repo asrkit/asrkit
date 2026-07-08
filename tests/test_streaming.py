@@ -52,13 +52,13 @@ class _FakeRec:
 
 
 def _streaming_meta():
-    return AdapterMeta(id="local/fake-stream", provider="sherpa-onnx", vendor="local",
+    return AdapterMeta(id="sherpa/fake-stream", provider="sherpa-onnx", vendor="sherpa",
                        name="Fake", source="local", modes=["streaming"], langs=["en"],
                        config_type="onlineParaformer")
 
 
 def _batch_meta():
-    return AdapterMeta(id="local/fake-batch", provider="sherpa-onnx", vendor="local",
+    return AdapterMeta(id="sherpa/fake-batch", provider="sherpa-onnx", vendor="sherpa",
                        name="Fake", source="local", modes=["batch"], langs=["en"],
                        config_type="senseVoice")
 
@@ -170,7 +170,7 @@ def test_api_stream_rejects_non_streaming_model():
 def test_api_stream_rejects_bad_window():
     """window_s<=0 → 及早 ValueError(在 make_adapter 之前,故未注册 model 也先抛这个)。"""
     with pytest.raises(ValueError):
-        api.transcribe_stream("local/fake-stream", "x.wav", window_s=0)
+        api.transcribe_stream("sherpa/fake-stream", "x.wav", window_s=0)
 
 
 def test_cli_stream_renders_final_to_stdout(monkeypatch, capsys):
@@ -179,7 +179,7 @@ def test_cli_stream_renders_final_to_stdout(monkeypatch, capsys):
         yield PartialResult(text="he", is_final=False)
         yield PartialResult(text="hello", is_final=True)
     monkeypatch.setattr(cli.api, "transcribe_stream", fake_stream)
-    rc = cli.main(["stream", "local/fake-stream", "x.wav"])
+    rc = cli.main(["stream", "sherpa/fake-stream", "x.wav"])
     out = capsys.readouterr().out
     assert rc == emit.EXIT_OK
     assert "hello" in out
@@ -201,7 +201,7 @@ def test_cli_stream_runtime_failure(monkeypatch, capsys):
     def fake_stream(model, audio, *, config=None, opts=None):
         yield PartialResult(text="", is_final=True, error="streaming failed: boom")
     monkeypatch.setattr(cli.api, "transcribe_stream", fake_stream)
-    rc = cli.main(["stream", "local/fake-stream", "x.wav"])
+    rc = cli.main(["stream", "sherpa/fake-stream", "x.wav"])
     err = capsys.readouterr().err
     assert rc == emit.EXIT_FAILED
     assert "[error]" in err

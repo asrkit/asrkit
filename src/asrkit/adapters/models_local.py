@@ -1,9 +1,9 @@
 """本地模型注册表（47 个端侧模型）。数据源：registry.json / models.dart / 下载脚本。
 
 每条 → 一个 AdapterMeta（provider=sherpa-onnx，由 local_sherpa 处理）。
-id = "local/<folder>"；下载地址来自 sherpa-onnx 的 GitHub releases。
+id = "sherpa/<folder>"；下载地址来自 sherpa-onnx 的 GitHub releases。
 精度：默认 tag=int8（端侧默认）；SenseVoice 另有 fp32 版，二者共享 base=sensevoice，
-      可用 local/sensevoice:int8 / local/sensevoice:fp32 寻址。
+      可用 sherpa/sensevoice:int8 / sherpa/sensevoice:fp32 寻址。
 """
 from __future__ import annotations
 
@@ -86,9 +86,9 @@ def _metas():
         if ctype in MULTI_ARCHS and not is_english_only(langs):
             caps["multilingual"] = True
         out.append(AdapterMeta(
-            id=f"local/{folder}",
+            id=f"sherpa/{folder}",
             provider="sherpa-onnx",
-            vendor="local",
+            vendor="sherpa",
             name=name,
             source="local",
             modes=["streaming"] if streaming else ["batch"],

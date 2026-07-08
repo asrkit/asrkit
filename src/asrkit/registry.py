@@ -2,7 +2,8 @@
 
     provider ──▶ 协议 adapter 类（sherpa-onnx / openai / …）
     model id ──▶ 一条 AdapterMeta
-    别名：local/<base>[:<tag>] ──▶ 具体 id（默认 tag 优先 int8）
+    别名：sherpa/<base>[:<tag>] ──▶ 具体 id（默认 tag 优先 int8）；
+          local/<base>... 为历史前缀（≤0.5.3），永久保留作别名，见 resolve()。
 """
 from __future__ import annotations
 
@@ -59,15 +60,15 @@ def _rebuild_aliases() -> None:
 
 
 def _default_prefix() -> str:
-    """裸名解析用的默认引擎前缀。缺省 'local'（sherpa）；config 的 default-engine 可改。
-    引擎名 sherpa-onnx/local 归一到寻址前缀 'local'，其余引擎前缀 = 引擎名。"""
+    """裸名解析用的默认引擎前缀。缺省 'sherpa'；config 的 default-engine 可改。
+    引擎名 sherpa-onnx/local/sherpa 归一到寻址前缀 'sherpa'，其余引擎前缀 = 引擎名。"""
     try:
         from . import config as _config
         eng = _config.get_default("engine")
     except Exception:
         eng = None
-    if not eng or eng in ("sherpa-onnx", "local"):
-        return "local"
+    if not eng or eng in ("sherpa-onnx", "local", "sherpa"):
+        return "sherpa"
     return eng
 
 
@@ -77,7 +78,10 @@ def resolve(model_id: str) -> AdapterMeta:
         return _MODELS[model_id]
     if model_id in _ALIASES:
         return _MODELS[_ALIASES[model_id]]
-    # 裸名简写：不带 '/' 时补默认引擎前缀（缺省 local；可由 config 的 default-engine 改）。
+    # 历史别名：local/ 曾是 sherpa 的寻址前缀（≤0.5.3），永久保留、绝不破坏（R6）。
+    if model_id.startswith("local/"):
+        return resolve("sherpa/" + model_id[len("local/"):])
+    # 裸名简写：不带 '/' 时补默认引擎前缀（缺省 sherpa；可由 config 的 default-engine 改）。
     if "/" not in model_id:
         prefix = _default_prefix()
         cand = f"{prefix}/{model_id}"
@@ -170,10 +174,17 @@ def _load_user_models() -> None:
     metas = []
     for e in usermodels.load():
         try:
+            # 归一历史条目：曾用 local/ 前缀 + vendor="local" 写入的用户模型，统一正名为 sherpa。
+            uid = e["id"]
+            if uid.startswith("local/"):
+                uid = "sherpa/" + uid[len("local/"):]
+            vendor = e.get("vendor", "sherpa")
+            if vendor == "local":
+                vendor = "sherpa"
             metas.append(AdapterMeta(
-                id=e["id"],
+                id=uid,
                 provider=e.get("provider", "sherpa-onnx"),
-                vendor=e.get("vendor", "local"),
+                vendor=vendor,
                 name=e.get("name", e["id"]),
                 source=e.get("source", "local"),
                 modes=e.get("modes", ["streaming"] if e.get("streaming") else ["batch"]),
