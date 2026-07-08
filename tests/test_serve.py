@@ -5,7 +5,7 @@ import wave
 import pytest
 
 from asrkit import registry, server
-from asrkit.types import AdapterMeta, BaseAdapter, TranscribeResult
+from asrkit.types import AdapterMeta, BaseAdapter, PartialResult, TranscribeResult
 
 
 @pytest.fixture
@@ -125,3 +125,101 @@ def test_serve_cache_size_env_fallbacks(monkeypatch):
     assert server._cache_size() == 8
     monkeypatch.setenv("ASRKIT_SERVE_CACHE", "16")
     assert server._cache_size() == 16
+
+
+# ---- stream=true SSE（P3-D） -------------------------------------------------
+
+def _fake_adapter(modes, partials):
+    """构造一个假 adapter：忽略 chunks，直接吐脚本化 PartialResult 序列。"""
+    class _A:
+        class meta:  # 简化：仅需 meta.modes 属性
+            pass
+
+        def transcribe_stream(self, chunks, opts):
+            return iter(partials)
+
+    a = _A()
+    a.meta = type("M", (), {"modes": modes})()
+    return a
+
+
+def test_stream_sse_happy_path(client, monkeypatch):
+    partials = [
+        PartialResult(text="he", committed="", partial="he"),
+        PartialResult(text="hello world", committed="hello world", partial="", is_final=True),
+    ]
+    monkeypatch.setattr(server, "_get_adapter",
+                        lambda model: _fake_adapter(["streaming"], partials))
+    r = client.post("/v1/audio/transcriptions",
+                    data={"model": "stub/echo", "stream": "true"},
+                    files={"file": ("a.wav", b"placeholder", "audio/wav")})
+    assert r.status_code == 200
+    assert "text/event-stream" in r.headers["content-type"]
+    body = r.text
+    assert '"type": "transcript.text.delta"' in body
+    assert '"delta": "hello world"' in body  # 首个 delta = "" -> "hello world"
+    assert '"type": "transcript.text.done"' in body
+    assert '"text": "hello world"' in body
+    assert "data: [DONE]" in body
+
+
+def test_stream_non_streaming_model_400(client, monkeypatch):
+    monkeypatch.setattr(server, "_get_adapter",
+                        lambda model: _fake_adapter(["batch"], []))
+    r = client.post("/v1/audio/transcriptions",
+                    data={"model": "stub/echo", "stream": "true"},
+                    files={"file": ("a.wav", b"placeholder", "audio/wav")})
+    assert r.status_code == 400
+    assert "not a streaming model" in r.json()["error"]["message"]
+
+
+def test_stream_unknown_model_404(client, monkeypatch):
+    def boom(model):
+        raise server.registry.ModelNotFoundError("nope")
+    monkeypatch.setattr(server, "_get_adapter", boom)
+    r = client.post("/v1/audio/transcriptions",
+                    data={"model": "does/not-exist", "stream": "true"},
+                    files={"file": ("a.wav", b"placeholder", "audio/wav")})
+    assert r.status_code == 404
+
+
+def test_stream_setup_broad_exception_500(client, monkeypatch):
+    def boom(model):
+        raise RuntimeError("plugin load failed")
+    monkeypatch.setattr(server, "_get_adapter", boom)
+    r = client.post("/v1/audio/transcriptions",
+                    data={"model": "stub/echo", "stream": "true"},
+                    files={"file": ("a.wav", b"placeholder", "audio/wav")})
+    assert r.status_code == 500
+
+
+def test_stream_error_event(client, monkeypatch):
+    partials = [PartialResult(text="", is_final=True, error="boom")]
+    monkeypatch.setattr(server, "_get_adapter",
+                        lambda model: _fake_adapter(["streaming"], partials))
+    r = client.post("/v1/audio/transcriptions",
+                    data={"model": "stub/echo", "stream": "true"},
+                    files={"file": ("a.wav", b"placeholder", "audio/wav")})
+    assert r.status_code == 200
+    body = r.text
+    assert '"type": "error"' in body
+    assert "boom" in body
+    assert "data: [DONE]" in body
+
+
+def test_stream_delta_defense_non_append(client, monkeypatch):
+    # committed 非追加（"ab" -> "xy"）：不应崩，最终 done 仍带全文
+    partials = [
+        PartialResult(text="ab", committed="ab", partial=""),
+        PartialResult(text="xy", committed="xy", partial="", is_final=True),
+    ]
+    monkeypatch.setattr(server, "_get_adapter",
+                        lambda model: _fake_adapter(["streaming"], partials))
+    r = client.post("/v1/audio/transcriptions",
+                    data={"model": "stub/echo", "stream": "true"},
+                    files={"file": ("a.wav", b"placeholder", "audio/wav")})
+    assert r.status_code == 200
+    body = r.text
+    assert '"type": "transcript.text.done"' in body
+    assert '"text": "xy"' in body
+    assert "data: [DONE]" in body

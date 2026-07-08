@@ -13,6 +13,7 @@
 ## [Unreleased]
 
 ### 新增
+- **serve 流式(SSE)**：POST /v1/audio/transcriptions 加 stream=true → text/event-stream，OpenAI 兼容 transcript.text.delta/done 事件（delta 由端点定稿驱动）；断连保证清理临时文件。
 - **麦克风流式**：asrkit stream <model> --mic 实时转写(opt-in asrkit[mic]，Ctrl-C 停打印最终稿)；新增 api.transcribe_stream_mic。
 - **engine rm**：新增 asrkit engine rm <name> —— 打印手动卸载指引 + 共享依赖警告 + 重置默认引擎(若指向它);绝不代跑 pip uninstall。
 - **--verbose / 日志**：引入 logging，run/transcribe/stream/serve 支持 -v(INFO)/-vv(DEBUG)；点亮 _http 重试、serve 请求、转写 metrics。默认静默、作为库 import 零副作用。

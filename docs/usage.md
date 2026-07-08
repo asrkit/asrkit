@@ -295,6 +295,32 @@ export ASRKIT_DOUBAO_POLL_TIMEOUT_S=600   # 默认 300;非法/<=0 回退默认
 export ASRKIT_SERVE_CACHE=16   # 默认 8;非法/<=0 回退默认
 ```
 
+### serve 流式(SSE)：`stream=true`
+
+`POST /v1/audio/transcriptions` 加表单字段 `stream=true` 即走 **SSE**(`text/event-stream`),边转边推,OpenAI 兼容事件形态(`transcript.text.delta` / `transcript.text.done` + `data: [DONE]`)。仅 `modes` 含 `streaming` 的模型可用,批处理模型会 400。
+
+```bash
+curl -N http://127.0.0.1:11435/v1/audio/transcriptions \
+  -F model=local/paraformer-online \
+  -F stream=true \
+  -F file=@a.wav
+```
+
+```
+data: {"type": "transcript.text.delta", "delta": "hello"}
+
+data: {"type": "transcript.text.delta", "delta": " world"}
+
+data: {"type": "transcript.text.done", "text": "hello world"}
+
+data: [DONE]
+
+```
+
+- `delta` 只发已定稿(committed)部分的增量,append-only;末尾 `transcript.text.done` 带全文 `text`。
+- 出错(如格式不符、运行时异常)会发 `{"type": "error", "error": "..."}` 事件,随后仍以 `[DONE]` 收尾。
+- `stream=false`(默认)行为不变,仍是一次性 JSON/text/srt/vtt。
+
 ---
 
 ## 四、返回字段（TranscribeResult）
