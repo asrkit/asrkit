@@ -20,6 +20,10 @@ import requests
 from requests.exceptions import ConnectionError as _ConnectionError
 from requests.exceptions import ConnectTimeout, ReadTimeout, Timeout
 
+from . import log
+
+_LOG = log.get_logger("http")
+
 _local = threading.local()
 _BACKOFF_BASE = 0.5
 _BACKOFF_CAP = 8.0
@@ -83,15 +87,21 @@ def post(url: str, *, idempotent: bool = False, retries: Optional[int] = None, *
         except ConnectTimeout:           # 从未到达服务端 → 计费/只读都安全重
             if attempt == n:
                 raise
-            _sleep(_backoff(attempt))
+            delay = _backoff(attempt)
+            _LOG.info("retry %d/%d after %.1fs: %s (ConnectTimeout)", attempt + 1, n, delay, url)
+            _sleep(delay)
             continue
-        except (ReadTimeout, _ConnectionError, Timeout):  # 可能已发出/已处理 → 仅只读重
+        except (ReadTimeout, _ConnectionError, Timeout) as e:  # 可能已发出/已处理 → 仅只读重
             if idempotent and attempt < n:
-                _sleep(_backoff(attempt))
+                delay = _backoff(attempt)
+                _LOG.info("retry %d/%d after %.1fs: %s (%s)", attempt + 1, n, delay, url, type(e).__name__)
+                _sleep(delay)
                 continue
             raise
         if resp.status_code in codes and attempt < n:
-            _sleep(_retry_after(resp) or _backoff(attempt))
+            delay = _retry_after(resp) or _backoff(attempt)
+            _LOG.info("retry %d/%d after %.1fs: %s (HTTP %d)", attempt + 1, n, delay, url, resp.status_code)
+            _sleep(delay)
             continue
         return resp
     raise AssertionError("unreachable")  # 循环必在 return/raise 收尾

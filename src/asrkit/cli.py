@@ -107,6 +107,11 @@ def _batch_code(rc: int, r) -> int:
     return emit.EXIT_FAILED if r.error else emit.EXIT_ERROR
 
 
+def _add_verbose(sp):
+    sp.add_argument("-v", "--verbose", action="count", default=0,
+                    help="verbose logging to stderr (-v INFO, -vv DEBUG)")
+
+
 def _add_transcribe_flags(sp):
     sp.add_argument("--api-key", default=None)
     sp.add_argument("--base-url", default=None)
@@ -213,17 +218,20 @@ def main(argv: Optional[list] = None) -> int:
     svp = sub.add_parser("serve", help="run an OpenAI-compatible transcription server")
     svp.add_argument("--host", default="127.0.0.1", help="bind host (default: 127.0.0.1, local only)")
     svp.add_argument("--port", type=int, default=11435, help="port (default: 11435)")
+    _add_verbose(svp)
 
     rp = sub.add_parser("run", help="download if missing, then transcribe (Ollama-style)")
     rp.add_argument("model")
     rp.add_argument("audio", nargs="+")
     _add_transcribe_flags(rp)
+    _add_verbose(rp)
 
     tp = sub.add_parser("transcribe", help="transcribe only (no auto-download)")
     tp.add_argument("audio", nargs="+")
     tp.add_argument("-m", "--model", required=True)
     tp.add_argument("--model-dir", default=None)
     _add_transcribe_flags(tp)
+    _add_verbose(tp)
 
     stp = sub.add_parser("stream", help="stream-transcribe one file with a streaming model")
     stp.add_argument("model")
@@ -234,8 +242,11 @@ def main(argv: Optional[list] = None) -> int:
     stp.add_argument("--convert", action="store_true",
                      help="decode/resample/downmix to fit the local engine "
                           "(off by default: on mismatch it errors)")
+    _add_verbose(stp)
 
     a = p.parse_args(argv)
+    from . import log
+    log.setup(getattr(a, "verbose", 0))
     from . import registry, store
 
     def _installed(m) -> bool:
@@ -361,6 +372,7 @@ def main(argv: Optional[list] = None) -> int:
                 except Exception as e:
                     print(f"[error] {e}", file=sys.stderr)
                     return emit.EXIT_ERROR
+                log.get_logger().debug("model=%s metrics=%s", a.model, getattr(r, "metrics", None))
                 return _batch_code(_print_result(r, fmt=a.format, output=a.output), r)
 
             # 批量/表格:字幕聚合到 stdout 不成立 → 用法错(fail fast)

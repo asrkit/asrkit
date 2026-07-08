@@ -189,6 +189,25 @@ asrkit stream local/paraformer-online a.m4a --convert  # opt-in 解码/重采样
 - 仅 `modes` 含 `streaming` 的模型可用(`asrkit list --json` 看 modes);批处理模型会给出清晰报错。
 - 退出码:非流式/未配置/坏窗 = 2,模型未注册 = 3,引擎未装/格式错/运行时失败 = 4。
 
+### 日志 / `--verbose`
+
+`run`/`transcribe`/`stream`/`serve` 都支持 `-v`/`-vv`,把诊断日志点亮到 stderr(标准库 `logging`,零新依赖)。默认(不加 `-v`)完全静默——不影响既有的 `[error]`/`[warn]` 输出。
+
+```bash
+asrkit run local/paraformer a.wav -v      # INFO:看到 _http 重试等
+asrkit run local/paraformer a.wav -vv     # DEBUG:额外打印 model/metrics
+asrkit serve --verbose                    # INFO:记录每个请求(model/format/成功与否)
+```
+
+- `-v` = INFO(如云端调用的重试:`retry 1/3 after 0.8s: ... (HTTP 429)`)。
+- `-vv` = DEBUG(额外含单文件转写的 `model=... metrics=...`)。
+- 作为库嵌入(`from asrkit.server import build_app`)时,asrkit 的 logger 默认只挂 `NullHandler`(不刷屏、不装 stderr handler);想看日志请自行配置标准 `logging`,例如:
+  ```python
+  import logging
+  logging.getLogger("asrkit").setLevel(logging.INFO)
+  logging.getLogger("asrkit").addHandler(logging.StreamHandler())
+  ```
+
 ---
 
 ## 二、Python
