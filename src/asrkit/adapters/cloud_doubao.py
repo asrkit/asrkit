@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import base64
+import math
 import os
 import time
 import uuid
@@ -22,6 +23,19 @@ _SCHEMA = {
     "app_key": {"type": "secret", "required": False, "label": "App ID (X-Api-App-Key)"},
     "access_key": {"type": "secret", "required": False, "label": "Access Key (X-Api-Access-Key)"},
 }
+
+
+def _poll_timeout_s() -> float:
+    """轮询总超时(秒)。env ASRKIT_DOUBAO_POLL_TIMEOUT_S 覆盖,非法/非有限/<=0 回退默认。"""
+    raw = os.environ.get("ASRKIT_DOUBAO_POLL_TIMEOUT_S")
+    if raw:
+        try:
+            v = float(raw)
+            if math.isfinite(v) and v > 0:
+                return v
+        except ValueError:
+            pass
+    return 300.0
 
 
 @register_protocol("doubao")
@@ -68,8 +82,14 @@ class Doubao(BaseAdapter):
             if sub.status_code >= 300:
                 return TranscribeResult(text="", error=f"submit HTTP {sub.status_code}: {sub.text[:200]}")
 
-            for _ in range(30):
-                time.sleep(1)
+            poll_timeout = _poll_timeout_s()
+            deadline = time.perf_counter() + poll_timeout
+            interval = 1.0
+            while True:
+                remaining = deadline - time.perf_counter()
+                if remaining <= 0:
+                    break
+                time.sleep(min(interval, remaining))
                 q = _http.post(f"{base}/query", headers=headers, data="{}", timeout=60, idempotent=True)
                 code = q.headers.get("x-api-status-code", "")
                 if code == "20000000":
@@ -80,7 +100,9 @@ class Doubao(BaseAdapter):
                         latency_ms=int((time.perf_counter() - t0) * 1000), raw_response=j)
                 if code.startswith("45") or code.startswith("55"):
                     return TranscribeResult(text="", error=f"query failed code={code}: {q.text[:200]}")
-            return TranscribeResult(text="", error="doubao polling timeout (30s)")
+                interval = min(interval * 1.5, 5.0)
+            return TranscribeResult(
+                text="", error=f"doubao polling timeout ({int(poll_timeout)}s)")
         except Exception as e:
             return TranscribeResult(text="", error=f"{type(e).__name__}: {e}")
 
