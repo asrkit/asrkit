@@ -38,6 +38,7 @@ sherpa = ["sherpa-onnx>=1.13.3", "numpy", "soundfile", "soxr"]   # 默认端侧�
 whispercpp = ["pywhispercpp", "numpy", "soundfile", "soxr"]
 faster-whisper = ["faster-whisper"]
 transformers = ["transformers", "torch"]
+mic = ["sounddevice", "numpy"]             # 麦克风实时输入:asrkit stream --mic
 # —— 组合别名 ——
 local = ["asrkit[sherpa]"]                 # “本地默认体验” = sherpa
 engines = ["asrkit[sherpa]", "asrkit[whispercpp]", "asrkit[faster-whisper]", "asrkit[transformers]"]

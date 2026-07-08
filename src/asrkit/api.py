@@ -58,20 +58,31 @@ def remove(model: str, *, config=None):
     return store.remove(meta, config or {})
 
 
-def transcribe_stream(model, audio, *, config=None, opts=None, window_s=0.1):
-    """流式转写:换 model 字符串即切模型。返回 PartialResult 迭代器。
-
-    仅 modes 含 "streaming" 的模型可用。及早校验(不进生成器):
-    window_s<=0 / 非流式模型 / 未配置 → ValueError;未注册模型 → ModelNotFoundError。
-    """
-    if window_s <= 0:
-        raise ValueError("window_s must be > 0")
+def _streaming_adapter(model, config):
     adapter = registry.make_adapter(model, config or {})
     if "streaming" not in adapter.meta.modes:
         raise ValueError(f"{model} is not a streaming model")
     if not adapter.is_configured():
         raise ValueError(f"{model} is not configured (missing API key?)")
+    return adapter
+
+
+def transcribe_stream(model, audio, *, config=None, opts=None, window_s=0.1):
+    """流式转写(文件分块)。仅 streaming 模型;及早校验。"""
+    if window_s <= 0:
+        raise ValueError("window_s must be > 0")
+    adapter = _streaming_adapter(model, config)
     opts = opts or TranscribeOptions()
     from . import audio as _audio
     chunks = _audio.iter_file_chunks(audio, 16000, 1, window_s, convert=opts.convert)
+    return adapter.transcribe_stream(chunks, opts)
+
+
+def transcribe_stream_mic(model, *, config=None, opts=None,
+                          samplerate=16000, block_s=0.1, device=None):
+    """麦克风实时流式转写。仅 streaming 模型;需 asrkit[mic];Ctrl-C 停。"""
+    adapter = _streaming_adapter(model, config)
+    opts = opts or TranscribeOptions()
+    from . import mic as _mic
+    chunks = _mic.record_chunks(samplerate=samplerate, block_s=block_s, device=device)
     return adapter.transcribe_stream(chunks, opts)

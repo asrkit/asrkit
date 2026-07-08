@@ -190,6 +190,18 @@ asrkit stream local/paraformer-online a.m4a --convert  # opt-in 解码/重采样
 - 退出码:非流式/未配置/坏窗 = 2,模型未注册 = 3,引擎未装/格式错/运行时失败 = 4。
 - 流式对 sherpa online 模型做端点检测,长音频/长会话自动分段(`committed` 逐段增长)。
 
+#### 麦克风实时输入:`--mic`
+
+对着麦克风边说边转,`Ctrl-C` 停止并打印最终稿。需要额外安装:`pip install "asrkit[mic]"`(未装会给出清晰报错,退出码 1)。
+
+```bash
+asrkit stream local/paraformer-online --mic          # 实时麦克风流式,Ctrl-C 停
+asrkit stream local/paraformer-online --mic --device 1   # 指定设备(索引或名称子串)
+```
+
+- `--mic` 与音频文件参数互斥(同时给出 → 用法错误,退出码 2);`--device` 必须搭配 `--mic` 使用。
+- `Ctrl-C` 干净停止:已有的最终文本(若有)打到 stdout,退出码 0。
+
 ### 日志 / `--verbose`
 
 `run`/`transcribe`/`stream`/`serve` 都支持 `-v`/`-vv`,把诊断日志点亮到 stderr(标准库 `logging`,零新依赖)。默认(不加 `-v`)完全静默——不影响既有的 `[error]`/`[warn]` 输出。

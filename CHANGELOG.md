@@ -13,6 +13,7 @@
 ## [Unreleased]
 
 ### 新增
+- **麦克风流式**：asrkit stream <model> --mic 实时转写(opt-in asrkit[mic]，Ctrl-C 停打印最终稿)；新增 api.transcribe_stream_mic。
 - **engine rm**：新增 asrkit engine rm <name> —— 打印手动卸载指引 + 共享依赖警告 + 重置默认引擎(若指向它);绝不代跑 pip uninstall。
 - **--verbose / 日志**：引入 logging，run/transcribe/stream/serve 支持 -v(INFO)/-vv(DEBUG)；点亮 _http 重试、serve 请求、转写 metrics。默认静默、作为库 import 零副作用。
 - **流式分段**：sherpa online 流式开启端点检测,PartialResult 的 committed(已定稿段)/partial(当前假设)现由静音端点填实、长会话自动分段(rule3=300 防连续说话被硬切)。

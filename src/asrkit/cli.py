@@ -235,7 +235,9 @@ def main(argv: Optional[list] = None) -> int:
 
     stp = sub.add_parser("stream", help="stream-transcribe one file with a streaming model")
     stp.add_argument("model")
-    stp.add_argument("audio")
+    stp.add_argument("audio", nargs="?", default=None)
+    stp.add_argument("--mic", action="store_true", help="read live audio from the microphone (needs asrkit[mic])")
+    stp.add_argument("--device", default=None, help="microphone device index or name substring (with --mic)")
     stp.add_argument("--model-dir", default=None)
     stp.add_argument("--language", default=None,
                      help="language hint (e.g. zh, en) — helps Whisper-family models")
@@ -421,16 +423,35 @@ def main(argv: Optional[list] = None) -> int:
     if a.cmd == "stream":
         from . import emit
         from .audio import AudioFormatError
-        cfg, opts = _cfg(a), _opts(a)      # 复用:lang_hint/convert(segment 对流式无意义,忽略)
+        cfg, opts = _cfg(a), _opts(a)
         live = sys.stderr.isatty()
+        if a.mic and a.audio:                     # v2:诚实报错,不静默忽略
+            print("[error] cannot combine --mic with an audio file", file=sys.stderr)
+            return emit.EXIT_USAGE
+        if a.device and not a.mic:
+            print("[error] --device only applies with --mic", file=sys.stderr)
+            return emit.EXIT_USAGE
         try:
-            stream = api.transcribe_stream(a.model, a.audio, config=cfg, opts=opts)
+            if a.mic:
+                dev = a.device
+                if isinstance(dev, str) and dev.isdigit():
+                    dev = int(dev)
+                stream = api.transcribe_stream_mic(a.model, config=cfg, opts=opts, device=dev)
+            else:
+                if not a.audio:
+                    print("[error] stream needs an audio file, or --mic", file=sys.stderr)
+                    return emit.EXIT_USAGE
+                stream = api.transcribe_stream(a.model, a.audio, config=cfg, opts=opts)
         except registry.ModelNotFoundError as e:
             print(f"[error] {e}", file=sys.stderr)
             return emit.EXIT_MODEL_NOT_FOUND
-        except ValueError as e:            # 非流式模型 / 未配置 / window_s<=0
+        except ValueError as e:
             print(f"[error] {e}", file=sys.stderr)
             return emit.EXIT_USAGE
+        except RuntimeError as e:                 # mic 缺 sounddevice
+            print(f"[error] {e}", file=sys.stderr)
+            return emit.EXIT_ERROR
+        last_text = ""
         try:
             for pr in stream:
                 if pr.error:
@@ -443,16 +464,26 @@ def main(argv: Optional[list] = None) -> int:
                     if live:
                         sys.stderr.write("\r\x1b[K")
                         sys.stderr.flush()
-                    print(pr.text)                     # 最终 → stdout(可管道)
-                elif live:
-                    sys.stderr.write("\r\x1b[K" + pr.text)
-                    sys.stderr.flush()
-        except AudioFormatError as e:        # 格式不符且未 --convert(穿透而来)
+                    print(pr.text)
+                    last_text = pr.text
+                else:
+                    last_text = pr.text
+                    if live:
+                        sys.stderr.write("\r\x1b[K" + pr.text)
+                        sys.stderr.flush()
+        except AudioFormatError as e:
             if live:
                 sys.stderr.write("\r\x1b[K")
                 sys.stderr.flush()
             print(f"[error] {e}", file=sys.stderr)
             return emit.EXIT_FAILED
+        except KeyboardInterrupt:                 # mic Ctrl-C 兜底(若未在 record_chunks 内被吞)
+            if live:
+                sys.stderr.write("\r\x1b[K")
+                sys.stderr.flush()
+            if last_text:
+                print(last_text)
+            return emit.EXIT_OK
         return emit.EXIT_OK
 
     if a.cmd == "add-model":
