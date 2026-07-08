@@ -1,6 +1,11 @@
 # 设计 — 长跑健壮性修复(doubao 轮询上限 + serve 缓存无界)
 
-> 状态:brainstorming 完成、用户批准两个默认值,待 Codex 评审 → 写实现计划。
+> 状态:brainstorming 完成、用户批准默认值、**Codex(gpt-5.5)评审采纳 3 项 → v2**,待写实现计划。
+>
+> **v2 修订**(Codex `.omc/artifacts/ask/codex-*2026-07-08T02-02-54*.md`):
+> 1. **deadline 不溢出**:原循环 sleep 后仍会发一次 query,叠加 `_http` 重试可远超配置超时。→ 改 remaining-based:每轮先算 `remaining = deadline - now`,`remaining<=0` 即 break,`sleep(min(interval, remaining))`,不在 deadline 之后再排新 query(残留仅"一次在途 query 自身 timeout=60",诚实且有界)。
+> 2. **缓存双建竞态**:`make_adapter` 在锁外,重入锁后**必须再查一次**缓存,命中则返回已有——否则并发同 model miss 会用冷 adapter 覆盖热的、返回分裂对象(本地模型 lazy load 时尤其咬人)。
+> 3. **非有限浮点**:`_poll_timeout_s` 用 `math.isfinite(v) and v > 0`,挡 `ASRKIT_DOUBAO_POLL_TIMEOUT_S=inf` 导致的无限轮询。
 > 波次:专家评审遗留的两颗"看着能用实则炸"的炸弹;落地默认下个 PATCH,**升号先问人类**。
 > 定位约束:纯 bug 修复 + 向后兼容(新增 env 旋钮,默认行为更健壮);不碰契约、不加运行时依赖。
 
@@ -34,28 +39,33 @@
 
 `os`、`time` 已 import(`os.path.getsize`、`time.sleep` 在用)。加模块级 helper + 改轮询循环(submit 段不动):
 
+需 `import math`(`os`、`time` 已 import)。
+
 ```python
 def _poll_timeout_s() -> float:
-    """轮询总超时(秒)。env ASRKIT_DOUBAO_POLL_TIMEOUT_S 覆盖,非法/<=0 回退默认。"""
+    """轮询总超时(秒)。env ASRKIT_DOUBAO_POLL_TIMEOUT_S 覆盖,非法/非有限/<=0 回退默认。"""
     raw = os.environ.get("ASRKIT_DOUBAO_POLL_TIMEOUT_S")
     if raw:
         try:
             v = float(raw)
-            if v > 0:
+            if math.isfinite(v) and v > 0:     # v2:挡 inf/nan 导致无限轮询
                 return v
         except ValueError:
             pass
     return 300.0
 ```
 
-轮询段(替换现 `for _ in range(30): ...` 到 `return ... timeout (30s)`):
+轮询段(替换现 `for _ in range(30): ...` 到 `return ... timeout (30s)`),**remaining-based,不在 deadline 后再排 query**:
 
 ```python
             poll_timeout = _poll_timeout_s()
             deadline = time.perf_counter() + poll_timeout
             interval = 1.0
-            while time.perf_counter() < deadline:
-                time.sleep(interval)
+            while True:
+                remaining = deadline - time.perf_counter()
+                if remaining <= 0:                        # v2:到点即停,不再排新 query
+                    break
+                time.sleep(min(interval, remaining))       # v2:不 sleep 过 deadline
                 q = _http.post(f"{base}/query", headers=headers, data="{}",
                                timeout=60, idempotent=True)
                 code = q.headers.get("x-api-status-code", "")
@@ -67,7 +77,7 @@ def _poll_timeout_s() -> float:
                         latency_ms=int((time.perf_counter() - t0) * 1000), raw_response=j)
                 if code.startswith("45") or code.startswith("55"):
                     return TranscribeResult(text="", error=f"query failed code={code}: {q.text[:200]}")
-                interval = min(interval * 1.5, 5.0)     # 轻微退避,上限 5s
+                interval = min(interval * 1.5, 5.0)         # 轻微退避,上限 5s
             return TranscribeResult(
                 text="", error=f"doubao polling timeout ({int(poll_timeout)}s)")
 ```
@@ -75,7 +85,7 @@ def _poll_timeout_s() -> float:
 - 只读轮询(`idempotent=True`),不涉重复计费。
 - 超时消息报**实际**超时值(`int(poll_timeout)`)。
 - 退避从 1s 起,×1.5 到 5s 上限:短任务仍 ~1s 响应,长任务 query 次数大降。
-- 超时判定用挂钟 `deadline`,与固定次数解耦;最后一次 `sleep` 可能小幅超出 deadline(≤5s),可接受。
+- **不溢出**:每轮先算 `remaining`,`<=0` 即 break、`sleep` 不超 `remaining`,故 deadline 之后不再排新 query。残留仅"最后一次在途 query 自身 `timeout=60` + `_http` 重试"这一 HTTP 调用边界,不可完全消除但有界(单次调用)。
 
 ### 3.2 serve 缓存(`server.py`)
 
@@ -112,6 +122,10 @@ def _get_adapter(model: str):
             return a
     a = registry.make_adapter(model)         # 锁外(可能慢/可能抛 ModelNotFoundError)
     with _CACHE_LOCK:
+        existing = _ADAPTERS.get(model)      # v2:重入锁后再查,防并发双建覆盖热 adapter
+        if existing is not None:
+            _ADAPTERS.move_to_end(model)
+            return existing                  # 丢弃刚建的冷 a,返回已有热的(对象一致)
         _ADAPTERS[model] = a
         _ADAPTERS.move_to_end(model)
         while len(_ADAPTERS) > _cache_size():
@@ -120,6 +134,7 @@ def _get_adapter(model: str):
 ```
 
 - **异常不入缓存**:`make_adapter` 抛 `ModelNotFoundError` 在存入前,坏 model 不毒化缓存(与今天行为一致)。
+- **并发双建收敛**(v2):同 model 并发 miss 仍可能各建一次(锁外),但重入锁后**只留一个、都返回同一对象**;多余的冷 adapter 被丢弃、GC 回收。本地模型 lazy load(sherpa/faster-whisper 在 `transcribe` 才真加载),故重复 make 的成本主要是对象构造而非模型权重,代价可控。
 - **容量每次插入时读**:`_cache_size()` 每次插入求值 → 测试可 monkeypatch env 或该函数控制容量。
 - 命中在锁内 `move_to_end`,维持 LRU 顺序;线程安全。
 - `transcriptions` 端点调用点不变(仍 `adapter = _get_adapter(model)`,404 分支不变)。
@@ -151,6 +166,7 @@ def _get_adapter(model: str):
 - **迟到成功不再 30s 截断**:`monkeypatch cloud_doubao.time.sleep` → noop;`_http.post` 打桩:`/submit` 返回 status 200;`/query` 前 K 次返回"处理中"状态码(如 `""` 或非终态)、第 K+1 次返回 header `x-api-status-code="20000000"` 且 `.json()` 带 text。断言返回该 text(非 timeout),即便 K 远大于 30(证明不再受 30 次硬限)。
 - **超时可配 + 消息报实际值**:`monkeypatch cloud_doubao.time.sleep` → noop,并 `monkeypatch cloud_doubao.time.perf_counter` 用递增桩(如每次调用 +100)使 deadline 很快被跨过;`/query` 恒"处理中";`monkeypatch _poll_timeout_s`→返回如 120。断言返回 `error` 含 `"doubao polling timeout (120s)"`。
 - **终态错误码提前返回**:`/query` 返回 `45xxx` → 立即 `query failed`,不等超时。
+- **非法/非有限 env 回退默认(v2)**:`ASRKIT_DOUBAO_POLL_TIMEOUT_S` 设 `"inf"`/`"nan"`/`"abc"`/`"0"`/`"-5"` → `_poll_timeout_s()` 均返回 `300.0`(单元测该 helper,不跑真轮询)。
 
 ### serve(mock `registry.make_adapter`)
 - **命中不重建**:`monkeypatch server.registry.make_adapter` 计数并每次返回新哨兵;先 `_get_adapter("m")` 两次 → make 只调 1 次、两次返回同一对象。测试前后 `_ADAPTERS.clear()` 保证隔离。
