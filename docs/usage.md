@@ -238,6 +238,20 @@ export ASRKIT_HTTP_RETRIES=5   # 默认 3；0 表示不重试
 
 > **成本安全（重要）**：计费的转写请求（OpenAI/ElevenLabs/DashScope 的转写、豆包 `submit`）**只在限流（HTTP 429）或连接从未建立（connect timeout）时重试**；读超时、5xx 等"请求可能已被服务端处理"的情况**不重试**，避免同一段音频被重复计费。豆包的轮询查询（`query`，只读、不计费）则会重试全部瞬时错误（429/5xx/超时/连接失败）。
 
+**豆包长音频轮询超时**：豆包（录音文件识别）是异步 submit + 轮询,长音频需要更久。总轮询超时默认 300s,长文件可调大:
+
+```bash
+export ASRKIT_DOUBAO_POLL_TIMEOUT_S=600   # 默认 300;非法/<=0 回退默认
+```
+
+### serve 的 adapter 缓存
+
+`asrkit serve` 把已加载的 adapter 按 model id 缓存(本地模型不每请求重载),用**有界 LRU**防长跑内存无界增长。容量默认 8,多模型混合服务可调大:
+
+```bash
+export ASRKIT_SERVE_CACHE=16   # 默认 8;非法/<=0 回退默认
+```
+
 ---
 
 ## 四、返回字段（TranscribeResult）

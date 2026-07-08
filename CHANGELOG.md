@@ -12,6 +12,10 @@
 
 ## [Unreleased]
 
+### 修复
+- **doubao 长音频**:录音文件识别轮询从硬编码 30s 上限改为 wall-clock deadline + 退避(1s→5s),默认 300s(`ASRKIT_DOUBAO_POLL_TIMEOUT_S` 可配);长音频不再必然超时。只读轮询,不涉重复计费。
+- **serve 内存**:`asrkit serve` 的 adapter 缓存从无界 dict 改为有界 LRU(默认 8,`ASRKIT_SERVE_CACHE` 可配),防长跑内存无界增长;并发同模型双建会收敛为一个。
+
 ## [0.5.3] - 2026-07-08
 
 主题：**发现 + 元数据修真 + 体检 + 最小流式**（W3/W4 累积;全部向后兼容,纯新增）。
