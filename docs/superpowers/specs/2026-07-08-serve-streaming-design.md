@@ -1,6 +1,14 @@
 # 设计 — serve 流式端点(SSE)(P3-D)
 
-> 状态:brainstorming 完成、用户批准(OpenAI 兼容 committed 增量 delta),待 Codex 评审 → 实现计划。
+> 状态:brainstorming 完成、用户批准、**Codex(gpt-5.5)评审采纳 4 项 → v2**,待实现计划。
+>
+> **v2 修订**(Codex,已复现的真问题):
+> 1. **断连不泄露 tmp**:Starlette 断连时从 `send()` 抛 `ClientDisconnect`,**不跑** `_sse()` 的 `finally` → tmp 泄露(Codex 复现)。→ 用 `StreamingResponse` 子类,`__call__` 的 `finally` 里 `aclose()` 迭代器 + `_unlink`(**保证执行**);cleanup 移出 `_sse`。
+> 2. **tmp.write 加保护**:写盘提到 try 外会在 read/write 失败时泄露 fd/文件、丢 500 形状。→ 写盘包 try,失败即清理 + 500。
+> 3. **早错兜底**:`_get_adapter` 除 404/400 外的异常(registry/plugin/user-model 加载)会泄露 tmp。→ 加宽 except:log + unlink + 500。
+> 4. **delta 防御**:切片前加 `full.startswith(sent)` 守卫(SherpaLocal 安全,但护住第三方 adapter 的非追加式 committed)。
+>
+> Codex 确认无误:`AudioFormatError` 经 `iterate_in_threadpool` 正确传播回 `_sse except`;`iterate_in_threadpool` 足以卸载重活到线程池。
 > 定位约束:复用已有 `transcribe_stream`;serve 是 opt-in extra(fastapi);流式路径**复用 serve 的 adapter LRU 缓存**(与非流式路径一致,用 `_get_adapter`),不每请求重载模型。
 
 ---
@@ -57,8 +65,17 @@ def _unlink(path: str) -> None:
     ):
         suffix = os.path.splitext(file.filename or "")[1] or ".wav"
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-        tmp.write(await file.read())
-        tmp.close()
+        try:                                          # v2:写盘加保护,失败即清理 + 500
+            tmp.write(await file.read())
+            tmp.close()
+        except Exception:  # noqa: BLE001
+            try:
+                tmp.close()
+            except Exception:
+                pass
+            _unlink(tmp.name)
+            _LOG.exception("upload write error: model=%s", model)
+            return JSONResponse(status_code=500, content={"error": {"message": "internal server error"}})
         if stream:
             return _stream_transcription(model, tmp.name, language)
         # —— 非流式:现状逻辑不变 ——(原 try/except/finally 保持)
@@ -82,17 +99,42 @@ def _unlink(path: str) -> None:
 
 ### 3.4 `_stream_transcription`(build_app 内,SSE)
 
+先在 `build_app()` 内(fastapi import 之后)定义**带清理的响应子类**,保证断连也 unlink:
+
+```python
+        class _CleanupStreamingResponse(StreamingResponse):
+            """__call__ 的 finally 保证执行:断连时 Starlette 抛 ClientDisconnect,
+            仍能 aclose 上游迭代器 + 清理 tmp(生成器自身 finally 在断连时不保证跑)。"""
+            def __init__(self, *args, cleanup_path=None, **kw):
+                super().__init__(*args, **kw)
+                self._cleanup_path = cleanup_path
+            async def __call__(self, scope, receive, send):
+                try:
+                    await super().__call__(scope, receive, send)
+                finally:
+                    try:
+                        await self.body_iterator.aclose()     # 停上游 sherpa 迭代
+                    except Exception:  # noqa: BLE001
+                        pass
+                    if self._cleanup_path:
+                        _unlink(self._cleanup_path)
+```
+
 ```python
     def _stream_transcription(model, path, language):
         try:
             adapter = _get_adapter(model)          # 复用 serve LRU 缓存
+            if "streaming" not in adapter.meta.modes:
+                _unlink(path)
+                return JSONResponse(status_code=400,
+                                    content={"error": {"message": f"{model} is not a streaming model"}})
         except registry.ModelNotFoundError as e:
             _unlink(path)
             return JSONResponse(status_code=404, content={"error": {"message": str(e)}})
-        if "streaming" not in adapter.meta.modes:
+        except Exception:                          # v2:早错兜底,防 tmp 泄露
             _unlink(path)
-            return JSONResponse(status_code=400,
-                                content={"error": {"message": f"{model} is not a streaming model"}})
+            _LOG.exception("stream setup error: model=%s", model)
+            return JSONResponse(status_code=500, content={"error": {"message": "internal server error"}})
         opts = TranscribeOptions(lang_hint=language)
         from .audio import AudioFormatError, iter_file_chunks
 
@@ -106,7 +148,7 @@ def _unlink(path: str) -> None:
                         yield _sse_event({"type": "error", "error": pr.error})
                         break
                     full = pr.text if pr.is_final else pr.committed   # append-only 源
-                    if len(full) > len(sent):
+                    if full.startswith(sent) and len(full) > len(sent):   # v2:防御非追加
                         yield _sse_event({"type": "transcript.text.delta", "delta": full[len(sent):]})
                         sent = full
                     if pr.is_final:
@@ -119,15 +161,14 @@ def _unlink(path: str) -> None:
                 _LOG.exception("stream transcription error: model=%s", model)
                 yield _sse_event({"type": "error", "error": "internal server error"})
                 yield "data: [DONE]\n\n"
-            finally:
-                _unlink(path)
+            # 不在此 unlink:交给 _CleanupStreamingResponse.__call__ 的 finally(断连也保证)
 
         _LOG.info("stream transcribe model=%s start", model)
-        return StreamingResponse(_sse(), media_type="text/event-stream")
+        return _CleanupStreamingResponse(_sse(), media_type="text/event-stream", cleanup_path=path)
 ```
 
-- **delta 源 append-only**:非终态用 `committed`(端点定稿、只增),终态用 `pr.text`(=committed 全文)。`sent` 追踪已发前缀,只发增量。未定稿的 volatile `partial` 不单独推(避免 OpenAI 客户端遇到"回退")——端点提交后才作为 delta 出现。
-- **临时文件**:`_sse` 的 `finally` 清理;进 SSE 前的 404/400 早返回也各自 `_unlink`。
+- **delta 源 append-only**:非终态用 `committed`(端点定稿、只增),终态用 `pr.text`(=committed 全文)。`sent` 追踪已发前缀,只发增量;`full.startswith(sent)` 守住第三方 adapter 的非追加式 committed。未定稿的 volatile `partial` 不单独推(避免 OpenAI 客户端遇到"回退")。
+- **临时文件**:进 SSE 前的 404/400/500 早返回各自 `_unlink`;进 SSE 后由 `_CleanupStreamingResponse.__call__` 的 `finally` 保证清理(**含断连**)。
 - **缓存一致**:与非流式同走 `_get_adapter`,不每请求重载本地模型。
 
 ## 4. 契约/行为影响
@@ -151,7 +192,10 @@ def _unlink(path: str) -> None:
 - **未知模型 + stream=true → 404**:`_get_adapter` 抛 `ModelNotFoundError`。
 - **stream=false 回归**:现有非流式 JSON 测试仍绿(不受影响)。
 - **错误事件**:假 transcribe_stream yield 一个 `PartialResult(error=...)` → 断言 body 有 `{"type":"error"}` + `[DONE]`。
+- **setup 广异常 → 500(v2)**:`monkeypatch _get_adapter` 抛非 ModelNotFoundError 的 `RuntimeError` → 断言 500 + 通用 message(tmp 不泄露——至少不抛未捕获)。
+- **delta 防御(v2)**:假 adapter 的 committed **非追加**(如 "ab" 后变 "xy")→ 断言不产生错乱 delta(要么跳过、要么最终 done 带全文),不崩。
 - **回归**:现有 serve 测试(health/models/非流式/缓存)全绿。
+- **注**:客户端断连时的 tmp 清理由 `_CleanupStreamingResponse.__call__` 的 finally 保证——TestClient 不易模拟中途断连,此路径靠设计(响应级 finally)覆盖,不强求单测;正常完成/错误路径由上面用例覆盖。
 
 ## 7. 不做(YAGNI)
 
