@@ -377,3 +377,103 @@ data: [DONE]
 - **许可证**：各模型许可证以其**官方来源**为准（ASRKit 只做接口、不分发权重）；**商用前请自行核对**，`asrkit show <model>` 指向来源。
 
 一句话：`asrkit run 模型 音频` 一步到位；换模型只换字符串。
+
+---
+
+## 六、完整参考（速查）
+
+> 上面是按用法叙述；这里是**一处看全**的命令 / flag / 寻址 / API / 环境变量清单。模型清单见 §五。
+
+### 6.1 模型寻址（model 字符串）
+
+| 形式 | 例 | 说明 |
+|---|---|---|
+| `<引擎>/<模型>` | `sherpa/sensevoice`、`faster-whisper/tiny`、`whispercpp/base` | 本地引擎 |
+| `transformers/<HF-id>` | `transformers/openai/whisper-large-v3` | 开放寻址，任意 HuggingFace ASR 模型 |
+| `<厂商>/<模型>` | `openai/whisper-1`、`dashscope/qwen3-asr-flash` | 云端 |
+| 裸名 | `sensevoice` → 默认引擎 + 名 | 缺省默认引擎 = sherpa（`asrkit engine default` 可改） |
+| 精度 tag | `sherpa/sensevoice:int8` / `:fp32` | Ollama 式 |
+| `local/…`（历史别名） | `local/sensevoice` ≡ `sherpa/sensevoice` | **永久保留、向后兼容** |
+
+### 6.2 命令全集（15 个顶层子命令）
+
+| 命令 | 作用 |
+|---|---|
+| `asrkit run <model> <audio...>` | 缺则先下载，再转写（Ollama 式） |
+| `asrkit transcribe <audio...> -m <model>` | 只转写（不自动下载） |
+| `asrkit stream <model> [<audio>] [--mic]` | 流式转写（文件分块 / 麦克风） |
+| `asrkit pull <model> [--url <地址>]` | 下载本地模型（tar.*/zip 按内容识别） |
+| `asrkit rm <model>` | 删除已下载的本地模型（仅本地） |
+| `asrkit show <model>` | 模型详情 |
+| `asrkit list [筛选…]` | 列模型（见 6.4） |
+| `asrkit search <term> [--json]` | 按 id/名称子串搜 |
+| `asrkit add-model <id> --arch <架构> [选项…]` | 注册自定义模型 |
+| `asrkit engine <list\|install\|default\|rm>` | 管理引擎 |
+| `asrkit config <set-key\|get-key\|set\|list\|path>` | 配置/密钥 |
+| `asrkit serve [--host --port -v]` | OpenAI 兼容 HTTP 网关 |
+| `asrkit doctor [--net]` | 体检安装/密钥/目录/config |
+| `asrkit completion <bash\|zsh\|fish>` | 输出 shell 补全脚本 |
+
+### 6.3 `run` / `transcribe` 通用 flag
+
+| flag | 作用 |
+|---|---|
+| `-m/--model`（transcribe 必填） | 模型 |
+| `--language <码>` | 语言提示（助 Whisper 家族） |
+| `-f/--format {txt,json,srt,vtt,csv,tsv}` | 输出格式（默认 txt） |
+| `-o/--output <路径>` | 写文件；批量时为目录逐文件镜像 |
+| `--convert` | opt-in 解码/重采样/混单声道（默认关，不符即报错） |
+| `--segment` | opt-in 长音频 VAD 分段（需 `ASRKIT_VAD_MODEL`） |
+| `--batch` | 强制聚合输出（脚本用稳定 NDJSON/csv） |
+| `--stdin-format <wav>` | stdin `-` 输入的字节格式 |
+| `-v/-vv` | 日志详细度（INFO/DEBUG） |
+| `--api-key/--base-url/--app-key/--access-key` | 云端凭据（也可 config/env） |
+| `--model-dir`（transcribe/stream） | 指定本地模型目录 |
+
+`stream` 专有：`--mic`（麦克风，需 `asrkit[mic]`）、`--device <索引\|名>`。输入支持多文件 / glob / 目录（递归）/ `-`（stdin）。
+
+### 6.4 `asrkit list` 筛选
+
+`--json` · `--installed`（只已装本地）· `--ids`（裸 id 一行一个，供脚本/补全）· `--source cloud|local` · `--lang <码>` · `--arch <架构>`。
+
+### 6.5 Python API
+
+```python
+from asrkit import transcribe, list_models
+transcribe(model, audio, *, config=None, opts=None)
+run(model, audio, *, config=None, opts=None, log=print)
+transcribe_stream(model, audio, *, config=None, opts=None, window_s=0.1)     # → PartialResult 迭代器
+transcribe_stream_mic(model, *, config=None, opts=None, samplerate=16000, block_s=0.1, device=None)
+pull(model, *, config=None, url=None, log=print)
+list_models() -> [AdapterMeta];  show(model) -> AdapterMeta;  remove(model, *, config=None)
+```
+
+### 6.6 serve HTTP 端点（OpenAI 兼容）
+
+| 端点 | 说明 |
+|---|---|
+| `POST /v1/audio/transcriptions` | 表单 `file/model/language/response_format/stream`；`response_format`=json/verbose_json/text/srt/vtt |
+| ↑ `stream=true` | → SSE，事件 `transcript.text.delta`/`.done` + `[DONE]`（仅 streaming 模型） |
+| `GET /v1/models` | 列模型 |
+| `GET /health` | 健康检查 |
+
+### 6.7 安装 extras
+
+`asrkit`（内核+云端）· `asrkit[local]`（=sherpa，47 模型）· `asrkit[mic]`（麦克风）· `asrkit[serve]`（HTTP）· `asrkit[faster-whisper]` · `asrkit[whispercpp]` · `asrkit[transformers]` · `asrkit[engines]`（四引擎）· `asrkit[all]`（引擎+serve）。
+
+### 6.8 环境变量
+
+| 变量 | 作用 |
+|---|---|
+| `ASRKIT_MODELS_ROOT` | 模型目录（默认 `~/.asrkit/models`） |
+| `ASRKIT_MODELS_JSON` | 自定义模型注册表路径 |
+| `ASRKIT_CONFIG` | 配置文件路径 |
+| `ASRKIT_HTTP_RETRIES` | 云端重试次数（默认 3；0 不重试） |
+| `ASRKIT_DOUBAO_POLL_TIMEOUT_S` | doubao 轮询总超时秒数（默认 300） |
+| `ASRKIT_SERVE_CACHE` | serve adapter LRU 容量（默认 8） |
+| `ASRKIT_VAD_MODEL` | `--segment` 用的 VAD 模型路径 |
+| `HF_ENDPOINT` | HF 系引擎镜像（底层库自理，如 `https://hf-mirror.com`） |
+
+### 6.9 退出码（`emit.EXIT_*`）
+
+`0` 成功 · `1` 意外异常 · `2` 用法错误 · `3` 模型不存在 · `4` 转写/渲染失败。批量取"最严重"（优先级 `1>3>4`）。详见 `docs/result-contract.md`。
