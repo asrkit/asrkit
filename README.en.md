@@ -15,18 +15,27 @@ It covers a panorama **no other tool does**: Chinese SOTA on-device models (Sens
 
 > ⚠️ **Early beta, under active development.** The core interface is usable, but we're still iterating — addressing/APIs may shift slightly between minor versions. Try it and tell us what breaks.
 
+## Install — pick your way, it's not pip-only
+
+The base install needs only `requests` (cloud is built in); engines/models/`serve` are all opt-in. So **cloud-only use is nearly zero-setup** — pick the row that fits you:
+
+| You want | Install |
+|---|---|
+| **Cloud-only, zero env hassle** | `uv tool install asrkit` — `uv` is a single one-line binary; `asrkit` lands on your PATH, no Python env to manage |
+| **Not even install (run once)** | `uvx asrkit transcribe audio.wav -m siliconflow/sensevoice --api-key <KEY>` — pulled from PyPI and run, nothing left behind |
+| **Regular Python user** | `pip install asrkit` |
+| **Global command, don't touch current env** | `pipx install asrkit` |
+| **On-device engines (sherpa, 47 models)** | `pip install "asrkit[local]"` — local engines run in your Python env |
+
+> Install `uv`: `curl -LsSf https://astral.sh/uv/install.sh | sh` (one line on macOS/Linux, single binary, zero runtime).
+> After installing, run `asrkit doctor` for a one-command health check (engines / keys / dirs / config; `--net` adds connectivity checks).
+
 ## 30 seconds to first transcript
 
 ```bash
-pip install asrkit                                        # seconds: interface + cloud (just requests)
 asrkit transcribe audio.wav -m siliconflow/sensevoice --api-key <KEY>   # free cloud model, works instantly
-
-pip install "asrkit[local]"                               # add on-device (sherpa, 47 models)
-asrkit run sherpa/sensevoice audio.wav                     # downloads on first run, then transcribes
+asrkit run sherpa/sensevoice audio.wav                     # on-device: downloads on first run, then transcribes (needs asrkit[local])
 ```
-
-> Want a global command that doesn't touch your current env? `pipx install asrkit` or `uv tool install asrkit` work too.
-> After installing, run `asrkit doctor` for a one-command health check (engines / keys / dirs / config; `--net` adds connectivity checks).
 
 ## The model string is the only thing that changes
 
@@ -96,9 +105,9 @@ asrkit completion zsh        # bash/zsh/fish completion (model names complete dy
 
 `run`/`transcribe`/`stream`/`serve` all support `-v` (INFO) / `-vv` (DEBUG) for more log detail; silent by default, doesn't affect stdout consumed by scripts.
 
-## Install: a tiny interface core, everything pluggable
+## Pluggable: a tiny core, engines/serve added on demand
 
-**The base install is just the interface + cloud (only `requests` — installs in seconds, runs anywhere).** Add local engines on demand:
+**The base install is just the interface + cloud (only `requests` — installs in seconds, runs anywhere).** Everything else is opt-in (extras in the table below):
 
 | You want | Install |
 |---|---|
