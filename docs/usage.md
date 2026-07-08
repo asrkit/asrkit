@@ -188,6 +188,7 @@ asrkit stream local/paraformer-online a.m4a --convert  # opt-in 解码/重采样
 - live partial 只在 stderr 是 TTY 时覆盖同一行(`\r`);管道/重定向时不吐 ANSI,stdout 只落最终文本。
 - 仅 `modes` 含 `streaming` 的模型可用(`asrkit list --json` 看 modes);批处理模型会给出清晰报错。
 - 退出码:非流式/未配置/坏窗 = 2,模型未注册 = 3,引擎未装/格式错/运行时失败 = 4。
+- 流式对 sherpa online 模型做端点检测,长音频/长会话自动分段(`committed` 逐段增长)。
 
 ### 日志 / `--verbose`
 

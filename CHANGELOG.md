@@ -15,6 +15,7 @@
 ### 新增
 - **engine rm**：新增 asrkit engine rm <name> —— 打印手动卸载指引 + 共享依赖警告 + 重置默认引擎(若指向它);绝不代跑 pip uninstall。
 - **--verbose / 日志**：引入 logging，run/transcribe/stream/serve 支持 -v(INFO)/-vv(DEBUG)；点亮 _http 重试、serve 请求、转写 metrics。默认静默、作为库 import 零副作用。
+- **流式分段**：sherpa online 流式开启端点检测,PartialResult 的 committed(已定稿段)/partial(当前假设)现由静音端点填实、长会话自动分段(rule3=300 防连续说话被硬切)。
 
 ### 修复
 - **doubao 长音频**:录音文件识别轮询从硬编码 30s 上限改为 wall-clock deadline + 退避(1s→5s),默认 300s(`ASRKIT_DOUBAO_POLL_TIMEOUT_S` 可配);长音频不再必然超时。只读轮询,不涉重复计费。

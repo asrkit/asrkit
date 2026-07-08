@@ -45,6 +45,10 @@ class _FakeRec:
         pass
     def get_result(self, st):
         return "x" * st.fed
+    def is_endpoint(self, st):
+        return False
+    def reset(self, st):
+        pass
 
 
 def _streaming_meta():
@@ -74,7 +78,54 @@ def test_transcribe_stream_yields_growing_partials(monkeypatch, tmp_path):
     assert [p.is_final for p in out] == [False, False, False, True]
     texts = [p.text for p in out]
     assert texts == sorted(texts, key=len)                 # 递增
-    assert all(p.committed == "" and p.partial == "" for p in out)   # 契约留空
+    assert all(p.committed == "" for p in out[:3])            # 无端点 → committed 累积前为空
+    assert all(p.partial == p.text for p in out[:3])          # 无 committed 时 text == partial
+    assert all(p.partial for p in out[:3])                    # partial = 当前假设,非空
+    assert out[-1].partial == "" and out[-1].committed == out[-1].text   # 定稿全进 committed
+
+
+def test_transcribe_stream_endpoints_accumulate_committed(monkeypatch, tmp_path):
+    """端点触发时当前段进 committed、reset 被调、新段从头开始。"""
+    pytest.importorskip("numpy")
+
+    class _EPStream:
+        def __init__(self):
+            self.seg = 0            # 当前段已喂块数
+        def accept_waveform(self, sr, samples):
+            self.seg += 1
+        def input_finished(self):
+            pass
+
+    class _EPRec:
+        """第 2 块是端点;每段 get_result = 'seg'*当前段块数。"""
+        def __init__(self):
+            self.resets = 0
+            self._st = None
+        def create_stream(self):
+            self._st = _EPStream()
+            return self._st
+        def is_ready(self, st):
+            return False
+        def decode_stream(self, st):
+            pass
+        def get_result(self, st):
+            return "a" * st.seg
+        def is_endpoint(self, st):
+            return st.seg == 2       # 第 2 块判为端点
+        def reset(self, st):
+            self.resets += 1
+            st.seg = 0               # 新段从头
+
+    ad = local_sherpa.SherpaLocal(_streaming_meta())
+    rec = _EPRec()
+    _patch_engine(monkeypatch, tmp_path, rec)
+    out = list(ad.transcribe_stream(iter([[0.0], [0.0], [0.0]]), TranscribeOptions()))
+    # 第 2 块(index 1)是端点:committed 收下 "aa",partial 清空
+    assert out[1].committed == "aa" and out[1].partial == ""
+    assert rec.resets >= 1
+    # 定稿:committed 含两段(第一段 aa + 尾段剩余),partial 空,is_final
+    assert out[-1].is_final and out[-1].partial == ""
+    assert "aa" in out[-1].committed
 
 
 def test_transcribe_stream_batch_model_raises_call_time(monkeypatch):

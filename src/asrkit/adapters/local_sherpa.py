@@ -61,11 +61,13 @@ def _build(ct: str, d: str, threads: int, lang_hint: str, streaming: bool,
         if ct == "onlineParaformer":
             return so.OnlineRecognizer.from_paraformer(
                 tokens=_tok(), encoder=_find(d, prefer, "encoder*.onnx", "*encoder*.onnx"),
-                decoder=_find(d, prefer, "decoder*.onnx", "*decoder*.onnx"), num_threads=threads)
+                decoder=_find(d, prefer, "decoder*.onnx", "*decoder*.onnx"), num_threads=threads,
+                enable_endpoint_detection=True, rule3_min_utterance_length=300.0)
         return so.OnlineRecognizer.from_transducer(
             tokens=_tok(), encoder=_find(d, prefer, "encoder*.onnx", "*encoder*.onnx"),
             decoder=_find(d, prefer, "decoder*.onnx", "*decoder*.onnx"),
-            joiner=_find(d, prefer, "joiner*.onnx", "*joiner*.onnx"), num_threads=threads)
+            joiner=_find(d, prefer, "joiner*.onnx", "*joiner*.onnx"), num_threads=threads,
+            enable_endpoint_detection=True, rule3_min_utterance_length=300.0)
 
     if ct == "paraformer":
         return so.OfflineRecognizer.from_paraformer(
@@ -276,16 +278,27 @@ class SherpaLocal(BaseAdapter):
             rec = self._rec
             st = rec.create_stream()
             sr = 16000                       # chunks 已是 16k 单声道 float32
+            committed = ""
             for chunk in chunks:
                 st.accept_waveform(sr, chunk)
                 while rec.is_ready(st):
                     rec.decode_stream(st)
-                yield PartialResult(text=_result_text(rec.get_result(st)), is_final=False)
+                partial = _result_text(rec.get_result(st))
+                if rec.is_endpoint(st):
+                    if partial:
+                        committed = f"{committed} {partial}".strip()
+                    rec.reset(st)
+                    partial = ""
+                text = f"{committed} {partial}".strip()
+                yield PartialResult(text=text, committed=committed, partial=partial, is_final=False)
             st.accept_waveform(sr, np.zeros(sr // 2, dtype=np.float32))
             st.input_finished()
             while rec.is_ready(st):
                 rec.decode_stream(st)
-            yield PartialResult(text=_result_text(rec.get_result(st)), is_final=True)
+            partial = _result_text(rec.get_result(st))
+            if partial:
+                committed = f"{committed} {partial}".strip()
+            yield PartialResult(text=committed, committed=committed, partial="", is_final=True)
         except AudioFormatError:
             raise                            # 交 CLI 格式错误分支,不吞
         except Exception as e:               # _build/缺文件/运行时/解码 → 对称收进 error

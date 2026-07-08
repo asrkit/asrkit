@@ -113,19 +113,19 @@ csv 用逗号分隔、tsv 用 tab 分隔；写入用标准库 `csv.writer`（`li
 
 ---
 
-## 五、流式契约：`PartialResult`（W4 行使记录）
+## 五、流式契约：`PartialResult`（W4 行使记录，P3-E 端点检测填实）
 
 `asrkit stream` / `api.transcribe_stream` 返回 `PartialResult` 迭代器（见 `src/asrkit/types.py`）。消费者**一律以 `text` 为准**（权威展示文本）。
 
-| 字段 | 类型 | 含义 | 本刀（W4）填充 |
+| 字段 | 类型 | 含义 | 填充情况 |
 |---|---|---|---|
-| `text` | str | 当前完整假设 / 最终文本 | ✅ 每块给出 |
+| `text` | str | 当前完整假设 / 最终文本 = `committed`(+空格+)`partial`，再 `strip()` | ✅ 每块给出 |
 | `is_final` | bool | 是否为定稿（迭代最后一个为 `True`） | ✅ |
-| `committed` | str | 可选优化：已定稿部分 | 留空（契约允许，端侧留空） |
-| `partial` | str | 可选优化：当前假设增量 | 留空 |
+| `committed` | str | 已定稿段的累积（端点触发后收进的历史文本） | ✅ 由端点检测填实（P3-E） |
+| `partial` | str | 当前段的实时假设（尚未定稿） | ✅ 由端点检测填实（P3-E） |
 | `ts_ms` | int? | 时间戳 | 未填（文件分块无稳定挂钟语义） |
 | `error` | str? | 运行时失败信息 | 随末尾 `is_final=True` 给出 |
 
-**语义**：每解码一块 yield 一个 `PartialResult(text=<增长假设>, is_final=False)`；喂完 flush 尾音后 yield 最终 `PartialResult(text=<最终文本>, is_final=True)`。`text` 每块**重发全量**（非增量）。仅 `modes` 含 `streaming` 的模型支持；批处理模型 `api.transcribe_stream` 抛 `ValueError`、adapter 直调抛 `NotImplementedError`。
+**语义**：sherpa online 模型开启端点检测（`enable_endpoint_detection=True`，`rule3_min_utterance_length=300.0` 抑制"连续说话被强制切段"，改由静音驱动分段）。每喂一块：解码 → 取当前 `partial` 假设 → 若 `is_endpoint(st)` 为真，则把 `partial` 收进 `committed` 累积、调用 `reset(st)` 清空解码器状态、`partial` 清空 → `text = (committed + " " + partial).strip()`。喂完 flush 尾音后，若还有残留 `partial` 也收进 `committed`，yield 最终 `PartialResult(text=committed, committed=committed, partial="", is_final=True)`。仅 `modes` 含 `streaming` 的模型支持；批处理模型 `api.transcribe_stream` 抛 `ValueError`、adapter 直调抛 `NotImplementedError`。
 
-> **复盘（留给未来独立一刀）**：当前 `text` 每块重发全量，消费者需自行 diff 才知新增。若将来要"仅追加已定稿"，再引入 `committed`/`partial` 精细化——契约已预留字段，属**纯新增**、无需破坏性变更。麦克风/serve 流式端点、词级时间戳同为后续项。
+> **复盘（留给未来独立一刀）**：麦克风/serve 流式端点、词级时间戳、`ts_ms` 挂钟语义为后续项。
