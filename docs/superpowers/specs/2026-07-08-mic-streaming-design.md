@@ -1,6 +1,14 @@
 # 设计 — 麦克风流式输入(P3-C)
 
-> 状态:brainstorming 完成、用户批准(Ctrl-C 停 + 打印最终文本),待 Codex 评审 → 实现计划。
+> 状态:brainstorming 完成、用户批准、**Codex(gpt-5.5)评审采纳 4 项 → v2**,待实现计划。
+>
+> **v2 修订**(Codex):
+> 1. **依赖检查及早**:`record_chunks` 是生成器 → `import sounddevice` 延迟到首次迭代、落在 `_stream` 的 `except Exception` 里 → 缺依赖变 `EXIT_FAILED` 而非设计的 `EXIT_ERROR`。→ 拆成**非生成器外壳**(call-time import,缺则立即 `RuntimeError`)+ 内层生成器。
+> 2. **start() 资源清理**:`stream.start()` 若在 try/finally 外抛出,stream 不关。→ start() 放进受保护块。
+> 3. **overflow 别静默丢音**:`stream.read` 的 `overflowed=True` 表示上次以来输入被丢弃。→ 用刚建的 logging 首次 overflow **warn 一次**(`asrkit.mic` logger)。
+> 4. **flag 组合诚实报错**:`--mic` 同时给 `audio`、或 `--device` 不带 `--mic` → 加 `EXIT_USAGE` 报错,不静默忽略。
+>
+> Codex 确认无误:Ctrl-C 吞在 record_chunks 内 → 下游 tail-flush 照常 emit is_final(无双打);`data[:,0]` 对 channels=1 正确;`_streaming_adapter` 重构等价(window_s 检查仍在 make_adapter 前)。
 > 定位约束:麦克风是 opt-in extra(`asrkit[mic]`),**内核仍零依赖**;复用 W4/E 的 `transcribe_stream`(麦克风只换 chunk 源);透明:直接采 16k 单声道 float32。
 
 ---
@@ -38,6 +46,8 @@ from __future__ import annotations
 
 from typing import Any, Iterator, Optional
 
+from . import log
+
 _INSTALL_HINT = 'mic input needs sounddevice. Run: pip install "asrkit[mic]"'
 
 
@@ -45,21 +55,30 @@ def record_chunks(samplerate: int = 16000, block_s: float = 0.1,
                   device: Optional[Any] = None) -> Iterator[Any]:
     """从麦克风持续采样,逐块 yield float32 单声道数组(约 samplerate*block_s 采样)。
 
-    Ctrl-C(KeyboardInterrupt)→ 干净停止(return,让下游正常收尾)。
-    缺 sounddevice → RuntimeError(友好提示)。
+    **外壳非生成器**:依赖检查 call-time —— 缺 sounddevice 立即 RuntimeError(CLI 归 EXIT_ERROR)。
+    Ctrl-C(KeyboardInterrupt)→ 干净停止(内层 return,让下游正常收尾 emit is_final)。
     """
     try:
         import numpy as np
         import sounddevice as sd
     except ImportError as e:
         raise RuntimeError(_INSTALL_HINT) from e
+    return _record(np, sd, samplerate, block_s, device)
+
+
+def _record(np, sd, samplerate: int, block_s: float, device) -> Iterator[Any]:
+    _LOG = log.get_logger("mic")
     blocksize = max(1, int(samplerate * block_s))
     stream = sd.InputStream(samplerate=samplerate, channels=1, dtype="float32",
                             blocksize=blocksize, device=device)
-    stream.start()
+    warned = False
     try:
+        stream.start()                                    # v2:放进受保护块
         while True:
-            data, _overflowed = stream.read(blocksize)          # (frames, 1) float32
+            data, overflowed = stream.read(blocksize)     # (frames, 1) float32
+            if overflowed and not warned:                 # v2:overflow 首次 warn 一次
+                _LOG.warning("microphone input overflowed — some audio was dropped")
+                warned = True
             yield np.ascontiguousarray(data[:, 0], dtype=np.float32)
     except KeyboardInterrupt:
         return
@@ -120,6 +139,12 @@ def transcribe_stream_mic(model, *, config=None, opts=None,
         from .audio import AudioFormatError
         cfg, opts = _cfg(a), _opts(a)
         live = sys.stderr.isatty()
+        if a.mic and a.audio:                     # v2:诚实报错,不静默忽略
+            print("[error] cannot combine --mic with an audio file", file=sys.stderr)
+            return emit.EXIT_USAGE
+        if a.device and not a.mic:
+            print("[error] --device only applies with --mic", file=sys.stderr)
+            return emit.EXIT_USAGE
         try:
             if a.mic:
                 dev = a.device
@@ -191,13 +216,15 @@ def transcribe_stream_mic(model, *, config=None, opts=None,
 
 ## 6. 测试(mock sounddevice,不需硬件;numpy importorskip)
 
-- **record_chunks 吐块 + Ctrl-C 停**:`sys.modules` 注入假 `sounddevice`(InputStream.read 前 N 次返回 `(np.zeros((bs,1),float32), False)`、第 N+1 次 `raise KeyboardInterrupt`);断言 record_chunks yield N 块后干净停(StopIteration),假 stream 的 stop/close 被调(finally)。
-- **缺 sounddevice → RuntimeError**:`monkeypatch.setitem(sys.modules, "sounddevice", None)` 使 `import sounddevice` 抛 ImportError;断言 `next(record_chunks())` 抛 `RuntimeError` 且含 install hint。
+- **record_chunks 吐块 + Ctrl-C 停**:`sys.modules` 注入假 `sounddevice`(InputStream.read 前 N 次返回 `(np.zeros((bs,1),float32), False)`、第 N+1 次 `raise KeyboardInterrupt`);断言 record_chunks yield N 块后干净停(StopIteration),假 stream 的 start/stop/close 被调(finally)。
+- **缺 sounddevice → RuntimeError(call-time,v2)**:`monkeypatch.setitem(sys.modules, "sounddevice", None)` 使 `import sounddevice` 抛 ImportError;断言 **`record_chunks()` 调用本身**(不迭代)抛 `RuntimeError` 且含 install hint(证明外壳非生成器、及早)。
+- **overflow warn 一次(v2)**:假 read 返回 `overflowed=True`;`caplog.at_level(logging.WARNING, logger="asrkit")`;断言恰有一条 "overflow" WARNING(即使多块 overflow 也只 warn 一次)。
 - **api.transcribe_stream_mic 校验**:非流式 model(如 `openai/whisper-1`)→ `ValueError`(不碰麦克风)。
 - **api.transcribe_stream 重构不回归**:现有 test_streaming 的 api 守卫测试仍绿(window_s<=0、非流式)。
 - **CLI `--mic` 渲染**:`monkeypatch api.transcribe_stream_mic`→产假 partials(含 is_final);`capsys` 断言 stdout 有最终文本、EXIT_OK。
 - **CLI `--mic` Ctrl-C 兜底**:假 stream 产一个非 final partial 后 `raise KeyboardInterrupt`;断言 stdout 打了 last_text、EXIT_OK。
 - **CLI 无 audio 无 --mic → EXIT_USAGE**。
+- **CLI flag 组合报错(v2)**:`--mic` + audio → EXIT_USAGE("cannot combine");`--device X` 不带 `--mic` → EXIT_USAGE("only applies with --mic")。
 - **CLI mic 缺依赖**:`monkeypatch api.transcribe_stream_mic`→抛 `RuntimeError(hint)`;断言 EXIT_ERROR + stderr 提示。
 - **回归**:现有 stream 文件测试仍绿。
 
