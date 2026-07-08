@@ -64,3 +64,20 @@ def test_poll_timeout_reports_actual_value(monkeypatch):
     ad = _make_adapter()
     r = ad.transcribe(AudioInput(original_path=__file__), TranscribeOptions())
     assert r.error and "doubao polling timeout (7s)" in r.error
+
+
+def test_poll_terminal_error_returns_early(monkeypatch):
+    """query 返回 45xx 终态错误码 → 立即 query failed,不等超时、不再轮询。"""
+    monkeypatch.setattr(cloud_doubao.time, "sleep", lambda *_: None)
+    calls = {"n": 0}
+    def fake_post(url, **kw):
+        if url.endswith("/submit"):
+            return _Resp(status_code=200)
+        calls["n"] += 1
+        return _Resp(headers={"x-api-status-code": "45000001"}, text="bad request")
+    monkeypatch.setattr(cloud_doubao._http, "post", fake_post)
+    from asrkit.types import AudioInput, TranscribeOptions
+    ad = _make_adapter()
+    r = ad.transcribe(AudioInput(original_path=__file__), TranscribeOptions())
+    assert r.error and "query failed code=45000001" in r.error
+    assert calls["n"] == 1                     # 第一次 query 即返回,不继续轮询
