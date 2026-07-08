@@ -2,30 +2,35 @@
 
 # ASRKit
 
-**One interface for speech recognition — cloud built in, engines on demand, models pull-and-go.**
+**One interface for speech recognition — on-device to cloud, swap one model string, your code doesn't change.**
 
 [![PyPI](https://img.shields.io/pypi/v/asrkit)](https://pypi.org/project/asrkit/)
 [![Python](https://img.shields.io/pypi/pyversions/asrkit)](https://pypi.org/project/asrkit/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/asrkit/asrkit/actions/workflows/ci.yml/badge.svg)](https://github.com/asrkit/asrkit/actions)
 
-ASRKit is **Ollama + LiteLLM for speech recognition**: change one model string to swap between on-device models, cloud APIs, and any engine — your code doesn't change. **The core is just a thin interface** — cloud built in (tiny deps), local engines installed on demand, models pulled on demand, plus an optional OpenAI-compatible local server.
+ASRKit is to speech recognition what **Ollama + LiteLLM** are to LLMs: models pull-and-go, one addressing scheme across on-device and cloud, plus an optional OpenAI-compatible local server. **The core is just a thin interface** — the base install depends only on `requests`; engines install on demand, models download on demand. No torch for things you don't use.
+
+It covers a panorama **no other tool does**: Chinese SOTA on-device models (SenseVoice / Paraformer / FireRed / TeleSpeech — 47 models, pull-and-go) + China's cloud vendors (DashScope / Doubao / SiliconFlow, which no Western toolchain covers) + the whole Whisper family + the entire HuggingFace ASR hub — one interface to compare, mix, and switch.
 
 > ⚠️ **Early beta, under active development.** The core interface is usable, but we're still iterating — addressing/APIs may shift slightly between minor versions. Try it and tell us what breaks.
 
+## 30 seconds to first transcript
+
 ```bash
 pip install asrkit                                        # seconds: interface + cloud (just requests)
-asrkit transcribe audio.wav -m dashscope/qwen3-asr-flash --api-key <KEY>   # cloud, works instantly
+asrkit transcribe audio.wav -m siliconflow/sensevoice --api-key <KEY>   # free cloud model, works instantly
 
 pip install "asrkit[local]"                               # add on-device (sherpa, 47 models)
 asrkit run local/sensevoice audio.wav                     # downloads on first run, then transcribes
 ```
 
 > Want a global command that doesn't touch your current env? `pipx install asrkit` or `uv tool install asrkit` work too.
+> After installing, run `asrkit doctor` for a one-command health check (engines / keys / dirs / config; `--net` adds connectivity checks).
 
-## One interface, swap anything
+## The model string is the only thing that changes
 
-The model string is the only thing that changes — engine, model, on-device vs cloud, all the same call:
+Engine, model, on-device or cloud — all the same call:
 
 ```bash
 asrkit run local/sensevoice                      audio.wav              # sherpa-onnx (on-device)
@@ -35,10 +40,20 @@ asrkit run transformers/openai/whisper-large-v3  audio.wav              # any Hu
 asrkit run dashscope/qwen3-asr-flash             audio.wav --api-key …  # cloud, bring your own key
 ```
 
+On-device `local/sensevoice` and cloud `siliconflow/sensevoice` are **the same call** — comparing edge vs cloud is just swapping the string.
+
 ```python
 from asrkit import transcribe
-print(transcribe("dashscope/qwen3-asr-flash", "audio.wav", config={"api_key": "…"}).text)
+print(transcribe("local/sensevoice", "audio.wav").text)
 ```
+
+## Why ASRKit
+
+- **A Chinese/multilingual panorama no one else combines.** 47 on-device models + 5 cloud vendors out of the box; China's clouds and Chinese on-device SOTA are first-class citizens, not an afterthought.
+- **The interface is the core; everything is pluggable.** The base install ships only the interface + cloud (just `requests`); engines, models, and the server are all add-ons. Use an engine you haven't installed → **a friendly error with the install command**, not an `ImportError`.
+- **Learn once, use three ways.** CLI, Python library, and HTTP (OpenAI-compatible serve) — one model addressing scheme across all of them.
+- **Transparent by design.** It doesn't touch your audio or change a model's native behavior by default. Wrong format? An honest error — never silent garbage. Unsupported options warn instead of being silently dropped. Conversion and chunking are opt-in.
+- **Private.** Your audio and API keys never leave your machine — it's a library/tool, not a hosted service.
 
 ## Batch & scripting
 
@@ -50,17 +65,31 @@ asrkit transcribe ./recordings -m dashscope/qwen3-asr-flash -f json --batch # re
 cat a.wav | asrkit transcribe  -  -m local/sensevoice                       # stdin
 ```
 
-- **NDJSON / csv / tsv** for batches (a single file is still one object); `srt/vtt` subtitles need model-provided timestamps, otherwise an honest error.
-- **Graded exit codes** `0/2/3/4` (ok / usage error / model not found / transcription failed; any failure in a batch → non-zero), so scripts can tell why.
-- **Cloud batches retry** transient failures (429/5xx) automatically — cost-safe: billable requests retry only on rate-limit/connection failure, never double-billing (`ASRKIT_HTTP_RETRIES` tunable).
+- **NDJSON / csv / tsv** for batches (a single file is still one object); contract in [docs/result-contract.md](docs/result-contract.md).
+- **`srt/vtt` subtitles**: the whisper family (faster-whisper / whispercpp / openai/whisper-1) returns timestamps, so subtitles just work; other models get an **honest error** — never a fabricated timeline.
+- **Graded exit codes** `0/1/2/3/4` (ok / unexpected / usage error / model not found / transcription failed; any failure in a batch → non-zero), so scripts can tell why.
+- **Cloud batches retry** transient failures automatically — cost-safe: billable requests retry only on rate-limit/connection failure, never double-billing (`ASRKIT_HTTP_RETRIES` tunable).
 
-## Why ASRKit
+## Streaming (minimal)
 
-- **The interface is the core; everything is pluggable.** `pip install asrkit` ships only the interface + cloud (tiny — just `requests`); engines, models, and the server are all add-ons. No torch for things you don't use.
-- **Same interface, local or cloud.** On-device `local/sensevoice` and cloud `siliconflow/sensevoice` — swap the string, not your code.
-- **Curated *and* open.** 47 on-device models + 5 cloud vendors (including China's DashScope / Doubao / SiliconFlow) out of the box; custom models are one JSON line, new engines are a plugin — no fork required.
-- **Transparent by design.** It doesn't touch your audio or change a model's native behavior by default. Wrong format? An honest error — never silent garbage. Conversion and long-audio chunking are opt-in.
-- **Private.** Your audio and API keys never leave your machine — it's a library/tool, not a hosted service.
+Decode sherpa online (streaming) models chunk by chunk, emitting incremental text as audio is fed:
+
+```bash
+asrkit stream local/paraformer-online meeting.wav             # live partials → stderr, final text → stdout
+asrkit stream local/paraformer-online meeting.wav > out.txt   # pipe-friendly: capture final text only
+```
+
+Only models with `streaming` in `modes` are supported (batch models get a clear error); microphone input and a streaming serve endpoint are on the roadmap.
+
+## Discovery & diagnostics
+
+```bash
+asrkit search whisper        # search models by id/name
+asrkit list --lang ja        # filter by language (broad multilingual models returned as candidates)
+asrkit doctor                # health check: engines / keys (presence only) / models dir writable / config valid
+asrkit doctor --net          # add download-source / cloud reachability checks
+asrkit completion zsh        # bash/zsh/fish completion (model names complete dynamically)
+```
 
 ## Install: a tiny interface core, everything pluggable
 
@@ -74,22 +103,24 @@ cat a.wav | asrkit transcribe  -  -m local/sensevoice                       # st
 | Local server | `asrkit[serve]` |
 | Everything | `asrkit[all]` |
 
-Use an engine you haven't installed → **a friendly error with the install command**, not an `ImportError`.
-
 > **Ownership model:** engines are **shared pip packages** — `asrkit engine install <name>` installs into the right environment for you; uninstall with your own `pip uninstall` (shared packages, your env, your call). Models are **asrkit-owned** — `pull` to download, `rm` to delete, clean and symmetric.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `asrkit list` | list all models (✓ = installed) |
+| `asrkit list` | list all models (✓ = installed); filter with `--lang/--arch`, bare ids with `--ids` |
+| `asrkit search <term>` | search models by id/name |
 | `asrkit run <model> <audio>` | download if missing, then transcribe |
 | `asrkit transcribe <audio…> -m <model>` | transcribe only; multiple files / dir / glob / `-` (stdin), `--batch`; `--format txt/json/srt/vtt/csv/tsv`, `-o`, `--language` |
+| `asrkit stream <model> <audio>` | streaming transcription (sherpa online models) |
 | `asrkit pull <model> [--url …]` / `rm <model>` | download (`--url` overrides the source) / remove an on-device model |
 | `asrkit show <model>` | model details |
 | `asrkit engine list` / `install <name>` / `default <name>` | manage engines |
 | `asrkit config set-key <vendor> <KEY>` / `list` | store keys / default engine / models dir |
+| `asrkit doctor [--net]` | health-check the install and config |
 | `asrkit serve` | run an OpenAI-compatible local server |
+| `asrkit completion <shell>` | bash/zsh/fish completion script |
 | `asrkit add-model …` | register a custom sherpa model |
 
 ## Engines & models
@@ -141,9 +172,18 @@ asrkit add-model local/my-model --url https://…/model.tar.bz2 --arch senseVoic
 
 **Add an engine** — ship a small package that declares an `asrkit.adapters` entry point; `pip install` auto-registers it. No fork, no core changes. Recipe: [docs/engines-and-addressing.md](docs/engines-and-addressing.md#九扩展实操).
 
+## Design principles & boundaries
+
+ASRKit is deliberately restrained — what it *doesn't* do matters as much as what it does:
+
+- **It never touches your audio.** The core does zero processing and hands bytes to the model/cloud as-is; decoding/resampling/chunking are all opt-in (`--convert`/`--segment`).
+- **It doesn't swallow specialist ecosystems.** Speaker diarization and forced alignment stay out of the interface layer — use the `raw_response` escape hatch or compose on top.
+- **It doesn't uninstall engines for you.** Engines are shared pip packages: it helps you install into the right env, but your environment is yours.
+- **It doesn't fake support.** No timestamps from the model → no subtitles; an option that won't take effect → a warning. Honest errors beat silent wrong output.
+
 ## Docs
 
-[Usage](docs/usage.md) · [Adapter contract](docs/adapter-spec.md) · [Engines & addressing](docs/engines-and-addressing.md) · [Model management](docs/model-management.md)
+[Usage](docs/usage.md) · [Adapter contract](docs/adapter-spec.md) · [Result contract](docs/result-contract.md) · [Engines & addressing](docs/engines-and-addressing.md) · [Model management](docs/model-management.md) · [Roadmap](docs/roadmap.md)
 
 ---
 
