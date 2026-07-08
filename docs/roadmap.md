@@ -18,18 +18,22 @@
 - **W2 · 云端重试 + 下载源可自定义(未发版)**:
   - **云端 HTTP 健壮性(已完成)**:新 `asrkit/_http.py`——线程局部 `Session` + 分级重试/退避。**成本安全**:计费转写只重 `429`+`ConnectTimeout`,不重 5xx/读超时(避免重复计费);只读 doubao 轮询重全部。`ASRKIT_HTTP_RETRIES` 可调(默认 3);429 认 `Retry-After`。doubao 改用 uuid 幂等 `X-Api-Request-Id` 并 submit/query 复用;openai/elevenlabs 补 200MB 守卫。
   - **下载源可自定义(已完成)**:`asrkit pull <model> --url <tarball>` 一次性覆盖(限 http/https,经 install 边界透传);HF 系引擎镜像用 `HF_ENDPOINT`(底层库自理,零代码)。**不做**持久 `download-base`/镜像配置(YAGNI)。
+- **W3 · 发现 + 元数据 + 体检(未发版,待下个 PATCH)**:
+  - **字幕落地**:whisper 家族(faster-whisper / whispercpp / openai/whisper-1)返回 `segments`,`srt/vtt` 对这些模型可用(此前全模型只报错)。
+  - **选项诚实**:显式"忽略语言提示"的模型(如 SenseVoice)传 `--language` 给 warning 而非静默丢弃;`capabilities.language_hint` 三态判读;whispercpp 现透传 `--language`。
+  - **发现**:`asrkit list --lang/--arch` 筛选、`asrkit search <term>`、`asrkit list --ids`(裸 id,供补全)。
+  - **元数据修真**:广多语模型标 `capabilities.multilingual`(`--lang X` 作候选返回);SenseVoice 语言补全为 zh/en/ja/ko/yue。
+  - **shell 补全(已完成)**:`asrkit completion <bash|zsh|fish>` 输出补全脚本(子命令 + 动态 model 名 + 格式值)。
+  - **`asrkit doctor`(已完成)**:一条命令体检引擎/密钥(只报有无)/models 目录可写/config 完整;`--net` 加下载源/云端可达。硬问题(目录不可写/config 损坏)退非零;纯只读、零新依赖、网络 opt-in。
+- **W4 · 最小流式(未发版,待下个 PATCH)**:`asrkit stream <model> <audio>` + `api.transcribe_stream` —— 对 sherpa online 模型逐块解码、边喂边出增量文本(live→stderr 覆盖行、final→stdout 可管道);**首次行使 `PartialResult` 契约**(只用 text+is_final,committed/partial 按契约留空)——1.0 前"契约行使一次"的关卡。文件分块、零新依赖。麦克风/serve 流式/词级时间戳明确留后续。
 
 ---
 
 ## 待办(按优先级)
 
-### P2 · 值得做
-
-- **`asrkit doctor`(体检命令)** —— 一条命令查:哪些引擎装了、哪些密钥配了、`~/.asrkit/models` 可写否、能否连通模型下载源/云端。降低"装不上/跑不了"的支持成本。
-
 ### P3 · 功能补全(按需)
 
-- **流式转写** —— `BaseAdapter.transcribe_stream` 已声明但无人实现、CLI/serve 未暴露;实时字幕/边说边转需要。大工程。
+- **流式扩面** —— 最小文件流式已落地(W4)。后续:**麦克风输入**(需 sounddevice)、**serve 流式端点**(SSE/WebSocket)、**`committed`/`partial` 精细化**(仅追加已定稿,契约已预留字段)、词级时间戳。均为独立后续刀。
 - **`--verbose` / 日志** —— serve 与调试用;现在信息只进 `result.error`,服务端不好排障。
 
 ### P4 · 打磨
