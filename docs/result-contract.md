@@ -35,7 +35,9 @@
 | `segment_timestamps` | `bool` | 模型是否返回 `segments`（分句时间戳）；仅 whisper 家族的 capabilities 包含此字段（值为 `True`） |
 | `multilingual` | `bool` | 该模型是否支持多语言（广多语架构如 whisper/dolphin/qwen3Asr/funasrNano/omnilingualCtc 的非英语专用版本标注）；`asrkit list --lang X` 据此把它们纳入候选、`show` 显示该字段 |
 
-**选项诚实**：若模型的 `language_hint` 为 `"none"`（忽略语言提示），而用户传了 `--language`，`TranscribeResult.warnings` 会包含一条提示，例如 `"local/sensevoice auto-detects language; --language is ignored"`。单文件/批量模式下，warnings 会打到 stderr。
+**选项诚实**：若模型的 `language_hint` 为 `"none"`（忽略语言提示），而用户传了 `--language`，`TranscribeResult.warnings` 会包含一条提示，例如 `"sherpa/sensevoice auto-detects language; --language is ignored"`。单文件/批量模式下，warnings 会打到 stderr。
+
+> 注：sherpa 模型的规范前缀是 `sherpa/`；旧的 `local/` 前缀作为历史别名永久保留、仍可解析（如 `local/sensevoice` 等价 `sherpa/sensevoice`），存量脚本不受影响。
 
 ---
 
@@ -81,7 +83,7 @@ file, model, text, lang, duration_s, latency_ms, load_ms, decode_ms, rtf, cost_e
 | 列 | 来源 | 说明 |
 |---|---|---|
 | `file` | 输入文件路径 | 批量记录里的 `rec["file"]` |
-| `model` | 本次使用的 model id | 如 `local/sensevoice` |
+| `model` | 本次使用的 model id | 如 `sherpa/sensevoice` |
 | `text` | `result.text` | 空则为空字符串 |
 | `lang` | `result.lang` | 空则为空字符串 |
 | `duration_s` | `result.metrics["duration_s"]` | 音频时长（秒）；本地 sherpa adapter 会填充，其它 adapter 视情况可能为空 |

@@ -22,7 +22,7 @@ pip install asrkit                                        # seconds: interface +
 asrkit transcribe audio.wav -m siliconflow/sensevoice --api-key <KEY>   # free cloud model, works instantly
 
 pip install "asrkit[local]"                               # add on-device (sherpa, 47 models)
-asrkit run local/sensevoice audio.wav                     # downloads on first run, then transcribes
+asrkit run sherpa/sensevoice audio.wav                     # downloads on first run, then transcribes
 ```
 
 > Want a global command that doesn't touch your current env? `pipx install asrkit` or `uv tool install asrkit` work too.
@@ -33,18 +33,20 @@ asrkit run local/sensevoice audio.wav                     # downloads on first r
 Engine, model, on-device or cloud — all the same call:
 
 ```bash
-asrkit run local/sensevoice                      audio.wav              # sherpa-onnx (on-device)
+asrkit run sherpa/sensevoice                      audio.wav              # sherpa-onnx (on-device)
 asrkit run faster-whisper/large-v3               audio.wav              # faster-whisper engine
 asrkit run whispercpp/base                       audio.wav              # whisper.cpp engine
 asrkit run transformers/openai/whisper-large-v3  audio.wav              # any HuggingFace model
 asrkit run dashscope/qwen3-asr-flash             audio.wav --api-key …  # cloud, bring your own key
 ```
 
-On-device `local/sensevoice` and cloud `siliconflow/sensevoice` are **the same call** — comparing edge vs cloud is just swapping the string.
+On-device `sherpa/sensevoice` and cloud `siliconflow/sensevoice` are **the same call** — comparing edge vs cloud is just swapping the string.
+
+> Note: the canonical prefix for sherpa models is `sherpa/`; the old `local/` prefix is kept permanently as a historical alias and still resolves (e.g. `local/sensevoice` is equivalent to `sherpa/sensevoice`) — existing scripts are unaffected.
 
 ```python
 from asrkit import transcribe
-print(transcribe("local/sensevoice", "audio.wav").text)
+print(transcribe("sherpa/sensevoice", "audio.wav").text)
 ```
 
 ## Why ASRKit
@@ -60,9 +62,9 @@ print(transcribe("local/sensevoice", "audio.wav").text)
 Transcribe many files, a directory, a glob, or stdin at once — structured tables for comparison and scripting:
 
 ```bash
-asrkit transcribe *.wav        -m local/sensevoice          -f csv          # one row each: file,model,text,latency_ms,rtf…
+asrkit transcribe *.wav        -m sherpa/sensevoice          -f csv          # one row each: file,model,text,latency_ms,rtf…
 asrkit transcribe ./recordings -m dashscope/qwen3-asr-flash -f json --batch # recurse a dir → NDJSON
-cat a.wav | asrkit transcribe  -  -m local/sensevoice                       # stdin
+cat a.wav | asrkit transcribe  -  -m sherpa/sensevoice                       # stdin
 ```
 
 - **NDJSON / csv / tsv** for batches (a single file is still one object); contract in [docs/result-contract.md](docs/result-contract.md).
@@ -75,9 +77,9 @@ cat a.wav | asrkit transcribe  -  -m local/sensevoice                       # st
 Decode sherpa online (streaming) models chunk by chunk, emitting incremental text as audio is fed:
 
 ```bash
-asrkit stream local/paraformer-online meeting.wav             # live partials → stderr, final text → stdout
-asrkit stream local/paraformer-online meeting.wav > out.txt   # pipe-friendly: capture final text only
-asrkit stream local/sensevoice --mic                          # live microphone transcription, Ctrl-C to stop (needs asrkit[mic])
+asrkit stream sherpa/paraformer-online meeting.wav             # live partials → stderr, final text → stdout
+asrkit stream sherpa/paraformer-online meeting.wav > out.txt   # pipe-friendly: capture final text only
+asrkit stream sherpa/sensevoice --mic                          # live microphone transcription, Ctrl-C to stop (needs asrkit[mic])
 ```
 
 Only models with `streaming` in `modes` are supported (batch models get a clear error). `serve` also supports streaming: see "Run it as a server" below.
@@ -131,7 +133,7 @@ asrkit completion zsh        # bash/zsh/fish completion (model names complete dy
 
 | Engine | Install | Address | Covers |
 |---|---|---|---|
-| **sherpa-onnx** (default on-device) | `asrkit[local]` | `local/<model>` or bare `<model>` | 47 on-device models, 17 architectures |
+| **sherpa-onnx** (default on-device) | `asrkit[local]` | `sherpa/<model>` or bare `<model>` | 47 on-device models, 17 architectures |
 | **faster-whisper** | `asrkit[faster-whisper]` | `faster-whisper/<model>` | fast Whisper, native long-audio |
 | **whisper.cpp** | `asrkit[whispercpp]` | `whispercpp/<model>` | ultra-light Whisper (no torch/onnx) |
 | **transformers** | `asrkit[transformers]` | `transformers/<any-hf-id>` | the whole HuggingFace ASR hub + LLM-arch SOTA |
@@ -161,7 +163,7 @@ asrkit serve                              # 127.0.0.1:11435 by default, local on
 ```python
 from openai import OpenAI
 c = OpenAI(base_url="http://localhost:11435/v1", api_key="unused")
-c.audio.transcriptions.create(model="local/sensevoice", file=open("a.wav", "rb"))
+c.audio.transcriptions.create(model="sherpa/sensevoice", file=open("a.wav", "rb"))
 ```
 - Endpoints: `POST /v1/audio/transcriptions` (`response_format`: json/verbose_json/text/srt/vtt), `GET /v1/models`, `GET /health`.
 - Streaming: add `stream=true` to the same endpoint → `text/event-stream`, OpenAI-compatible `transcript.text.delta` (partial) / `transcript.text.done` (final) events; temp files are cleaned up automatically on disconnect. Only streaming models are supported — requesting `stream=true` on a non-streaming model errors out.
@@ -172,7 +174,7 @@ c.audio.transcriptions.create(model="local/sensevoice", file=open("a.wav", "rb")
 **Add any sherpa model** — one command, or an entry in `~/.asrkit/models.json`:
 
 ```bash
-asrkit add-model local/my-model --url https://…/model.tar.bz2 --arch senseVoice --langs zh,en
+asrkit add-model sherpa/my-model --url https://…/model.tar.bz2 --arch senseVoice --langs zh,en
 ```
 
 **Add an engine** — ship a small package that declares an `asrkit.adapters` entry point; `pip install` auto-registers it. No fork, no core changes. Recipe: [docs/engines-and-addressing.md](docs/engines-and-addressing.md#九扩展实操).

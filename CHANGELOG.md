@@ -13,6 +13,7 @@
 ## [Unreleased]
 
 ### 新增
+- **寻址正名**：sherpa 端侧模型规范前缀从 local/ 改为 sherpa/（与 faster-whisper/whispercpp/transformers 等引擎前缀一致）；旧 local/ 前缀永久保留为别名，向后兼容不破坏（含已 pull 的模型、存量脚本、add-model 历史条目自动归一）。
 - **serve 流式(SSE)**：POST /v1/audio/transcriptions 加 stream=true → text/event-stream，OpenAI 兼容 transcript.text.delta/done 事件（delta 由端点定稿驱动）；断连保证清理临时文件。
 - **麦克风流式**：asrkit stream <model> --mic 实时转写(opt-in asrkit[mic]，Ctrl-C 停打印最终稿)；新增 api.transcribe_stream_mic。
 - **engine rm**：新增 asrkit engine rm <name> —— 打印手动卸载指引 + 共享依赖警告 + 重置默认引擎(若指向它);绝不代跑 pip uninstall。

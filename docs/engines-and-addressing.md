@@ -52,12 +52,14 @@
 |---|---|---|
 | 裸名（= 默认引擎简写） | `sensevoice`、`whisper-small` | `现状` |
 | 精度 tag | `sensevoice:fp32` | `现状` |
-| 本地默认引擎全名 | `local/sensevoice` | `现状` |
+| 本地默认引擎全名 | `sherpa/sensevoice` | `现状` |
 | **具体本地引擎** | `whispercpp/small`、`faster-whisper/small` | `现状` |
-| sherpa 引擎（无独立前缀） | `local/whisper-small` | `现状`（sherpa-onnx 模型走 `local/<folder>` 寻址，没有单独的 `sherpa/` 前缀；见下方说明） |
+| sherpa 引擎 | `sherpa/whisper-small` | `现状`（sherpa-onnx 模型走 `sherpa/<folder>` 寻址；旧 `local/` 前缀作为历史别名永久保留、仍可解析，见下方说明） |
 | 云厂商 | `siliconflow/sensevoice`、`openai/gpt-4o-transcribe` | `现状`（OpenAI 兼容已接） |
 
 **解析优先级**：带 `/` 按全名解析；不带 `/` 当默认引擎的简写（自动补默认前缀）。云端因需指明厂商+密钥，始终带 `/`，故裸名永远只落到本地默认引擎，无歧义。
+
+> 注：sherpa 模型的规范前缀是 `sherpa/`；旧的 `local/` 前缀作为历史别名永久保留、仍可解析（如 `local/sensevoice` 等价 `sherpa/sensevoice`），存量脚本不受影响。
 
 ---
 
@@ -66,11 +68,11 @@
 规则不变，前缀从"默认引擎"扩展到"指定引擎"，已随 faster-whisper / whisper.cpp 两个引擎落地：
 
 ```bash
-# 裸名 = 默认引擎(现在是 sherpa-onnx，寻址前缀 local/)——老命令永远不变
+# 裸名 = 默认引擎(现在是 sherpa-onnx，寻址前缀 sherpa/)——老命令永远不变
 asrkit run whisper-small a.wav
 
-# 指定引擎（sherpa 走 local/ 前缀，无独立 sherpa/ 前缀）
-asrkit run local/whisper-small a.wav
+# 指定引擎（sherpa 走 sherpa/ 前缀；旧 local/ 前缀作为历史别名永久保留、仍可解析）
+asrkit run sherpa/whisper-small a.wav
 asrkit run whispercpp/small a.wav
 asrkit run faster-whisper/small:int8 a.wav
 
@@ -83,8 +85,8 @@ asrkit run  siliconflow/sensevoice a.wav --api-key <KEY>
 `asrkit list` 按来源分组（示意）：
 
 ```
-💻 local/             (本地引擎 · 默认 · sherpa-onnx)
-   ✓ local/whisper-small
+💻 sherpa/            (本地引擎 · 默认 · sherpa-onnx)
+   ✓ sherpa/whisper-small
 💻 whispercpp/        (本地引擎)
      whispercpp/small
 ☁️ siliconflow/       (云端)
@@ -109,7 +111,7 @@ asrkit run  siliconflow/sensevoice a.wav --api-key <KEY>
 
 ## 六、默认引擎
 
-裸名与 `local/` 落到"默认引擎"。默认可由项目内定（当前 = sherpa-onnx，覆盖面最广），或用户配置（如 `ASRKIT_DEFAULT_ENGINE`）。
+裸名与 `sherpa/`（含历史别名 `local/`）落到"默认引擎"。默认可由项目内定（当前 = sherpa-onnx，覆盖面最广），或用户配置（如 `ASRKIT_DEFAULT_ENGINE`）。
 
 - 想省事 → 写裸名；
 - 想精确控制 → 写 `引擎/模型`。
@@ -118,11 +120,11 @@ asrkit run  siliconflow/sensevoice a.wav --api-key <KEY>
 
 ## 七、现状 vs 路线，以及"不破坏"保证
 
-**现状（已实现，0.3.0）**：四个本地引擎——**sherpa-onnx（默认）**、**faster-whisper**、**transformers（含 torch）**、**whisper.cpp**；+ **entry-point 第三方引擎插件**；+ **sherpa 用户模型注册表**（模型开放）。寻址 `local/<model>` / `faster-whisper/<model>` / `whispercpp/<model>` / **`transformers/<任意 HF id>`** + 裸名简写 + `:tag`；云端 `provider/model`。`asrkit engine list/install` 管理引擎；`is_installed`/`install` 下沉各 adapter。
+**现状（已实现，0.3.0）**：四个本地引擎——**sherpa-onnx（默认）**、**faster-whisper**、**transformers（含 torch）**、**whisper.cpp**；+ **entry-point 第三方引擎插件**；+ **sherpa 用户模型注册表**（模型开放）。寻址 `sherpa/<model>` / `faster-whisper/<model>` / `whispercpp/<model>` / **`transformers/<任意 HF id>`** + 裸名简写 + `:tag`；云端 `provider/model`。`asrkit engine list/install` 管理引擎；`is_installed`/`install` 下沉各 adapter。
 
 **路线（未实现，已留口子）**：更多引擎（whisper.cpp / transformers/vLLM）；entry-point 第三方引擎插件；`local/` 作"默认引擎"别名的进一步统一。
 
-**不破坏保证**：因为命名空间从第一天就是正式名、裸名只是"默认引擎"的简写——将来新增引擎时，新引擎用自己的前缀，**所有既有写法（裸名 / `local/x` / 云端）含义不变、永不失效**。这就是我们保留命名空间的回报。
+**不破坏保证**：因为命名空间从第一天就是正式名、裸名只是"默认引擎"的简写——将来新增引擎时，新引擎用自己的前缀，**所有既有写法（裸名 / `sherpa/x` / 历史别名 `local/x` / 云端）含义不变、永不失效**。这就是我们保留命名空间的回报。
 
 ---
 
@@ -200,10 +202,10 @@ asrkit run faster-whisper/small a.wav
 
 **最简单：一条命令**（无需编辑文件）：
 ```bash
-asrkit add-model local/my-model --url https://…/model.tar.bz2 --arch senseVoice --langs zh,en
-asrkit pull local/my-model && asrkit run local/my-model a.wav
+asrkit add-model sherpa/my-model --url https://…/model.tar.bz2 --arch senseVoice --langs zh,en
+asrkit pull sherpa/my-model && asrkit run sherpa/my-model a.wav
 # 已有模型文件时：加 --model-dir /path 软链到位，免下载、立即可用
-asrkit add-model local/my-model --arch senseVoice --model-dir /path/to/files
+asrkit add-model sherpa/my-model --arch senseVoice --model-dir /path/to/files
 ```
 
 或**手动**写进 `~/.asrkit/models.json`（或 `$ASRKIT_MODELS_JSON`）：
@@ -211,7 +213,7 @@ asrkit add-model local/my-model --arch senseVoice --model-dir /path/to/files
 ```json
 [
   {
-    "id": "local/my-firered",
+    "id": "sherpa/my-firered",
     "download_url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/xxx.tar.bz2",
     "config_type": "fireRedAsrCtc",
     "langs": ["zh", "en"]
@@ -219,7 +221,7 @@ asrkit add-model local/my-model --arch senseVoice --model-dir /path/to/files
 ]
 ```
 
-然后 `asrkit pull local/my-firered` → `asrkit run local/my-firered a.wav`。
+然后 `asrkit pull sherpa/my-firered` → `asrkit run sherpa/my-firered a.wav`。
 字段：`id`（必填）、`download_url`、`config_type`（引擎架构，见 local_sherpa 支持列表）、`langs`；可选 `provider`（默认 sherpa-onnx）、`tag`、`base`、`sha256`。
 
 ### 写一个引擎插件（引擎开放）
