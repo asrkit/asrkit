@@ -4,7 +4,7 @@ import wave
 
 import pytest
 
-from asrkit import registry
+from asrkit import registry, server
 from asrkit.types import AdapterMeta, BaseAdapter, TranscribeResult
 
 
@@ -61,3 +61,67 @@ def test_unknown_model_404(client):
                     data={"model": "does/not-exist"},
                     files={"file": ("a.wav", _wav_bytes(), "audio/wav")})
     assert r.status_code == 404
+
+
+def _reset_cache():
+    server._ADAPTERS.clear()
+
+
+def test_serve_cache_hit_no_rebuild(monkeypatch):
+    _reset_cache()
+    calls = {"n": 0}
+    def fake_make(model, *a, **k):
+        calls["n"] += 1
+        return object()
+    monkeypatch.setattr(server.registry, "make_adapter", fake_make)
+    a1 = server._get_adapter("m")
+    a2 = server._get_adapter("m")
+    assert a1 is a2 and calls["n"] == 1
+
+
+def test_serve_cache_bounded_lru_evicts(monkeypatch):
+    _reset_cache()
+    monkeypatch.setattr(server, "_cache_size", lambda: 2)
+    monkeypatch.setattr(server.registry, "make_adapter", lambda model, *a, **k: object())
+    server._get_adapter("A")
+    server._get_adapter("B")
+    server._get_adapter("C")
+    assert len(server._ADAPTERS) == 2 and "A" not in server._ADAPTERS
+    calls = {"n": 0}
+    def counting(model, *a, **k):
+        calls["n"] += 1
+        return object()
+    monkeypatch.setattr(server.registry, "make_adapter", counting)
+    server._get_adapter("A")
+    assert calls["n"] == 1
+
+
+def test_serve_cache_hit_refreshes_lru(monkeypatch):
+    _reset_cache()
+    monkeypatch.setattr(server, "_cache_size", lambda: 2)
+    monkeypatch.setattr(server.registry, "make_adapter", lambda model, *a, **k: object())
+    server._get_adapter("A")
+    server._get_adapter("B")
+    server._get_adapter("A")            # 命中 A → A 最近
+    server._get_adapter("C")            # 淘汰最久未用 = B
+    assert "A" in server._ADAPTERS and "B" not in server._ADAPTERS
+
+
+def test_serve_cache_exception_not_cached(monkeypatch):
+    _reset_cache()
+    def boom(model, *a, **k):
+        raise server.registry.ModelNotFoundError("nope")
+    monkeypatch.setattr(server.registry, "make_adapter", boom)
+    with pytest.raises(server.registry.ModelNotFoundError):
+        server._get_adapter("bad")
+    assert "bad" not in server._ADAPTERS
+
+
+def test_serve_cache_size_env_fallbacks(monkeypatch):
+    for bad in ["abc", "0", "-3", ""]:
+        monkeypatch.setenv("ASRKIT_SERVE_CACHE", bad)
+        assert server._cache_size() == 8
+    monkeypatch.delenv("ASRKIT_SERVE_CACHE", raising=False)
+    assert server._cache_size() == 8
+    monkeypatch.setenv("ASRKIT_SERVE_CACHE", "16")
+    assert server._cache_size() == 16

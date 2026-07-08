@@ -13,20 +13,47 @@ import json as _json
 import os
 import sys
 import tempfile
+import threading
+from collections import OrderedDict
 
 from . import api, formats, registry
 from .types import AudioInput, TranscribeOptions
 
-# 已加载 adapter 按 model id 缓存，避免每请求重载本地模型（serve 关键）。
-# 单进程内存缓存；同模型并发首次可能各建一次，无害。
-_ADAPTERS: dict = {}
+# 已加载 adapter 的有界 LRU 缓存,避免每请求重载本地模型 + 防长跑内存无界。
+# 单进程内存缓存;同模型并发首次可能各建一次(在锁外 make),重入锁后收敛为一个。
+_ADAPTERS: "OrderedDict[str, object]" = OrderedDict()
+_CACHE_LOCK = threading.Lock()
+
+
+def _cache_size() -> int:
+    """serve adapter LRU 容量。env ASRKIT_SERVE_CACHE 覆盖,非法/<=0 回退默认 8。"""
+    raw = os.environ.get("ASRKIT_SERVE_CACHE")
+    if raw:
+        try:
+            v = int(raw)
+            if v > 0:
+                return v
+        except ValueError:
+            pass
+    return 8
 
 
 def _get_adapter(model: str):
-    a = _ADAPTERS.get(model)
-    if a is None:
-        a = registry.make_adapter(model)   # 可能抛 ModelNotFoundError
+    with _CACHE_LOCK:
+        a = _ADAPTERS.get(model)
+        if a is not None:
+            _ADAPTERS.move_to_end(model)
+            return a
+    a = registry.make_adapter(model)         # 锁外(可能慢/可能抛 ModelNotFoundError)
+    with _CACHE_LOCK:
+        existing = _ADAPTERS.get(model)      # 重入锁后再查,防并发双建覆盖热 adapter
+        if existing is not None:
+            _ADAPTERS.move_to_end(model)
+            return existing
         _ADAPTERS[model] = a
+        _ADAPTERS.move_to_end(model)
+        while len(_ADAPTERS) > _cache_size():
+            _ADAPTERS.popitem(last=False)
     return a
 
 
