@@ -12,6 +12,10 @@
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-07-08
+
+主题：**发现 + 元数据修真 + 体检 + 最小流式**（W3/W4 累积;全部向后兼容,纯新增）。
+
 ### 新增
 - **`asrkit doctor`**：一条命令体检安装/配置——引擎装没装、密钥配没配(只报有无,不泄露)、`~/.asrkit/models` 可写否、config 完整否;`--net` 加下载源/云端可达检查。硬问题(目录不可写/config 损坏)退出非零。
 - **字幕落地**：whisper 家族（faster-whisper / whispercpp / openai/whisper-1）现返回 `segments`，`srt/vtt` 对这些模型可用（此前对所有模型只报错）。
