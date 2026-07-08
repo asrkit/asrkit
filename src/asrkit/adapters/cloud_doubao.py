@@ -13,6 +13,7 @@ import time
 import uuid
 
 from .. import _http
+from ..audio import container_format
 from ..registry import register_model, register_protocol
 from ..types import AdapterMeta, AudioInput, BaseAdapter, TranscribeOptions, TranscribeResult
 
@@ -57,6 +58,7 @@ class Doubao(BaseAdapter):
                 return TranscribeResult(
                     text="", error=f"audio is {sz >> 20}MB, over the 200MB inline-upload "
                     "limit; segment the file first")
+            fmt = container_format(audio.original_path)     # 如实声明,绝不谎报 wav
             with open(audio.original_path, "rb") as f:
                 b64 = base64.b64encode(f.read()).decode()
 
@@ -76,7 +78,7 @@ class Doubao(BaseAdapter):
             t0 = time.perf_counter()
             sub = _http.post(f"{base}/submit", headers=headers, json={
                 "user": {"uid": "asrkit"},
-                "audio": {"format": "wav", "data": b64},
+                "audio": {"format": fmt, "data": b64},
                 "request": {"model_name": self.meta.model},
             }, timeout=60, idempotent=False)
             if sub.status_code >= 300:

@@ -28,7 +28,14 @@ def _make_adapter():
     return registry.make_adapter("doubao/auc-2", {"app_key": "k", "access_key": "s"})
 
 
-def test_poll_late_success_not_truncated_at_30(monkeypatch):
+def _wav(tmp_path):
+    """已知扩展名的真实文件(内容无所谓,_http 全 mock)。"""
+    p = tmp_path / "clip.wav"
+    p.write_bytes(b"RIFF0000WAVE")
+    return str(p)
+
+
+def test_poll_late_success_not_truncated_at_30(monkeypatch, tmp_path):
     """第 40 次 query 才成功(>30)——不再被 30 次硬限截断。"""
     monkeypatch.setattr(cloud_doubao.time, "sleep", lambda *_: None)
     calls = {"n": 0}
@@ -43,13 +50,13 @@ def test_poll_late_success_not_truncated_at_30(monkeypatch):
     monkeypatch.setattr(cloud_doubao._http, "post", fake_post)
     from asrkit.types import AudioInput, TranscribeOptions
     ad = _make_adapter()
-    r = ad.transcribe(AudioInput(original_path=__file__), TranscribeOptions())
+    r = ad.transcribe(AudioInput(original_path=_wav(tmp_path)), TranscribeOptions())
     assert r.error is None or r.error == ""
     assert r.text == "done late"
     assert calls["n"] >= 40
 
 
-def test_poll_timeout_reports_actual_value(monkeypatch):
+def test_poll_timeout_reports_actual_value(monkeypatch, tmp_path):
     """恒处理中 + 超时很小 → 报实际超时值,不无限轮询。"""
     monkeypatch.setattr(cloud_doubao.time, "sleep", lambda *_: None)
     monkeypatch.setattr(cloud_doubao, "_poll_timeout_s", lambda: 7.0)
@@ -62,11 +69,11 @@ def test_poll_timeout_reports_actual_value(monkeypatch):
     monkeypatch.setattr(cloud_doubao._http, "post", fake_post)
     from asrkit.types import AudioInput, TranscribeOptions
     ad = _make_adapter()
-    r = ad.transcribe(AudioInput(original_path=__file__), TranscribeOptions())
+    r = ad.transcribe(AudioInput(original_path=_wav(tmp_path)), TranscribeOptions())
     assert r.error and "doubao polling timeout (7s)" in r.error
 
 
-def test_poll_terminal_error_returns_early(monkeypatch):
+def test_poll_terminal_error_returns_early(monkeypatch, tmp_path):
     """query 返回 45xx 终态错误码 → 立即 query failed,不等超时、不再轮询。"""
     monkeypatch.setattr(cloud_doubao.time, "sleep", lambda *_: None)
     calls = {"n": 0}
@@ -78,6 +85,6 @@ def test_poll_terminal_error_returns_early(monkeypatch):
     monkeypatch.setattr(cloud_doubao._http, "post", fake_post)
     from asrkit.types import AudioInput, TranscribeOptions
     ad = _make_adapter()
-    r = ad.transcribe(AudioInput(original_path=__file__), TranscribeOptions())
+    r = ad.transcribe(AudioInput(original_path=_wav(tmp_path)), TranscribeOptions())
     assert r.error and "query failed code=45000001" in r.error
     assert calls["n"] == 1                     # 第一次 query 即返回,不继续轮询

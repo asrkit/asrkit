@@ -13,6 +13,31 @@ class AudioFormatError(Exception):
     """输入格式/采样率/声道与本地引擎要求不符，且未开启 convert。"""
 
 
+# 云端上传时按扩展名如实声明容器格式。内核对音频零处理（见 §0），扩展名是我们
+# 唯一诚实的信号：据实上报，绝不硬编码谎报为 "wav"。
+_EXT_TO_FORMAT = {
+    ".wav": "wav", ".mp3": "mp3", ".m4a": "m4a", ".mp4": "mp4",
+    ".flac": "flac", ".ogg": "ogg", ".opus": "opus", ".aac": "aac",
+    ".amr": "amr", ".webm": "webm", ".wma": "wma", ".aiff": "aiff", ".aif": "aiff",
+}
+
+
+def container_format(path: str) -> str:
+    """Infer the container-format tag to declare to a cloud API, from the file
+    extension. The kernel does zero audio processing, so the extension is our
+    only honest signal — declare it truthfully, never fake "wav".
+    Unknown extension → AudioFormatError (honest failure, no silent lie)."""
+    import os
+    ext = os.path.splitext(path)[1].lower()
+    fmt = _EXT_TO_FORMAT.get(ext)
+    if not fmt:
+        known = ", ".join(sorted(set(_EXT_TO_FORMAT)))
+        raise AudioFormatError(
+            f"cannot tell the audio format from '{ext or path}'; a cloud upload "
+            f"must declare its format truthfully — use a known extension ({known}).")
+    return fmt
+
+
 def load_samples(
     path: str,
     required_sr: int = 16000,

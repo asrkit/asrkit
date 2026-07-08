@@ -11,6 +11,7 @@ import os
 import time
 
 from .. import _http
+from ..audio import AudioFormatError, container_format
 from ..registry import register_model, register_protocol
 from ..types import AdapterMeta, BaseAdapter, TranscribeResult
 
@@ -25,7 +26,11 @@ def _data_uri(path: str) -> str:
                          f"inline-upload limit; segment the file first")
     ext = os.path.splitext(path)[1].lower()
     mime = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".m4a": "audio/mp4",
-            ".flac": "audio/flac", ".ogg": "audio/ogg"}.get(ext, "audio/wav")
+            ".mp4": "audio/mp4", ".flac": "audio/flac", ".ogg": "audio/ogg"}.get(ext)
+    if not mime:                                    # 如实声明 MIME,不默认谎报 wav
+        raise AudioFormatError(
+            f"cannot tell the audio format from '{ext or path}'; a cloud upload "
+            "must declare its format truthfully — transcode to a known type first.")
     with open(path, "rb") as f:
         return f"data:{mime};base64," + base64.b64encode(f.read()).decode()
 
@@ -110,7 +115,7 @@ class FunAsrFlash(_DashBase):
                 "model": self.meta.model,
                 "input": {"messages": [{"role": "user", "content": [
                     {"type": "input_audio", "input_audio": {"data": _data_uri(audio.original_path)}}]}]},
-                "parameters": {"format": "wav", "sample_rate": "16000"}})
+                "parameters": {"format": container_format(audio.original_path)}})
             if err:
                 return TranscribeResult(text="", error=err)
             out = j.get("output", {}) or {}
