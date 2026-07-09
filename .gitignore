@@ -1,6 +1,7 @@
-# --- 内部资料，禁止发布 ---
+# --- 内部资料 / AI 工具目录，禁止发布 ---
 ASR全景调研/
 .omc/
+.superpowers/
 # 本地项目准则（含署名/邮箱等），不进公开仓库
 CLAUDE.md
 
@@ -15,6 +16,11 @@ __pycache__/
 .venv/
 venv/
 .env
+
+# --- 工具缓存 ---
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
 
 # --- OS / 编辑器 ---
 .DS_Store
