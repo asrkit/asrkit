@@ -1,8 +1,8 @@
 # ASRKit 项目详情概览
 
-> 快照日期:2026-07-08(v0.5.3 + Unreleased 累积)。这是一份"项目全貌"文档,给新协作者/未来的自己快速建立完整心智。
+> 快照日期:2026-07-08(v0.5.4)。这是一份"项目全貌"文档,给新协作者/未来的自己快速建立完整心智。
 > `[Unreleased]` 里已经又攒了一批未发版功能(serve SSE 流式、麦克风流式、流式端点检测分段、engine rm、`--verbose`/日志);本文档已把它们当作"已建成能力"记入。
-> 深度底稿:批评与规划见 [expert-review-2026-07.md](expert-review-2026-07.md);对标业界见 [lifecycle-audit.md](lifecycle-audit.md);待办见 [roadmap.md](roadmap.md)。
+> 深度底稿:批评与规划见 [expert-review-2026-07.md](archive/expert-review-2026-07.md);对标业界见 [lifecycle-audit.md](archive/lifecycle-audit.md);待办见 [roadmap.md](roadmap.md)。
 
 ---
 
@@ -20,7 +20,7 @@
 
 | 维度 | 值 |
 |---|---|
-| 版本 | **0.5.3**(单一版本源 `src/asrkit/__init__.py`,hatchling 动态读) |
+| 版本 | **0.5.4**(单一版本源 `src/asrkit/__init__.py`,hatchling 动态读) |
 | 代码规模 | 源码 2516 行 / 20 文件(不含 adapters)+ adapters/ 1112 行 / 10 文件;测试 2013 行 / 19 文件 |
 | 测试 | 165 passed, 2 skipped(e2e nightly);ruff + mypy 全绿 |
 | 模型总数 | 71(47 sherpa 端侧 + 7 faster-whisper + 5 whispercpp + 2 transformers 精选 + 10 云端) |

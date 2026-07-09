@@ -2,7 +2,7 @@
 
 > 状态:**启动前蓝图**(2026-07-07)。asrbench 是独立仓库(依赖方向 asrbench→asrkit,单向,见 [roadmap.md](roadmap.md) 生态方向),本文是开仓前的顶层设计共识,落在 asrkit 仓库里是因为它同时定义了 asrkit 的验收方式。
 > 启动时机:W3b(发现能力)落地后。届时以本文为底,走老流程:spec → 评审 → 实现计划。
-> 相关:[expert-review-2026-07.md](expert-review-2026-07.md)(C1 定位/C3 启动时机)、[result-contract.md](result-contract.md)(bench 消费的契约)。
+> 相关:[expert-review-2026-07.md](archive/expert-review-2026-07.md)(C1 定位/C3 启动时机)、[result-contract.md](result-contract.md)(bench 消费的契约)。
 
 ---
 

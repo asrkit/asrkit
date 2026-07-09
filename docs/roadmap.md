@@ -1,7 +1,7 @@
 # ASRKit 路线图 / 待办
 
 > 活文档:记录**尚未做**的改进与**明确不做**的决定。初期"完善三组(输出格式/config/serve)"的详细计划见
-> [roadmap-cli-completeness.md](roadmap-cli-completeness.md)(已全部完成)。
+> [roadmap-cli-completeness.md](archive/roadmap-cli-completeness.md)(已全部完成)。
 > 版本策略见 [CHANGELOG](../CHANGELOG.md):0.x 阶段功能/修复默认走 PATCH,MINOR 只留破坏性/里程碑。
 
 ---

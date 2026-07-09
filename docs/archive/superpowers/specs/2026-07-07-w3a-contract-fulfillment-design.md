@@ -20,7 +20,7 @@
 
 ## 2. 能力位约定(先钉死,P0 修订核心)
 
-沿用 [adapter-spec.md](../../adapter-spec.md) 既有的 `capabilities` 三态字符串,**不引入 bool 混用**:
+沿用 [adapter-spec.md](../../../adapter-spec.md) 既有的 `capabilities` 三态字符串,**不引入 bool 混用**:
 
 | 键 | 取值 | 含义 | 谁用 |
 |---|---|---|---|

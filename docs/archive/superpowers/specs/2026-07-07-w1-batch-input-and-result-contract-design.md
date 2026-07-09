@@ -1,7 +1,7 @@
 # W1 设计 — 批量输入 + 结果契约化(v2,含 Codex 评审修订)
 
 > 状态:brainstorming 定案 + Codex(gpt-5.5)评审修订,待写实现计划。
-> 目标波次:W1(见 [roadmap.md](../../roadmap.md))。落地默认下个 PATCH,升号前问人类。
+> 目标波次:W1(见 [roadmap.md](../../../roadmap.md))。落地默认下个 PATCH,升号前问人类。
 > 定位约束:守住"接口内核极薄"——批量逻辑待在 CLI 域(`inputs.py` + `emit.py`),**不动 core / `api.transcribe()` / `formats.render` 的每结果语义**,不加运行时依赖。
 >
 > **v2 修订**:Codex 评审(2026-07-07)采纳 11 项;`.omc/artifacts/ask/codex-*2026-07-07T04-24-21*.md` 存档。主要变更:显式 `--batch`、退出码是**明确行为变更**、退出优先级翻为 `1>3>4`、stdin 生命周期、unmatched glob fail-loud、批量 NDJSON 用恒含 text 的 dict 助手 + `schema_version` 且排除 raw_response、流式发射、表格发射独立成 `emit.py`。

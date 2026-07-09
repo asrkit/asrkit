@@ -1,7 +1,7 @@
 # ASRKit 全生命周期审核（综合评价底稿）
 
 > 对标一线开源工具（CLI：ripgrep / gh / kubectl / httpie；模型：Ollama / HuggingFace CLI / faster-whisper / whisper.cpp / yt-dlp），
-> 按**数据/用户的生命周期**逐段审 asrkit 的不足。这是 [roadmap.md](roadmap.md) 的详细版底稿；优先级标记 🔴高 / 🟠中 / 🟡低 / 🟢已不错。
+> 按**数据/用户的生命周期**逐段审 asrkit 的不足。这是 [roadmap.md](../roadmap.md) 的详细版底稿；优先级标记 🔴高 / 🟠中 / 🟡低 / 🟢已不错。
 
 ---
 
