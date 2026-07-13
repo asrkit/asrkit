@@ -15,7 +15,7 @@
 - 终端/CLI 帮助/报错**英文**;代码注释**中文**。
 - **成本安全**:计费 POST(转写、doubao submit)只重 `429` + `ConnectTimeout`;**不重** 5xx / 读超时 / 泛连接错。只读(doubao query 轮询)重 `429`+`{500,502,503,504}`+所有连接/超时。
 - 云端 adapter **请求形状逐字不变**,只把 `requests.post` 换成 `_http.post`;成功路径零改变;**全程 mock,不打真实 API**。
-- 提交用 `git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com"`,**显式 `git add <文件>`**,不 push。
+- 提交用 `git -c user.name="BolynWang" -c user.email="1710998763@qq.com"`,**显式 `git add <文件>`**,不 push。
 - **测试一律** `PYTHONPATH=src python -m pytest ... -o addopts=""`(仓库有 miniconda 旧副本会遮蔽本地源码)。
 - 契约细节见历史 spec：[`../specs/2026-07-07-w2-cloud-retry-and-download-override-design.md`](../specs/2026-07-07-w2-cloud-retry-and-download-override-design.md)。
 
@@ -278,7 +278,7 @@ Expected: PASS(全部)
 
 ```bash
 git add src/asrkit/_http.py tests/test_http.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(http): 线程局部 Session + 分级重试(计费只重 429/ConnectTimeout,只读重全部)"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(http): 线程局部 Session + 分级重试(计费只重 429/ConnectTimeout,只读重全部)"
 ```
 
 ---
@@ -379,7 +379,7 @@ Expected: PASS
 
 ```bash
 git add src/asrkit/adapters/cloud_doubao.py tests/test_cloud_retry.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(doubao): uuid 幂等 request-id 复用;submit 计费/query 只读走 _http"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(doubao): uuid 幂等 request-id 复用;submit 计费/query 只读走 _http"
 ```
 
 ---
@@ -499,7 +499,7 @@ Expected: PASS(全部)
 
 ```bash
 git add src/asrkit/adapters/cloud_openai.py src/asrkit/adapters/cloud_elevenlabs.py src/asrkit/adapters/cloud_dashscope.py tests/test_cloud_retry.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(cloud): openai/elevenlabs/dashscope 转写走 _http(idempotent=False);两家补 200MB 守卫+读 bytes"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(cloud): openai/elevenlabs/dashscope 转写走 _http(idempotent=False);两家补 200MB 守卫+读 bytes"
 ```
 
 ---
@@ -618,7 +618,7 @@ Expected: PASS(既有 + 新增全绿;e2e skip)
 
 ```bash
 git add src/asrkit/types.py src/asrkit/store.py src/asrkit/api.py src/asrkit/cli.py src/asrkit/adapters/local_sherpa.py src/asrkit/adapters/local_faster_whisper.py src/asrkit/adapters/local_whispercpp.py src/asrkit/adapters/local_transformers.py tests/test_smoke.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(pull): --url 一次性下载覆盖(经 install 边界透传,限 http/https)"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(pull): --url 一次性下载覆盖(经 install 边界透传,限 http/https)"
 ```
 
 ---
@@ -649,7 +649,7 @@ git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat
 
 ```bash
 git add docs/usage.md CHANGELOG.md
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "docs(w2): 云端重试/pull --url/HF_ENDPOINT 用法 + CHANGELOG"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "docs(w2): 云端重试/pull --url/HF_ENDPOINT 用法 + CHANGELOG"
 ```
 
 ---
@@ -676,7 +676,7 @@ Expected: ruff All checks passed;mypy Success;pytest 全绿(新增 test_http/tes
 
 ```bash
 git add -u
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "chore(w2): lint/type 收尾"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "chore(w2): lint/type 收尾"
 ```
 
 ---

@@ -16,7 +16,7 @@
 - **capabilities 用既有三态字符串**(`"required"/"supported"/"none"`),**绝不用真值判断**(`"none"` 是真值 —— 用真值会让 siliconflow 破例发 language)。归一只经 `capabilities.language_supported/language_ignored`。
 - **云端请求只在能力位开启时才变**:只有 openai/whisper-1(显式 capabilities)请求 verbose_json/language;**siliconflow/telespeech 请求逐字不变**。
 - 解析全程防御:无 segments → `segments=None`,text 照旧。
-- 提交用 `git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com"`,**显式 `git add <文件>`**,不 push。
+- 提交用 `git -c user.name="BolynWang" -c user.email="1710998763@qq.com"`,**显式 `git add <文件>`**,不 push。
 - **测试一律** `PYTHONPATH=src python -m pytest ... -o addopts=""`(miniconda 有旧副本会遮蔽)。
 - 契约细节见历史 spec：[`../specs/2026-07-07-w3a-contract-fulfillment-design.md`](../specs/2026-07-07-w3a-contract-fulfillment-design.md)。
 
@@ -173,7 +173,7 @@ Expected: PASS
 
 ```bash
 git add src/asrkit/capabilities.py src/asrkit/api.py src/asrkit/adapters/models_local.py tests/test_capabilities.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(capabilities): 三态 language_hint 归一 + 选项诚实告警;sherpa 按架构填能力位"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(capabilities): 三态 language_hint 归一 + 选项诚实告警;sherpa 按架构填能力位"
 ```
 
 ---
@@ -286,7 +286,7 @@ Expected: PASS
 
 ```bash
 git add src/asrkit/adapters/local_faster_whisper.py tests/test_segments.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(faster-whisper): 填 segments(物化生成器进计时区)+ 能力位"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(faster-whisper): 填 segments(物化生成器进计时区)+ 能力位"
 ```
 
 ---
@@ -381,7 +381,7 @@ Expected: PASS
 
 ```bash
 git add src/asrkit/adapters/local_whispercpp.py tests/test_segments.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(whispercpp): 填 segments(厘秒→秒,直接属性)+ 透传 language + 能力位"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(whispercpp): 填 segments(厘秒→秒,直接属性)+ 透传 language + 能力位"
 ```
 
 ---
@@ -503,7 +503,7 @@ Expected: PASS(既有 82 + 新增;siliconflow 形状不变)
 
 ```bash
 git add src/asrkit/adapters/cloud_openai.py tests/test_segments.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(openai): whisper-1 门控 verbose_json+timestamp_granularities+language 解析 segments;siliconflow 不变"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(openai): whisper-1 门控 verbose_json+timestamp_granularities+language 解析 segments;siliconflow 不变"
 ```
 
 ---
@@ -562,7 +562,7 @@ Expected: PASS
 
 ```bash
 git add src/asrkit/emit.py tests/test_batch.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(emit): 批量每条记录把 warnings 打到 stderr(全格式)"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(emit): 批量每条记录把 warnings 打到 stderr(全格式)"
 ```
 
 ---
@@ -595,7 +595,7 @@ git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat
 
 ```bash
 git add docs/result-contract.md CHANGELOG.md
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "docs(w3a): 契约文档 segments/能力位 + CHANGELOG"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "docs(w3a): 契约文档 segments/能力位 + CHANGELOG"
 ```
 
 ---
@@ -622,7 +622,7 @@ Expected: ruff All checks passed;mypy Success;pytest 全绿(新增 test_capabili
 
 ```bash
 git add -u
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "chore(w3a): lint/type 收尾"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "chore(w3a): lint/type 收尾"
 ```
 
 ---

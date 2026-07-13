@@ -19,7 +19,7 @@
 - **能力守卫语义**:`SherpaLocal.transcribe_stream` 外壳非生成器,非流式模型 **call-time** 抛 `NotImplementedError`;`api.transcribe_stream` 对不支持流式的 model **及早** 抛 `ValueError`(不进生成器)。
 - **错误对称**:`_stream` 内 `_build`/缺文件/sherpa 运行时/解码异常收进末尾 `PartialResult(is_final=True, error=...)`;唯 `AudioFormatError` **re-raise**(交 CLI 格式错误分支)。
 - **测试命令**:`PYTHONPATH=src python -m pytest tests/test_streaming.py -o addopts="" -v`(miniconda 有旧副本会遮蔽本地源码,必须 `PYTHONPATH=src`)。
-- **提交**:`git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com"`,显式 `git add <具体文件>`,绝不 `git add .`。
+- **提交**:`git -c user.name="BolynWang" -c user.email="1710998763@qq.com"`,显式 `git add <具体文件>`,绝不 `git add .`。
 
 ---
 
@@ -103,8 +103,8 @@ Expected: PASS(2 passed)
 - [ ] **Step 5: 提交**
 
 ```bash
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" add src/asrkit/audio.py tests/test_streaming.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(audio): iter_file_chunks — 文件分块窗口迭代器(W4 流式地基)"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" add src/asrkit/audio.py tests/test_streaming.py
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(audio): iter_file_chunks — 文件分块窗口迭代器(W4 流式地基)"
 ```
 
 ---
@@ -282,8 +282,8 @@ Expected: PASS(6 passed;若无 numpy 则部分 skipped)
 - [ ] **Step 5: 提交**
 
 ```bash
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" add src/asrkit/adapters/local_sherpa.py tests/test_streaming.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(sherpa): transcribe_stream — 逐块喂在线识别器,行使 PartialResult 契约(W4)"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" add src/asrkit/adapters/local_sherpa.py tests/test_streaming.py
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(sherpa): transcribe_stream — 逐块喂在线识别器,行使 PartialResult 契约(W4)"
 ```
 
 ---
@@ -354,8 +354,8 @@ Expected: PASS(2 passed)
 - [ ] **Step 5: 提交**
 
 ```bash
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" add src/asrkit/api.py tests/test_streaming.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(api): transcribe_stream — 薄公共流式入口,及早校验(W4)"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" add src/asrkit/api.py tests/test_streaming.py
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(api): transcribe_stream — 薄公共流式入口,及早校验(W4)"
 ```
 
 ---
@@ -480,8 +480,8 @@ Expected: 现有 122 + 新增 全绿(numpy 缺失时相应 skipped)
 - [ ] **Step 6: 提交**
 
 ```bash
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" add src/asrkit/cli.py tests/test_streaming.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(cli): asrkit stream — 流式子命令,live→stderr/final→stdout(W4)"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" add src/asrkit/cli.py tests/test_streaming.py
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(cli): asrkit stream — 流式子命令,live→stderr/final→stdout(W4)"
 ```
 
 ---
@@ -547,8 +547,8 @@ asrkit stream local/paraformer-online x.m4a --convert   # opt-in decode/resample
 - [ ] **Step 4: 提交**
 
 ```bash
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" add docs/usage.md docs/result-contract.md CHANGELOG.md
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "docs(stream): usage + PartialResult 契约行使复盘 + CHANGELOG(W4)"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" add docs/usage.md docs/result-contract.md CHANGELOG.md
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "docs(stream): usage + PartialResult 契约行使复盘 + CHANGELOG(W4)"
 ```
 
 ---

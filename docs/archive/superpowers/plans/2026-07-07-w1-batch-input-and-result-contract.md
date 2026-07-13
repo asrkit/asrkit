@@ -15,7 +15,7 @@
 - 终端输出/CLI 帮助/报错**一律英文**;代码注释中文。
 - 透明音频:内核零处理,stdin 原样字节落临时文件,不解码。
 - 单文件模式 stdout/stderr **输出字节与今天完全一致**(走原 `_print_result`);唯一可见变更是退出码分级。
-- 提交用 `git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com"`,**显式 `git add <文件>`**,不 push。
+- 提交用 `git -c user.name="BolynWang" -c user.email="1710998763@qq.com"`,**显式 `git add <文件>`**,不 push。
 - 退出码分级:`0` 成功 · `1` 意外异常 · `2` 用法错 · `3` 模型不存在 · `4` 转写/渲染失败。批量优先级 `1 > 3 > 4`。
 - 契约细节见历史 spec：[`../specs/2026-07-07-w1-batch-input-and-result-contract-design.md`](../specs/2026-07-07-w1-batch-input-and-result-contract-design.md)。
 
@@ -163,7 +163,7 @@ Expected: PASS(6 passed)
 
 ```bash
 git add src/asrkit/inputs.py tests/test_inputs.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(inputs): 输入解析核心 — 文件/glob/目录递归 + fail-loud"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(inputs): 输入解析核心 — 文件/glob/目录递归 + fail-loud"
 ```
 
 ---
@@ -260,7 +260,7 @@ Expected: PASS(9 passed)
 
 ```bash
 git add src/asrkit/inputs.py tests/test_inputs.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(inputs): stdin(-) 支持 — 单次/临时文件+清理回调/--stdin-format"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(inputs): stdin(-) 支持 — 单次/临时文件+清理回调/--stdin-format"
 ```
 
 ---
@@ -345,7 +345,7 @@ Expected: PASS(原有 + 3 新)
 
 ```bash
 git add src/asrkit/formats.py tests/test_formats.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(formats): result_dict(text 恒含);_json_payload 复用(单文件 json 不变)"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(formats): result_dict(text 恒含);_json_payload 复用(单文件 json 不变)"
 ```
 
 ---
@@ -469,7 +469,7 @@ Expected: PASS(2 passed)
 
 ```bash
 git add src/asrkit/emit.py tests/test_batch.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(emit): 退出码(1>3>4)+ NDJSON 批量(schema_version、排除 raw_response)"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(emit): 退出码(1>3>4)+ NDJSON 批量(schema_version、排除 raw_response)"
 ```
 
 ---
@@ -585,7 +585,7 @@ Expected: PASS
 
 ```bash
 git add src/asrkit/emit.py tests/test_batch.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(emit): csv/tsv(newline 安全)+ txt 批量聚合"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(emit): csv/tsv(newline 安全)+ txt 批量聚合"
 ```
 
 ---
@@ -684,7 +684,7 @@ Expected: PASS
 
 ```bash
 git add src/asrkit/emit.py tests/test_batch.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(emit): -o 目录镜像 — 逐文件写、同名去重、失败计数不中止"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(emit): -o 目录镜像 — 逐文件写、同名去重、失败计数不中止"
 ```
 
 ---
@@ -723,7 +723,7 @@ Expected: PASS(冒烟不依赖真引擎;此改只加字典键,真实覆盖走 ni
 
 ```bash
 git add src/asrkit/adapters/local_sherpa.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(sherpa): metrics 补 duration_s(csv 契约本地不空)"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(sherpa): metrics 补 duration_s(csv 契约本地不空)"
 ```
 
 ---
@@ -908,7 +908,7 @@ Expected: PASS(既有 + 新增全绿;e2e skip)
 
 ```bash
 git add src/asrkit/cli.py tests/test_batch.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(cli): 多输入/--batch/--stdin-format/csv-tsv;批量复用 adapter;退出码分级"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(cli): 多输入/--batch/--stdin-format/csv-tsv;批量复用 adapter;退出码分级"
 ```
 
 ---
@@ -950,7 +950,7 @@ git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat
 
 ```bash
 git add docs/result-contract.md docs/usage.md CHANGELOG.md
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "docs(w1): 结果契约文档 + 用法 + CHANGELOG(退出码行为变更醒目)"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "docs(w1): 结果契约文档 + 用法 + CHANGELOG(退出码行为变更醒目)"
 ```
 
 ---
@@ -977,7 +977,7 @@ Expected: ruff All checks passed;mypy Success;pytest 全绿(新增 test_inputs/t
 
 ```bash
 git add -u
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "chore(w1): lint/type 收尾"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "chore(w1): lint/type 收尾"
 ```
 
 ---

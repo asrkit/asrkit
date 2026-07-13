@@ -16,7 +16,7 @@
 - **doubao deadline 不溢出**:remaining-based,`remaining<=0` break,`sleep(min(interval, remaining))`,deadline 后不再排新 query。
 - **serve 缓存**:`make_adapter` 在锁外;重入锁后**再查一次**缓存,命中返回已有;`while len>size: popitem(last=False)` 淘汰;异常不入缓存。
 - **测试命令**:`PYTHONPATH=src python -m pytest <file> -o addopts="" -v`(必须 `PYTHONPATH=src`)。
-- **提交**:`git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com"`,显式 `git add <具体文件>`,绝不 `git add .`。
+- **提交**:`git -c user.name="BolynWang" -c user.email="1710998763@qq.com"`,显式 `git add <具体文件>`,绝不 `git add .`。
 
 ---
 
@@ -187,8 +187,8 @@ Lint(隔离 venv,不存在退回 `python -m ruff`/`python -m mypy`,都无则跳�
 - [ ] **Step 5: 提交**
 
 ```bash
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" add src/asrkit/adapters/cloud_doubao.py tests/test_doubao_poll.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "fix(doubao): 轮询改 wall-clock deadline + 退避 + 可配超时(长音频不再 30s 截断)"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" add src/asrkit/adapters/cloud_doubao.py tests/test_doubao_poll.py
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "fix(doubao): 轮询改 wall-clock deadline + 退避 + 可配超时(长音频不再 30s 截断)"
 ```
 
 ---
@@ -346,8 +346,8 @@ Lint:
 - [ ] **Step 5: 提交**
 
 ```bash
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" add src/asrkit/server.py tests/test_serve.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "fix(serve): adapter 缓存改有界 LRU(默认 8,ASRKIT_SERVE_CACHE 可配),防长跑内存无界"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" add src/asrkit/server.py tests/test_serve.py
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "fix(serve): adapter 缓存改有界 LRU(默认 8,ASRKIT_SERVE_CACHE 可配),防长跑内存无界"
 ```
 
 ---
@@ -375,8 +375,8 @@ git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "fix(
 - [ ] **Step 3: 提交**
 
 ```bash
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" add docs/usage.md CHANGELOG.md
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "docs: doubao 轮询超时 + serve 缓存容量两个 env 旋钮 + CHANGELOG"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" add docs/usage.md CHANGELOG.md
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "docs: doubao 轮询超时 + serve 缓存容量两个 env 旋钮 + CHANGELOG"
 ```
 
 ---

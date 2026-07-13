@@ -17,7 +17,7 @@
 - **保守标记**:仅真·广多语架构 `MULTI_ARCHS = {"whisper","dolphin","omnilingualCtc","qwen3Asr","funasrNano"}` 且非英语专用(`is_english_only(langs)` False);senseVoice **不打 flag**,改用显式 5 langs 精确命中。
 - **`list` 无 filter 的输出格式逐字不变**(仅被修正的元数据内容如 sensevoice langs / 新 `multilingual` 键有别,那是有意的内容修正)。
 - `--lang`/`--arch` 归一化:`strip().lower()` 两边比较。
-- 提交用 `git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com"`,**显式 `git add <文件>`**,不 push。
+- 提交用 `git -c user.name="BolynWang" -c user.email="1710998763@qq.com"`,**显式 `git add <文件>`**,不 push。
 - **测试一律** `PYTHONPATH=src python -m pytest ... -o addopts=""`。
 - 契约细节见历史 spec：[`../specs/2026-07-07-w3b1-discovery-design.md`](../specs/2026-07-07-w3b1-discovery-design.md)。
 
@@ -134,7 +134,7 @@ Expected: PASS
 
 ```bash
 git add src/asrkit/capabilities.py src/asrkit/adapters/models_local.py src/asrkit/adapters/local_faster_whisper.py src/asrkit/adapters/local_whispercpp.py src/asrkit/adapters/cloud_openai.py tests/test_discover.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(metadata): 广多语模型标 multilingual(含 qwen3/funasr/dolphin);sensevoice 补全 langs"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(metadata): 广多语模型标 multilingual(含 qwen3/funasr/dolphin);sensevoice 补全 langs"
 ```
 
 ---
@@ -274,7 +274,7 @@ Expected: PASS(既有 + 新;list 无 filter 行为不变)
 
 ```bash
 git add src/asrkit/cli.py tests/test_discover.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(cli): list --lang/--arch(归一化)+ 抽 _emit_model_rows 共享渲染"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(cli): list --lang/--arch(归一化)+ 抽 _emit_model_rows 共享渲染"
 ```
 
 ---
@@ -349,7 +349,7 @@ Expected: PASS
 
 ```bash
 git add src/asrkit/cli.py tests/test_discover.py
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat(cli): search 子命令 + show 显示 multilingual"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "feat(cli): search 子命令 + show 显示 multilingual"
 ```
 
 ---
@@ -375,7 +375,7 @@ git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "feat
 
 ```bash
 git add docs/usage.md CHANGELOG.md
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "docs(w3b1): 发现命令用法(list --lang/--arch/search)+ CHANGELOG"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "docs(w3b1): 发现命令用法(list --lang/--arch/search)+ CHANGELOG"
 ```
 
 ---
@@ -400,7 +400,7 @@ Expected: ruff All checks passed;mypy Success;pytest 全绿(新增 test_discover
 
 ```bash
 git add -u
-git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com" commit -m "chore(w3b1): lint/type 收尾"
+git -c user.name="BolynWang" -c user.email="1710998763@qq.com" commit -m "chore(w3b1): lint/type 收尾"
 ```
 
 ---

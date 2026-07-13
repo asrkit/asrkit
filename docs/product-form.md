@@ -166,7 +166,7 @@
 摘自 `CLAUDE.md`(本地私有,含署名/邮箱,已 gitignore)。**违反下列任一条都是严重问题:**
 
 1. **版本号**:升 `__version__` / 打 tag / 定版本号,**必须由人类明确批准**。AI 只能**提议**,不能自作主张。0.x 阶段默认一切走 **PATCH**,MINOR 只留破坏性变更/里程碑。
-2. **提交**:用 `git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com"`,**显式 `git add <具体文件>`,绝不 `git add .`**。
+2. **提交**:用 `git -c user.name="BolynWang" -c user.email="1710998763@qq.com"`,**显式 `git add <具体文件>`,绝不 `git add .`**。
 3. **推送 / 发 PyPI 由人类做**,AI 不推、不发。
 4. **i18n**:终端输出 / CLI 帮助 / 报错**一律英文**;注释与设计文档**中文**。
 5. **透明音频**:内核对音频零处理,格式不符**诚实报错**,绝不静默出乱码。`--convert`/`--segment` 是 opt-in。
