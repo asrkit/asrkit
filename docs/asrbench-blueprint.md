@@ -1,8 +1,8 @@
 # asrbench 蓝图 — 评测平台的定位、方法论、数据与论文路径
 
-> 状态:**启动前蓝图**(2026-07-07)。asrbench 是独立仓库(依赖方向 asrbench→asrkit,单向,见 [roadmap.md](roadmap.md) 生态方向),本文是开仓前的顶层设计共识,落在 asrkit 仓库里是因为它同时定义了 asrkit 的验收方式。
-> 启动时机:W3b(发现能力)落地后。届时以本文为底,走老流程:spec → 评审 → 实现计划。
-> 相关:[expert-review-2026-07.md](archive/expert-review-2026-07.md)(C1 定位/C3 启动时机)、[result-contract.md](result-contract.md)(bench 消费的契约)。
+> 状态:**候选独立项目蓝图**(最初写于 2026-07-07)。asrbench 与 ASRKit 的预期依赖方向是 asrbench→asrkit；是否启动、何时启动，以当前 [roadmap.md](roadmap.md) 为准，不再受已经完成的 W3b 阶段门约束。
+> 本文用于保留评测方法论，不代表 asrbench 已创建或已排入当前 P0。
+> 相关:[expert-review-2026-07.md](archive/expert-review-2026-07.md)(历史评审快照)、[result-contract.md](result-contract.md)(bench 未来可消费的契约)。
 
 ---
 

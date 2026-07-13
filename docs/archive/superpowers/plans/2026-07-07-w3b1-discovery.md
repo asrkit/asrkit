@@ -19,7 +19,7 @@
 - `--lang`/`--arch` 归一化:`strip().lower()` 两边比较。
 - 提交用 `git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com"`,**显式 `git add <文件>`**,不 push。
 - **测试一律** `PYTHONPATH=src python -m pytest ... -o addopts=""`。
-- 契约细节见 spec:`docs/superpowers/specs/2026-07-07-w3b1-discovery-design.md`。
+- 契约细节见历史 spec：[`../specs/2026-07-07-w3b1-discovery-design.md`](../specs/2026-07-07-w3b1-discovery-design.md)。
 
 ---
 

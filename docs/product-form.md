@@ -10,8 +10,8 @@
 
 ## 一句话定性
 
-**asrkit = 一个"统一语音转写协议"。** 旗舰交付物是一个**轻量、OpenAI 兼容、可冻成零 Python 二进制**的网关,前置所有云厂;Python 用户额外享受本地引擎的统一管理。对外身份是 **"统一 STT 界的 ffmpeg + 冒充 OpenAI 端点"**。
-**不追求把 Python 带到别人家里,只追求把统一协议送到任何语言的门口。**
+**asrkit = 一个"统一语音转写协议"。** 旗舰交付物是一个**轻量、OpenAI 兼容、无需用户安装或管理 Python 的自包含网关**(`asrkit-cloud`),前置所有云厂;Python 用户额外享受本地引擎的统一管理。对外身份是 **"统一 STT 界的 ffmpeg + 冒充 OpenAI 端点"**。
+**不追求让用户管理 Python,只追求把统一协议送到任何语言的门口。** 第一代网关可以内嵌 CPython 冻结分发;只有真实部署证明有必要时,才在不改变 HTTP 契约的前提下替换为纯 Go 运行时。
 
 ## 核心原理:统一的是"协议",不是"打包"
 
@@ -24,7 +24,7 @@
 ```
         ┌─────────────────────────────────────────────┐
         │  脊柱(永远在,零重量)= 统一                  │
-        │  寻址 vendor/model + 结果契约 + 路由器        │
+        │  寻址 source/model + 结果契约 + 路由器        │
         └─────────────────────────────────────────────┘
                  │                          │
         ┌────────┴─────────┐      ┌─────────┴──────────┐
@@ -45,7 +45,7 @@
 
 ## 杀手级细节:OpenAI 兼容 = 到处都能插
 
-脸 B 是 **OpenAI Whisper API 兼容**。任何已接 OpenAI 语音转写的产品,**endpoint 一改指向 asrkit 二进制,立刻白嫖国内云 + 统一切换,一行业务代码不用动**。集成故事不是"发明新接口让人学",而是"冒充人人已在用的接口"。
+脸 B 的目标是 **OpenAI transcription API 兼容子集**。对于只使用已兼容参数、且宿主已管理 Sidecar 生命周期的产品,通常只需切换 `base_url` 和 model string,无需重写业务转写流程。当前已交付的是 Python `asrkit serve`;自包含 `asrkit-cloud` 仍是下一阶段目标,兼容范围见 [openai-compatibility.md](openai-compatibility.md)。
 
 ## 必须画死的边界(让一切自洽的关键)
 
@@ -81,13 +81,14 @@
 | 铁律 | 作用 | 现状 |
 |---|---|---|
 | ① 每个后端独立成 extra | 隔离**安装重量** | ✅ sherpa/whispercpp/faster-whisper/transformers/serve/mic 全分开 |
-| ② 重依赖只在**函数体内** import | 隔离**加载重量** | ✅ torch/transformers/sherpa_onnx/numpy 的 import 全在方法内,无一在模块顶层 |
+| ② 可选重运行时只在**实际执行边界** import | 隔离**加载重量** | ✅ torch/transformers/sherpa_onnx/numpy/fastapi 等不在注册与轻量模块导入期加载 |
 | ③ 缺依赖给**友好安装提示** | pay-per-use 体验 | ✅ 有 `engine install` + `doctor` |
 
-**实测证据**(2026-07-09,`PYTHONPATH=src python -c "import asrkit; from asrkit import registry"`):
-- 构建完注册表(统一路由层)共 45 个模块,**torch/transformers/sherpa/numpy/soundfile/fastapi 一个都没加载**。
-- 连 base 依赖 `requests` 都是**用到才加载**。
-- 结论:`import asrkit` 零重依赖。轻量属性已达成,**风险只在退化**(见下一步的"护栏测试")。
+**实测与回归证据**(2026-07-13,`tests/test_thin_kernel.py`):
+- 独立子进程固定从当前 `src/` 加载,隔离本机配置和第三方 entry-point,覆盖内置注册表、五类 adapter 构造/安装探测、普通 CLI 列表及 `server`/`mic` 模块导入。
+- **torch/transformers/sherpa/numpy/soundfile/fastapi 等可选运行时一个都不加载**;测试同时用 import guard 主动阻断回归,不只事后检查 `sys.modules`。
+- 基础依赖 `requests` 会随云端 adapter 的 `_http` 注册路径加载,这是 base 安装契约内的允许成本;“requests 也始终懒加载”的旧描述不准确,已纠正。
+- 结论:薄内核属性已达成且有 CI 护栏;这里保证的是**可选重运行时惰性**,不是“注册表绝对零模块加载”。
 
 ## 分发形态:模型 vs 引擎运行时的关键区分
 
@@ -105,9 +106,32 @@
 
 | 口味 | 内含 | 大小 | 场景 | 工程量 |
 |---|---|---|---|---|
-| **`asrkit-cloud`** ⭐ | 仅云端(requests+fastapi) | ~20-40MB | 默认集成物,插进任何产品,只吃云 | 小(PyInstaller 直接冻) |
+| **`asrkit-cloud`** ⭐ | 仅云端(requests+fastapi,第一代内嵌 CPython) | ~20-40MB | 默认集成物,插进任何产品,只吃云;目标机器无需安装 Python | 小(PyInstaller/Nuitka 冻结) |
 | **`asrkit-sherpa`**(可选) | 云端 + sherpa **原生库**焊入 | 大些 | 要离线+可嵌入+零 Python 的产品 | **中大**:需把 sherpa 从 Python 绑定改为调 C-API |
 | transformers/faster-whisper | —— | ⛔ 不做二进制 | torch 是 GB 级,只走 pip 渠道 | —— |
+
+## 最终交付定案:一份协议、两个发行物、两类后端
+
+| 层 | 交付物 | 面向谁 | 能力 |
+|---|---|---|---|
+| 统一协议 | model string + result/error schema + OpenAI HTTP 子集 | 所有人 | 稳定的跨语言边界 |
+| Python 发行物 | `pip install asrkit` | Python 用户 | 云端 + 全部可选本地引擎 |
+| 无安装发行物 | `asrkit-cloud` 平台二进制 / Docker | Node/Go/Rust/Java/Electron/服务端 | 云端 + OpenAI 兼容网关 |
+
+非 Python 应用不链接 Python ABI,也不为每种语言维护一套 ASR SDK;它把 `asrkit-cloud` 当作私有 Sidecar 子进程,通过 loopback HTTP 调用。HTTP 是跨语言 ABI,内部实现可从冻结 Python 演进为 Go 而不影响宿主应用。
+
+详细的启动握手、密钥传递、平台打包、发行矩阵、安全边界与演进方案见 [嵌入与无依赖分发规范](embedding-and-distribution.md)。
+
+### 当前可用性 vs 目标形态
+
+| 能力 | 当前(0.5.4) | 目标 |
+|---|---|---|
+| Python API/CLI | 已可用 | 持续兼容 |
+| `asrkit serve` | 已可用;需 Python + serve extra,仅适合受信任本机 | 保留为 Python 入口 |
+| `asrkit-cloud` | **尚未实现/发布** | cloud-only 自包含 Sidecar |
+| embedded ready/随机端口/父进程监控/data dir | 尚未实现 | Sidecar 必备 |
+| 网关鉴权/上传上限/并发边界 | 尚未实现 | Sidecar 发布前完成 |
+| 纯 Go runtime | 尚未立项 | 冻结版获真实采用后再评估 |
 
 ---
 
@@ -116,25 +140,15 @@
 > 以下按"先证明形态成立,再锁住优势"排序。每条含足够上下文可直接动手。
 > **动手前先看第四部分的铁律**(尤其版本号 / 提交 / 不推送)。
 
-### ① [验证 · 高价值] 冻结 `asrkit-cloud` 二进制并跑通
-- **做什么**:用 PyInstaller(或 Nuitka)把"云端 serve"冻成单个自包含二进制。
-- **怎么验**:在一个**假装没装 Python 的环境**里启动该二进制,`curl` 打通一次云端转写(OpenAI 兼容端点 `POST /v1/audio/transcriptions`)。
-- **为什么**:这是给"零 Python 集成"这个产品形态**背书的最小验证**。跑通了,`asrkit-sherpa` 那口味要不要投工程也就有底了。
+### ① [验证 · 高价值] 冻结 `asrkit-cloud` 分发物并跑通
+- **做什么**:用 PyInstaller(或 Nuitka)把 cloud-only serve 先冻成自包含 `onedir`;跑通后再评估 `onefile`。
+- **怎么验**:在一个真正未安装系统 Python 的干净环境里启动,`curl` 和官方 OpenAI SDK 打通一次云端转写(`POST /v1/audio/transcriptions`)。
+- **为什么**:这是给"用户无需安装或管理 Python"这个产品形态**背书的最小验证**。跑通了,`asrkit-sherpa` 那口味要不要投工程也就有底了。
 - **注意**:先做**云端专用小包**,别一上来就想把本地引擎塞进去。serve 入口见 `src/asrkit/server.py`(fastapi,已懒加载)。
 
-### ② [护栏 · 高价值 · 纯增量] 加轻量回归测试
-- **做什么**:在 `tests/` 加一个测试,断言 `import asrkit` 不拉重依赖,锁死上面实测到的属性。
-- **参考实现**:
-  ```python
-  def test_import_stays_lightweight():
-      import asrkit, asrkit.registry  # noqa: F401  构建路由层
-      import sys
-      heavy = {"torch", "transformers", "sherpa_onnx", "numpy", "fastapi"}
-      leaked = heavy & set(sys.modules)
-      assert not leaked, f"重依赖在 import 期被拉进来了: {leaked}"
-  ```
-- **为什么**:轻量属性靠"重 import 都在函数内"这个约定撑着;一次手滑写到模块顶层就悄悄崩。CI 里焊死它,谁破坏谁当场红。
-- **顺带**:核一遍所有 adapter 确实没有顶层重 import(目前是干净的)。
+### ② [已完成 · 护栏] 轻量回归测试
+- `tests/test_thin_kernel.py` 已用源码路径独立子进程锁住注册、adapter 构造、CLI 和轻量服务模块的导入边界。
+- 覆盖 pyproject 全部可选 extras 及常见传递重依赖;任何提前 import 都会使 CI 当场失败。
 
 ### ③ [可选 · 大工程] `asrkit-sherpa` 原生口味
 - **做什么**:把 sherpa 从 Python 绑定(`import sherpa_onnx`)改为调用其 **C API / 原生库**,使其可焊进二进制、真·零 Python 跑本地。
@@ -158,16 +172,6 @@
 
 ---
 
-# 第五部分:当前状态快照(交接时点 2026-07-09 · 会过期)
+# 第五部分:当前状态入口
 
-- **版本**:`0.5.4`(源码 + 本地 tag `v0.5.4`),**未推送、未发 PyPI**。
-- **分支**:`main`,工作树干净。
-- **本地领先 origin 约 4 个 commit**(README 正名 + 本会话三次整理),等人类择机推送。
-- **本会话已完成的整理**(仅整理,未动核心代码):
-  - `38e400c` — .gitignore 收编工具缓存 + AI 工具目录
-  - `a76eede` — docs 归档:26 份历史/已完成文档搬入 `docs/archive/`,根目录 32→8,修 7 处断链
-  - `cc5d749` — AGENTS.md 私有化(含隐私,gitignore)
-- **代码本体评估**:3671 行 / 30 文件,结构干净(**不是屎山**)。多引擎 adapter + 4 云厂 + 流式四入口 + doctor + 补全均已完成。roadmap 自述"当前无未认领的核心待办"。
-- **活跃文档**(`docs/` 根):usage / adapter-spec / result-contract / engines-and-addressing / model-management / roadmap / project-overview / asrbench-blueprint。历史/已完成文档在 `docs/archive/`。
-- **相关外部上下文**:另一个项目 **Orca**(Node/Electron STT 应用)的改动停在其 `feat/custom-stt-endpoint` 分支,未提交但保留。Orca 用 sherpa 的 **Node 原生绑定**(零 Python),它对 asrkit 的真正需求是**国内云厂 + 统一切换**,不是本地 sherpa(那是重复)。
-- **参考源(只读,勿改)**:`/Users/user/Documents/AI-Lab/asr_bench`(真机端到端验证在此仓库,不在 asrkit repo)。
+北极星文档不再保存易腐烂的分支、ahead 数、工作树和代码行数。当前发布与工作状态见 [project-overview.md](project-overview.md),唯一执行队列见 [roadmap.md](roadmap.md),历史计划和评审见 [archive/](archive/)。

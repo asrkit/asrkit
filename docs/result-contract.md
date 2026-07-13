@@ -10,7 +10,7 @@
 
 | 字段 | 类型 | 含义 | 空值规则 |
 |---|---|---|---|
-| `text` | `str` | 识别文字（唯一必填字段） | 失败时为 `""`，序列化时**恒含**（见下） |
+| `text` | `str` | 识别文字（结果对象中的唯一必填字段） | `result_dict` 与批量输出恒含；单文件 JSON 为兼容旧行为会在空字符串时略去（见下） |
 | `segments` | `list[Segment]` \| `None` | 分句时间戳（`start`/`end`/`text`），字幕（srt/vtt）依赖此字段；目前由 whisper 家族（faster-whisper / whispercpp / openai/whisper-1）填充，sherpa 与 transformers 暂不填充（TODO） | 无则整字段略去；序列化时展开为 dict 列表 |
 | `word_timestamps` | `list[dict]` \| `None` | 逐词时间戳 `{word, start, end, conf?}` | 无则略去 |
 | `lang` | `str` \| `None` | 自动识别/指定的语言 | 无则略去 |
@@ -21,7 +21,7 @@
 | `raw_response` | `dict` \| `None` | 云端厂商原始响应（调试用） | 单文件 json：有则含；批量 NDJSON：**恒不含**（见下） |
 | `error` | `str` \| `None` | 出错信息；adapter 不抛异常，错误一律进此字段 | 成功时略去；失败时含 |
 
-> 序列化通用规则（`formats.result_dict`）：**`text` 恒含**（即便是空字符串，失败行也要有这个 key，方便脚本统一按 `text` 取值）；其它字段为空（`None`/`""`/`[]`/`{}`）时**整字段省略**，不会出现 `"lang": null` 这种噪音键。
+> `formats.result_dict` 的规则是：**`text` 恒含**；其它字段为空（`None`/`""`/`[]`/`{}`）时省略。CLI 的单文件 JSON 渲染保留一个历史兼容例外：空 `text` 会被略去。需要稳定机读 schema 时，应使用 `--batch -f json` 的 NDJSON 输出。
 
 ---
 
@@ -68,7 +68,7 @@
 {"text": "", "error": "boom", "file": "b.wav", "model": "m/x", "schema_version": 1}
 ```
 
-触发批量模式的条件（`cli.py` 中 `multi`/`forced` 判定）：位置参数展开后文件数 `!= 1`，或原始参数里含 `-`（stdin）/ 目录 / glob 通配符（`*`、`?`、`[`），或显式传了 `--batch`。
+触发批量模式的条件（`cli_commands/transcribe.py` 中的 `multi`/`forced` 判定）：位置参数展开后文件数 `!= 1`，或原始参数里含 `-`（stdin）/ 目录 / glob 通配符（`*`、`?`、`[`），或显式传了 `--batch`。
 
 ---
 
@@ -112,11 +112,11 @@ csv 用逗号分隔、tsv 用 tab 分隔；写入用标准库 `csv.writer`（`li
 
 **批量模式退出码取"最严重"**（`emit.worst_code`），优先级 **`1 > 3 > 4`**：只要批次中有任意一条命中 `EXIT_ERROR`（意外异常），整体返回 `1`，即使同时也有 `3`/`4` 也不会被掩盖；其次是 `3`（模型不存在，通常整批同一模型，一旦命中会在建立 adapter 阶段就短路）；最后才是 `4`（个别文件转写失败，其余继续处理）。批次全部成功才返回 `0`。
 
-> 注：单文件模式下，行为变更前历史上失败只返回 `1`；现在 `result.error` 非空的转写失败返回 **`4`**，其它程序性异常仍返回 `1`（`cli._batch_code`）。详见 `CHANGELOG.md` 的 `Unreleased` 一节。
+> 注：单文件模式下，历史上失败只返回 `1`；自 0.5.2 起，`result.error` 非空的转写失败返回 **`4`**，其它程序性异常仍返回 `1`。详见 `CHANGELOG.md` 的 0.5.2 一节。
 
 ---
 
-## 五、流式契约：`PartialResult`（W4 行使记录，P3-E 端点检测填实）
+## 五、流式契约：`PartialResult`
 
 `asrkit stream` / `api.transcribe_stream` 返回 `PartialResult` 迭代器（见 `src/asrkit/types.py`）。消费者**一律以 `text` 为准**（权威展示文本）。
 
@@ -131,4 +131,4 @@ csv 用逗号分隔、tsv 用 tab 分隔；写入用标准库 `csv.writer`（`li
 
 **语义**：sherpa online 模型开启端点检测（`enable_endpoint_detection=True`，`rule3_min_utterance_length=300.0` 抑制"连续说话被强制切段"，改由静音驱动分段）。每喂一块：解码 → 取当前 `partial` 假设 → 若 `is_endpoint(st)` 为真，则把 `partial` 收进 `committed` 累积、调用 `reset(st)` 清空解码器状态、`partial` 清空 → `text = (committed + " " + partial).strip()`。喂完 flush 尾音后，若还有残留 `partial` 也收进 `committed`，yield 最终 `PartialResult(text=committed, committed=committed, partial="", is_final=True)`。仅 `modes` 含 `streaming` 的模型支持；批处理模型 `api.transcribe_stream` 抛 `ValueError`、adapter 直调抛 `NotImplementedError`。
 
-> **复盘（留给未来独立一刀）**：麦克风/serve 流式端点、词级时间戳、`ts_ms` 挂钟语义为后续项。
+> **后续项**：词级时间戳、`ts_ms` 挂钟语义和 WebSocket 传输尚未实现。麦克风输入和 serve SSE 已实现，并复用这里的 `PartialResult` 语义。

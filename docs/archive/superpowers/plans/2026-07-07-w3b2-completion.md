@@ -19,7 +19,7 @@
 - 补全脚本靠 `asrkit list --ids`(裸 id 一行一个)动态取 model;`list --ids` **懒算 inst**(仅 `--installed` 或非 `--ids` 时才 `_installed`)。
 - 提交 `git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com"`,**显式 `git add`**,不 push。
 - **测试** `PYTHONPATH=src python -m pytest ... -o addopts=""`。
-- 契约见 spec:`docs/superpowers/specs/2026-07-07-w3b2-completion-design.md`。
+- 契约见历史 spec：[`../specs/2026-07-07-w3b2-completion-design.md`](../specs/2026-07-07-w3b2-completion-design.md)。
 
 ---
 

@@ -18,7 +18,7 @@
 - 解析全程防御:无 segments → `segments=None`,text 照旧。
 - 提交用 `git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com"`,**显式 `git add <文件>`**,不 push。
 - **测试一律** `PYTHONPATH=src python -m pytest ... -o addopts=""`(miniconda 有旧副本会遮蔽)。
-- 契约细节见 spec:`docs/superpowers/specs/2026-07-07-w3a-contract-fulfillment-design.md`。
+- 契约细节见历史 spec：[`../specs/2026-07-07-w3a-contract-fulfillment-design.md`](../specs/2026-07-07-w3a-contract-fulfillment-design.md)。
 
 ---
 

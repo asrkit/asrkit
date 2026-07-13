@@ -17,7 +17,7 @@
 - 单文件模式 stdout/stderr **输出字节与今天完全一致**(走原 `_print_result`);唯一可见变更是退出码分级。
 - 提交用 `git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com"`,**显式 `git add <文件>`**,不 push。
 - 退出码分级:`0` 成功 · `1` 意外异常 · `2` 用法错 · `3` 模型不存在 · `4` 转写/渲染失败。批量优先级 `1 > 3 > 4`。
-- 契约细节见 spec:`docs/superpowers/specs/2026-07-07-w1-batch-input-and-result-contract-design.md`。
+- 契约细节见历史 spec：[`../specs/2026-07-07-w1-batch-input-and-result-contract-design.md`](../specs/2026-07-07-w1-batch-input-and-result-contract-design.md)。
 
 ---
 

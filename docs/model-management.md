@@ -6,7 +6,7 @@
 ## 指导原则
 
 - **本地 = Ollama**：`pull` 即拉即用、`模型:tag` 命名、本地存储、`list/run/show`。
-- **云端 = LiteLLM**：`provider/model` 字符串、按 vendor 的环境变量 key 约定、（后期）Router 兜底。
+- **云端 = LiteLLM 式体验**：公开寻址统一为 `<source>/<model>`、按 vendor 解析环境变量 key、后期再考虑 Router 兜底。
 - 目标用户零学习成本：用过 Ollama/LiteLLM 的人，直接会用 ASRKit。
 
 ---
@@ -16,7 +16,7 @@
 | 类型 | 格式 | 例子 | tag 含义 |
 |---|---|---|---|
 | 本地 | `model[:tag]` | `sensevoice`、`sensevoice:fp32` | tag = **量化精度**，默认 `int8` |
-| 云端 | `provider/model` | `siliconflow/sensevoice` | LiteLLM 式，无精度概念 |
+| 云端 | `<source>/<model>` | `siliconflow/sensevoice` | LiteLLM 式，无精度概念 |
 
 - 不写 tag → 用默认精度（端侧默认 **int8**，图小图快）。
 - **只有"同一份权重、不同量化位数"才算 tag**；蒸馏/语言/大小档都是**独立模型**，不用 tag。
@@ -27,7 +27,7 @@
 ## 二、本地存储（Ollama 式）
 
 - 根目录：`~/.asrkit/models/`（可用 `$ASRKIT_MODELS_ROOT` 覆盖）。
-- **v0.x（实现现状）**：**平铺** `models/<folder>/`，folder = 模型 id 去掉 `local/`（如 `models/sensevoice/`、`models/sensevoice-fp32/`）。`tag` 只是**寻址别名**（`sensevoice:fp32` → 目录 `sensevoice-fp32`），**不是子目录**。安装为原子操作（`.partial` + rename）。
+- **v0.x（实现现状）**：**平铺** `models/<folder>/`，folder = 模型 id 去掉首段 namespace（如 `sherpa/sensevoice` → `models/sensevoice/`）。`tag` 只是**寻址别名**（`sensevoice:fp32` → 目录 `sensevoice-fp32`），**不是子目录**。安装为原子操作（`.partial` + rename）。
 - **未来**（记着，不急做）：抄 Ollama 的 **manifest + 内容寻址 blob 去重** —— int8/fp32 共享的 `tokens.txt` 只存一份。ASR 的 onnx 文件大，去重有价值，但 v0.x 不做。
 
 ---
@@ -65,7 +65,7 @@ asrkit list --available            # 🔜 目前没有"仅列可远程获取"的
 sensevoice:
   架构(config_type): senseVoice
   语言: [zh,en,ja,ko,yue]
-  许可证: Apache-2.0        # LiteLLM/Ollama 都不标，这是 ASRKit 的加分项
+  许可证: Apache-2.0        # 目标字段示例;当前内置本地模型的 license 覆盖尚未完成
   默认精度: int8
   精度:
     int8: { download_url: A, 装完选文件: model.int8.onnx, 体积: 228M }
@@ -78,22 +78,24 @@ sensevoice:
 - **无需自建服务器**：`download_url` 直连 sherpa-onnx 的 GitHub releases。数据源：你已有的 `models.dart` / `registry.json` / 下载脚本。
 - **下载格式自动识别**：`pull` 不依赖 URL 后缀，而是按文件内容（magic bytes）识别压缩格式——支持 `.tar.bz2`/`.tar.gz`/`.tar.xz`、纯 `.tar`、`.zip`；解压时对 tar 与 zip 均有路径穿越防护（`store.py` 的 `_safe_extract`/`_safe_extract_zip`），不会因恶意压缩包写到目标目录之外。
 - **自定义下载地址**：`asrkit pull <model> --url <URL>` 可覆盖模型的默认 `download_url`，从任意地址下载（同样按内容识别格式）。
-- **用户自定义模型（模型开放）**：不在内置表里的 sherpa 模型，写进 `~/.asrkit/models.json`（或 `$ASRKIT_MODELS_JSON`）即 `pull` 即用，无需改包。也可用 `asrkit add-model <id> --url <URL> --arch <config_type> --langs zh,en` 一条命令注册（免手写 JSON）；`--sha256` 校验下载文件；已有模型文件时 `--model-dir <path>` 直接软链到位，免下载、立即可用。字段与实操见 `engines-and-addressing.md §九`。
+- **元数据覆盖现状**：`license`/官方来源/`sha256` 字段已经存在,但内置本地模型尚未完成覆盖,不能把空字段当作已核验。补齐计划见 [roadmap.md](roadmap.md)。
+- **用户自定义模型（模型开放）**：不在内置表里的 sherpa 模型，写进 `~/.asrkit/models.json`（或 `$ASRKIT_MODELS_JSON`）即可注册。也可用 `asrkit add-model <id> --url <URL> --arch <config_type> --langs zh,en` 一条命令登记；`--sha256` 可校验下载文件。已有文件时用 `--model-dir <path>`：ASRKit 在 models root 内创建 leaf symlink，安装判断和运行时正常跟随；`rm` 只删除链接、保留外部目录。来源必须是已存在目录，且不能包含将要创建的链接；父路径软链与 `.`/`..` ID 会被拒绝。
 
 ---
 
 ## 五、云端约定（LiteLLM 式）
 
-- **key 解析顺序**（✅ 已实现）：显式 `config["api_key"]` > 环境变量 `<VENDOR>_API_KEY`（如 `SILICONFLOW_API_KEY`）> `~/.asrkit/config.json` 密钥库（`asrkit config set-key <vendor>` 写入，见 §七）。
-- **`provider/model` 路由**：已实现（协议 adapter 按 provider 分派）。
+- **key 解析顺序**（✅ 已实现）：显式 `config["api_key"]` > 环境变量 `<VENDOR>_API_KEY`（如 `SILICONFLOW_API_KEY`）> `~/.asrkit/config.json` 本地明文配置（权限 0600，`asrkit config set-key <vendor>` 写入，见 §七）。
+- **`<source>/<model>` 寻址**：已实现。外部 source 对云端通常是 vendor namespace、对本地是 engine namespace;内部 `provider` 是协议 adapter key,不要与公开 model id 首段混为一谈。
 - **密钥按 vendor 共享**：同厂商多模型共用一个 key（已在契约体现）。
-- **后期（阶段 4，抄 LiteLLM Router）**：兜底（端侧失败切云端）、重试、超时、多 key 轮换。现在不做。
+- **已实现**：共享 HTTP 分级重试/退避、请求超时、豆包轮询 deadline。
+- **尚未实现**：端侧失败自动切云、策略路由和多 key 轮换;有真实需求后再设计。
 
 ---
 
 ## 六、v0.x 落地范围
 
-**已完成**：`模型:精度` 命名 + 平铺 `models/<model>/` 存储 + `pull`（支持 `--url`、多压缩格式自动识别）/ `run` / `list` / `show` / `rm` / `search` / `add-model`；精度 `int8`(默认) / `fp32`；云端 `provider/model` 路由 + 环境变量/配置文件 key 解析。
+**已完成**：`模型:精度` 命名 + 平铺 `models/<model>/` 存储 + `pull`（支持 `--url`、多压缩格式自动识别）/ `run` / `list` / `show` / `rm` / `search` / `add-model`；精度 `int8`(默认) / `fp32`；云端 `<source>/<model>` 路由 + 环境变量/配置文件 key 解析。
 
 **不做**：blob 去重、Router 兜底、评测/横评（见 `roadmap.md` 的独立项目决定）。
 

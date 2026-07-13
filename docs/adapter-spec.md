@@ -1,12 +1,12 @@
 # ASRKit Adapter 契约 v1（草案 / DRAFT）
 
-> 状态：**已过独立评审、吸收全部修改，待冻结**。冻结后遵循"字段只增不改"原则（见 §10）。
+> 状态：**v1 草案，核心结构已在 Python 实现中使用，但尚未冻结**。本文同时包含当前实现和目标约束；冻结前仍须以代码与测试复核。冻结后才遵循"字段只增不改"原则（见 §10）。
 > 本契约不是凭空设计，而是从两套已跑通的实现中提炼：
 > - `asr_bench/desktop_bench`（Python，47 端侧模型真机跑通）
 > - `asr_bench`（Flutter/Dart，端侧 32 + 云端 21，含 6 家流式协议）
 >
-> 契约是 ASRKit 的"宪法"。任何人照本文写一个 adapter，即可接入 ASRKit 的全部能力
-> （CLI / pull / Python SDK / OpenAI 兼容网关；bench 横评为后续路线项）。
+> 契约是 ASRKit 的核心扩展边界。第三方 adapter 当前可接入注册表、CLI、Python SDK 和 HTTP 网关；
+> `pull`、流式等能力仍取决于 adapter 自身声明和实现，bench 横评是后续路线项。
 
 ---
 
@@ -21,7 +21,7 @@
 3. **字段宁少勿多。** 加字段容易、改字段是灾难。可选能力走可选字段。
 4. **原始响应可复核。** 结果保留 `raw_response`。
 
-> **进程隔离**（本地推理跑子进程、崩溃不连坐）为**路线项，非 v1 硬要求**——当前实现为同进程加载。原型 `worker.py` 用子进程隔离，可选 runner 待后续提供（见 hardening 规格 H-*）。
+> **进程隔离**（本地推理跑子进程、崩溃不连坐）为**路线项，非 v1 硬要求**——当前实现为同进程加载。只读参考项目 `asr_bench` 的 `worker.py` 验证过子进程思路；ASRKit 尚未提供该 runner。
 
 ---
 
@@ -114,7 +114,7 @@ class AdapterMeta:
     #      "segment_timestamps": True}   # 模型是否返回 segments（分句时间戳）；仅 whisper 家族标注
 
     pricing: dict | None = None   # {"unit":"hour","cny":4.5}
-    license: str | None = None    # 模型许可证（本地模型必填，非商用需显著标注）
+    license: str | None = None    # 模型许可证（目标：本地模型补齐；当前 registry 覆盖不完整）
     maturity: str = "stable"      # "stable" | "experimental"（best-effort 接入标 experimental）
 
     config_schema: dict = field(default_factory=dict)   # 见 §4
@@ -128,7 +128,7 @@ class AdapterMeta:
     config_type: str = ""         # 引擎架构：whisper/paraformer/senseVoice/transducer/qwen3Asr/...
     download_url: str = ""
     install_files: list[str] = field(default_factory=list)  # 支持精确名或 glob，见 §6
-    sha256: str = ""              # tarball 校验和；pull 后校验（H-03b）
+    sha256: str = ""              # tarball 校验和（目标字段；当前内置下载项尚未普遍填充）
     tag: str = ""                 # 精度标签（int8/fp32），Ollama 式 base:tag 寻址
     base: str = ""                # 逻辑模型名（多精度共享一个 base）
 ```
@@ -141,7 +141,7 @@ class AdapterMeta:
 
 ## 4. config_schema：密钥与自动表单
 
-平台按 `config_schema` 自动渲染配置表单；**密钥只存本地/自部署环境，永不上传**。
+平台可按 `config_schema` 渲染配置表单。ASRKit 本地配置文件不会主动同步到 ASRKit 服务；调用云端 adapter 时，鉴权信息和音频会按所选厂商协议发送给该厂商。当前 `~/.asrkit/config.json` 是权限为 0600 的明文文件，不是加密保险库。
 
 ```python
 config_schema = {
@@ -152,7 +152,7 @@ config_schema = {
 }
 ```
 
-**关键约定（来自 `cloud_config.dart`）**：
+**关键约定（参考只读项目 `asr_bench` 的 `cloud_config.dart`，并已用于当前 Python 配置解析）**：
 - **密钥按 `vendor` 共享，不按 model。** 同厂商多模型共用一套 Key。
 - **多密钥厂商**：火山支持"单 `api_key`"或"`app_key`+`access_key`"二选一——用 `required: False` 表达，可用性判断交给 adapter 的 `is_configured()`。
 
@@ -173,7 +173,7 @@ class PartialResult:
     error: str | None = None # 流式错误（握手失败/服务端 error 帧），不 raise
 ```
 
-**各家如何映射**（全部已在源码验证）：
+**协议映射参考**：下表来自只读参考项目 `asr_bench` 的已验证实现，不代表这些流式云协议已经全部进入当前 Python 包。当前 ASRKit 的云端 adapter 均为 batch；已实现的 streaming adapter 是 sherpa online 模型。
 
 | 来源 | 原始信号 | 映射 |
 |---|---|---|
@@ -183,7 +183,7 @@ class PartialResult:
 | **火山豆包** | 二进制帧、text 为**累计全文** | **只填 text（全量覆盖），committed/partial 留空** |
 | **端侧流式（zipformer 等）** | 解码器吐**累计全文** | **只填 text，committed/partial 留空** |
 
-生命周期：`connect → feed×N → finish → dispose`（Dart `CloudStreamer`），Python 封装为生成器。平台负责 VAD/心跳/重连/超时收尾；厂商内部细节（OpenAI 24k 重采样、火山 gzip 二进制帧）是 adapter 私事。
+目标生命周期：`connect → feed×N → finish → dispose`（参考项目的 Dart `CloudStreamer`），Python 对外封装为生成器。当前 sherpa streaming 已采用生成器接口；云端心跳、重连和协议收尾仍属未来 adapter 工作。
 
 > **改动依据评审 🔴#2 / 🟡#6**：明确 `text` 为唯一权威、`committed/partial` 为可选（端侧和火山根本不产出定稿分段）；`PartialResult` 增 `error` 通道。
 
@@ -207,8 +207,8 @@ install_files = ["*encoder*.onnx", "*decoder*.onnx", "<tokenizer_dir>/"]
 
 ## 7. 注册与发现
 
-- **目录发现**：`adapters/` 下模块启动时自动扫描。
-- **entry point**：第三方包通过 `[project.entry-points."asrkit.adapters"]` 声明，`pip install` 即接入。
+- **内置 adapter**：由 `registry.load_builtin()` 显式导入和注册，不扫描目录。
+- **第三方 entry point**：包通过 `[project.entry-points."asrkit.adapters"]` 声明，`pip install` 后由注册表发现。
 - **pip extras**：`asrkit` / `asrkit[cloud]` / `asrkit[local]` / `asrkit[all]`。
 
 ---
@@ -232,7 +232,8 @@ install_files = ["*encoder*.onnx", "*decoder*.onnx", "<tokenizer_dir>/"]
 | 音频增强（VAD/降噪/切段）——**默认关，opt-in** | ✅（用户开启时） | ❌ |
 | 端到端计时兜底 | ✅ | 可补 metrics |
 | 本地推理进程隔离（**路线项，非 v1 要求**） | 🔜 可选 runner | 实现同步 transcribe |
-| 重试/超时/密钥轮换 | ✅（阶段 4） | ❌ |
+| HTTP 重试/超时 | ✅（已实现共享 HTTP 层） | ❌ |
+| 多密钥轮换/智能路由 | 🔜 路线项 | ❌ |
 | 厂商协议细节（鉴权/帧格式/内部重采样） | ❌ | ✅ |
 | 能力声明 | ❌ | ✅ |
 
@@ -242,11 +243,11 @@ install_files = ["*encoder*.onnx", "*decoder*.onnx", "<tokenizer_dir>/"]
 
 - 冻结为 **契约 v1** 后：字段**只增不改、不删**；新增可选能力必须带默认值。
 - 破坏性变更 → 契约 v2 + 迁移工具。
-- 预留 `spec_version` 字段，v1 隐含。
+- `spec_version` 目前只是预留设计，尚未出现在 `AdapterMeta`；冻结时再决定是否加入。
 
 ---
 
-## 附：v1 已定决策（经独立评审确认/修正）
+## 附：v1 草案已达成的设计决策
 
 1. 流式 API → 生成器 `Iterator[PartialResult]`；`text` 为唯一权威输出。
 2. `vendor` → `meta` 一等字段，密钥按 vendor 聚合。
@@ -257,4 +258,4 @@ install_files = ["*encoder*.onnx", "*decoder*.onnx", "<tokenizer_dir>/"]
 7. **透明层原则（§0）** → 默认不动音频、不改模型原生行为；增强处理 opt-in；进程隔离降为路线项。
 8. `BaseAdapter.__init__(meta, config)`；`AdapterMeta` 增 `tag`/`base`（精度寻址）。
 
-> 二次修订（2026-07，音频透明原则）后需**重新走一遍评审再冻结**。
+> 二次修订（2026-07，音频透明原则）后仍需**按当前代码、插件样例和兼容性测试重新评审，再决定是否冻结**。

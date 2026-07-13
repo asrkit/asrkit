@@ -17,7 +17,7 @@
 - 云端 adapter **请求形状逐字不变**,只把 `requests.post` 换成 `_http.post`;成功路径零改变;**全程 mock,不打真实 API**。
 - 提交用 `git -c user.name="BolynWang" -c user.email="lm2039136@gmail.com"`,**显式 `git add <文件>`**,不 push。
 - **测试一律** `PYTHONPATH=src python -m pytest ... -o addopts=""`(仓库有 miniconda 旧副本会遮蔽本地源码)。
-- 契约细节见 spec:`docs/superpowers/specs/2026-07-07-w2-cloud-retry-and-download-override-design.md`。
+- 契约细节见历史 spec：[`../specs/2026-07-07-w2-cloud-retry-and-download-override-design.md`](../specs/2026-07-07-w2-cloud-retry-and-download-override-design.md)。
 
 ---
 

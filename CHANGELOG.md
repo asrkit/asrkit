@@ -8,9 +8,23 @@
 > **发版三步**
 > 1. 改版本号 —— 只改 `src/asrkit/__init__.py` 的 `__version__`(单一版本源,pyproject 自动同步),并同步 `tests/test_smoke.py` 的断言。
 > 2. 记 CHANGELOG —— 在下方加一节 `## [X.Y.Z] - YYYY-MM-DD`,分 `### 新增 / 变更 / 修复` 三段;**破坏性变更要醒目标出**。
-> 3. 打 tag 并推 —— `git tag -a vX.Y.Z -m "…" && git push origin main --tags`(tag 与 PyPI 版本一一对应)。
+> 3. 本地打 annotated tag —— `git tag -a vX.Y.Z -m "…"`(tag 与 PyPI 版本一一对应)。**推送和发布由人类执行。**
 
 ## [Unreleased]
+
+### 工程
+- **CLI 模块化收口**：将单文件 `cli.py` 拆为 `cli_commands/` 下的 parser、共享 helper 与六组命令 handler；命令、参数、输出和退出码保持不变。
+- **入口回归保护**：覆盖全部 14 个顶层命令的分发、嵌套帮助、`python -m asrkit.cli`、argparse 退出码、未知模型退出码和 `cli.api` 整体 monkeypatch 兼容性。
+- **薄内核回归保护**：在隔离子进程中从当前 `src/` 加载包，覆盖内置注册表、五类 adapter、安装探测、CLI 列表及 `server`/`mic` 轻量模块；主动阻断 torch、transformers、sherpa、numpy、FastAPI 等可选运行时的提前导入。
+- **nightly E2E 不再假绿**：真实推理改用仓库固定、注明 CC BY 4.0 来源的 LibriSpeech 音频；测试移出默认单测目录并由 nightly 显式调用，依赖缺失、fixture 缺失、模型下载或推理失败都直接失败，不再 `skip`。
+- **开发验证命中当前源码**：pytest 固定将 `src/` 放在导入路径首位，并断言 `asrkit.__file__` 来自当前 checkout；子进程测试显式继承源码路径，CI 统一使用 `python -m` 入口并新增 wheel 临时安装、CLI 和模型注册 smoke。
+
+### 修复
+- **`add-model --model-dir` 外部目录可用**：models root 内允许最后一级软链指向已有外部模型目录，`show`/运行时安装判断可正常跟随；`rm` 只 unlink 软链，绝不递归删除外部目标。
+- **模型路径安全**：无效来源不再写入注册表或创建断链；拒绝空模型名、`.`/`..`、父目录软链逃逸、包含目标链接的递归源目录，以及通过 runtime `model_dir` 覆盖让 `pull`/`remove` 写删外部目录。不完整外链不会被 `pull` 隐式替换。
+
+### 文档
+- 统一当前实现、目标产品形态和历史归档的边界；新增 OpenAI HTTP 兼容子集与非 Python Sidecar 分发规范，并修正模型数量、流式示例、隐私、许可证和密钥存储等过时描述。
 
 ## [0.5.4] - 2026-07-08
 
@@ -107,7 +121,7 @@
 
 ## [0.4.1] - 2026-07-06
 
-主题：**完善——工具与服务**（对照 Ollama + LiteLLM，见 `docs/roadmap-cli-completeness.md` A/B/C 三组，合并为一个补丁版发布）。均为向后兼容增量。
+主题：**完善——工具与服务**（对照 Ollama + LiteLLM，见历史规划 `docs/archive/roadmap-cli-completeness.md` A/B/C 三组，合并为一个补丁版发布）。均为向后兼容增量。
 
 ### 新增 · 输出格式与 CLI（A）
 - **输出格式** `--format {txt,json,srt,vtt}` + `-o/--output`（`run` 与 `transcribe` 均支持）：
@@ -124,7 +138,7 @@
   - `config set-key <vendor> <key>`（单密钥）/ `--app-key --access-key`（火山等双密钥）。
   - `config set default-engine <name>` / `config set models-root <path>`。
   - `config get-key <vendor>` / `config list`（**一律打码，仅末 4 位**）/ `config path`。
-- **凭据解析优先级**：显式 config > 环境变量 > **config.json keystore**（新兜底）。存一次，之后该 vendor 的模型自动带密钥。
+- **凭据解析优先级**：显式 config > 环境变量 > **config.json 本地配置**（新兜底）。存一次，之后该 vendor 的模型自动带密钥。
 - **默认引擎可切**：`asrkit engine default <name>`（= `config set default-engine`）——裸名解析改读配置（缺省仍 `local`/sherpa，向后兼容）。
 - **models 根目录**可持久化：`config set models-root`（优先级：显式 > `ASRKIT_MODELS_ROOT` > config > 默认）。
 - 安全：配置文件权限 **0600**；密钥**明文存储**（同 ollama/aws-cli 惯例），首次 `set-key` 提示；不放心者继续用环境变量。
@@ -133,7 +147,7 @@
 - **`asrkit serve`** —— OpenAI 兼容的本地转写服务（可选 extra `pip install "asrkit[serve]"`）：
   - `POST /v1/audio/transcriptions`（multipart：`file` / `model` / `language` / `response_format`），`response_format` 支持 `json`(默认) / `verbose_json` / `text` / `srt` / `vtt`。
   - `GET /v1/models`（OpenAI list 结构）、`GET /health`。
-  - 任何 OpenAI 客户端改 `base_url` 即可调用 ASRKit 背后的全部端云模型；云端密钥走 keystore，无需每次传。
+  - 支持项目声明的 OpenAI 音频转写兼容子集；客户端改 `base_url` 后可调用 ASRKit 背后的端云模型，云端密钥走本地配置，无需每次传。
 - 透明原则：上传文件按原始字节落临时文件，不解码/不重采样，请求结束清理。
 - 安全默认：绑 `127.0.0.1`（仅本机）；`--host 0.0.0.0` 显式警告。懒加载：基础安装不受影响，缺 extra 时友好报错。
 - 已知局限（后续）：本地模型每请求重新加载（无常驻缓存）；无 `stream=true` / 无鉴权。
@@ -180,7 +194,7 @@
 ### 说明
 - 默认仍只带 sherpa-onnx；引擎按需装或走插件。
 
-## [0.2.0] - 未发布
+## [0.2.0] - 2026-07-06
 
 ### 新增
 - **多引擎**：引擎作为可选组件，通过同一接口 `引擎/模型` 寻址。新增两个引擎：

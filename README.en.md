@@ -11,7 +11,7 @@
 
 ASRKit is to speech recognition what **Ollama + LiteLLM** are to LLMs: models pull-and-go, one addressing scheme across on-device and cloud, plus an optional OpenAI-compatible local server. **The core is just a thin interface** — the base install depends only on `requests`; engines install on demand, models download on demand. No torch for things you don't use.
 
-It covers a panorama **no other tool does**: Chinese SOTA on-device models (SenseVoice / Paraformer / FireRed / TeleSpeech — 47 models, pull-and-go) + China's cloud vendors (DashScope / Doubao / SiliconFlow, which no Western toolchain covers) + the whole Whisper family + the entire HuggingFace ASR hub — one interface to compare, mix, and switch.
+It brings an uncommon combination under one interface: Chinese SOTA on-device models (SenseVoice / Paraformer / FireRed / TeleSpeech — 47 pull-and-go models) + major China cloud providers (DashScope / Doubao / SiliconFlow) + the Whisper family + open addressing for HuggingFace ASR models.
 
 > ⚠️ **Early beta, under active development.** The core interface is usable, but we're still iterating — addressing/APIs may shift slightly between minor versions. Try it and tell us what breaks.
 
@@ -22,18 +22,18 @@ The base install needs only `requests` (cloud is built in); engines/models/`serv
 | You want | Install |
 |---|---|
 | **Cloud-only, zero env hassle** | `uv tool install asrkit` — `uv` is a single one-line binary; `asrkit` lands on your PATH, no Python env to manage |
-| **Not even install (run once)** | `uvx asrkit transcribe audio.wav -m siliconflow/sensevoice --api-key <KEY>` — pulled from PyPI and run, nothing left behind |
+| **Not even install (run once)** | `uvx asrkit transcribe audio.wav -m siliconflow/sensevoice --api-key <KEY>` — no ASRKit preinstall; uv creates a temporary environment and may retain download caches |
 | **Regular Python user** | `pip install asrkit` |
 | **Global command, don't touch current env** | `pipx install asrkit` |
 | **On-device engines (sherpa, 47 models)** | once asrkit is installed, `asrkit engine install sherpa-onnx` (into your Python env; no shell-quoting to fight) |
 
-> Install `uv`: `curl -LsSf https://astral.sh/uv/install.sh | sh` (one line on macOS/Linux, single binary, zero runtime).
+> Install `uv`: `curl -LsSf https://astral.sh/uv/install.sh | sh` (one line on macOS/Linux, single binary; no Python environment to manage manually for ASRKit).
 > After installing, run `asrkit doctor` for a one-command health check (engines / keys / dirs / config; `--net` adds connectivity checks).
 
 ## 30 seconds to first transcript
 
 ```bash
-asrkit transcribe audio.wav -m siliconflow/sensevoice --api-key <KEY>   # free cloud model, works instantly
+asrkit transcribe audio.wav -m siliconflow/sensevoice --api-key <KEY>   # cloud example; provider account/API key required, pricing may change
 asrkit run sherpa/sensevoice audio.wav                     # on-device: downloads on first run, then transcribes (needs asrkit engine install sherpa-onnx first)
 ```
 
@@ -60,11 +60,11 @@ print(transcribe("sherpa/sensevoice", "audio.wav").text)
 
 ## Why ASRKit
 
-- **A Chinese/multilingual panorama no one else combines.** 47 on-device models + 5 cloud vendors out of the box; China's clouds and Chinese on-device SOTA are first-class citizens, not an afterthought.
+- **A Chinese/multilingual-first edge-and-cloud combination.** 47 sherpa on-device models + 5 cloud vendors out of the box; China cloud providers and Chinese on-device models are first-class citizens, not an afterthought.
 - **The interface is the core; everything is pluggable.** The base install ships only the interface + cloud (just `requests`); engines, models, and the server are all add-ons. Use an engine you haven't installed → **a friendly error with the install command**, not an `ImportError`.
 - **Learn once, use three ways.** CLI, Python library, and HTTP (OpenAI-compatible serve) — one model addressing scheme across all of them.
 - **Transparent by design.** It doesn't touch your audio or change a model's native behavior by default. Wrong format? An honest error — never silent garbage. Unsupported options warn instead of being silently dropped. Conversion and chunking are opt-in.
-- **Private.** Your audio and API keys never leave your machine — it's a library/tool, not a hosted service.
+- **Clear data boundaries.** ASRKit itself does not host or collect audio. Local models stay on-device; cloud models send audio and required credentials to the provider you select, under that provider's privacy terms.
 
 ## Batch & scripting
 
@@ -86,9 +86,9 @@ cat a.wav | asrkit transcribe  -  -m sherpa/sensevoice                       # s
 Decode sherpa online (streaming) models chunk by chunk, emitting incremental text as audio is fed:
 
 ```bash
-asrkit stream sherpa/paraformer-online meeting.wav             # live partials → stderr, final text → stdout
-asrkit stream sherpa/paraformer-online meeting.wav > out.txt   # pipe-friendly: capture final text only
-asrkit stream sherpa/sensevoice --mic                          # live microphone transcription, Ctrl-C to stop (needs asrkit[mic])
+asrkit stream sherpa/stream-paraformer-zhen meeting.wav             # live partials → stderr, final text → stdout
+asrkit stream sherpa/stream-paraformer-zhen meeting.wav > out.txt   # pipe-friendly: capture final text only
+asrkit stream sherpa/stream-paraformer-zhen --mic                  # live microphone transcription, Ctrl-C to stop (needs asrkit[mic])
 ```
 
 Only models with `streaming` in `modes` are supported (batch models get a clear error). `serve` also supports streaming: see "Run it as a server" below.
@@ -144,7 +144,7 @@ asrkit completion zsh        # bash/zsh/fish completion (model names complete dy
 
 | Engine | Install | Address | Covers |
 |---|---|---|---|
-| **sherpa-onnx** (default on-device) | `asrkit[sherpa]` | `sherpa/<model>` or bare `<model>` | 47 on-device models, 17 architectures |
+| **sherpa-onnx** (default on-device) | `asrkit[sherpa]` | `sherpa/<model>` or bare `<model>` | 47 on-device models, 16 registered `config_type` values |
 | **faster-whisper** | `asrkit[faster-whisper]` | `faster-whisper/<model>` | fast Whisper, native long-audio |
 | **whisper.cpp** | `asrkit[whispercpp]` | `whispercpp/<model>` | ultra-light Whisper (no torch/onnx) |
 | **transformers** | `asrkit[transformers]` | `transformers/<any-hf-id>` | the whole HuggingFace ASR hub + LLM-arch SOTA |
@@ -154,7 +154,7 @@ asrkit completion zsh        # bash/zsh/fish completion (model names complete dy
 
 | Vendor | Addressing | Key |
 |---|---|---|
-| SiliconFlow | `siliconflow/sensevoice` (free), `siliconflow/telespeech` | `--api-key` |
+| SiliconFlow | `siliconflow/sensevoice`, `siliconflow/telespeech` | `--api-key` |
 | OpenAI | `openai/whisper-1` | `--api-key` |
 | Alibaba DashScope | `dashscope/qwen3-asr-flash`, `dashscope/fun-asr-flash`, `dashscope/qwen-omni-plus`, `dashscope/qwen-omni-flash` | `--api-key` |
 | Volcengine / Doubao | `doubao/auc-2` (2.0 Seed), `doubao/auc-1` (1.0) | `--api-key`, or `--app-key` + `--access-key` |
@@ -162,9 +162,11 @@ asrkit completion zsh        # bash/zsh/fish completion (model names complete dy
 
 Three ways to supply a key (highest priority first): `--api-key` > env var `<VENDOR>_API_KEY` (Volcengine's dual key uses `DOUBAO_APP_KEY`/`DOUBAO_ACCESS_KEY`) > `asrkit config set-key <vendor> <KEY>` once.
 
-## Run it as a server: OpenAI-compatible endpoint
+## Run it as a server: OpenAI-compatible subset
 
-`asrkit serve` starts a local server; any app on the OpenAI SDK (or an agent, or any language) reaches every model behind it by changing one `base_url` — this is the "LiteLLM proxy" half. **The caller needs zero asrkit deps, just HTTP.**
+`asrkit serve` starts a local server. OpenAI SDK apps that use ASRKit's supported fields, agents, and ordinary HTTP clients can change `base_url` and reach registered on-device or cloud models through one endpoint. **The caller needs zero asrkit deps, just HTTP.** See the [compatibility boundary](docs/openai-compatibility.md).
+
+> **Security boundary:** the current server is for trusted local integration. It has no built-in authentication, rate limiting, or request-body limit. Do not expose it directly to the public internet or an untrusted network; add authentication, upload limits, and access control at the reverse proxy first.
 
 ```bash
 pip install 'asrkit[serve]'
@@ -178,7 +180,7 @@ c.audio.transcriptions.create(model="sherpa/sensevoice", file=open("a.wav", "rb"
 ```
 - Endpoints: `POST /v1/audio/transcriptions` (`response_format`: json/verbose_json/text/srt/vtt), `GET /v1/models`, `GET /health`.
 - Streaming: add `stream=true` to the same endpoint → `text/event-stream`, OpenAI-compatible `transcript.text.delta` (partial) / `transcript.text.done` (final) events; temp files are cleaned up automatically on disconnect. Only streaming models are supported — requesting `stream=true` on a non-streaming model errors out.
-- Cloud keys come from the `asrkit config` keystore — no per-request key needed. Transparent: raw bytes uploaded, no decoding.
+- Cloud keys can come from a **plaintext config file protected with 0600 permissions**, so no per-request key is needed; use environment variables if you do not want credentials persisted. Transparent: raw bytes uploaded, no decoding.
 
 ## Extend it
 
@@ -188,7 +190,7 @@ c.audio.transcriptions.create(model="sherpa/sensevoice", file=open("a.wav", "rb"
 asrkit add-model sherpa/my-model --url https://…/model.tar.bz2 --arch senseVoice --langs zh,en
 ```
 
-**Add an engine** — ship a small package that declares an `asrkit.adapters` entry point; `pip install` auto-registers it. No fork, no core changes. Recipe: [docs/engines-and-addressing.md](docs/engines-and-addressing.md#九扩展实操).
+**Add an engine** — ship a small package that declares an `asrkit.adapters` entry point; `pip install` auto-registers it. No fork, no core changes. Recipe: [docs/engines-and-addressing.md](docs/engines-and-addressing.md#engine-plugin-recipe).
 
 ## Design principles & boundaries
 
@@ -201,8 +203,8 @@ ASRKit is deliberately restrained — what it *doesn't* do matters as much as wh
 
 ## Docs
 
-[Usage](docs/usage.md) · [Adapter contract](docs/adapter-spec.md) · [Result contract](docs/result-contract.md) · [Engines & addressing](docs/engines-and-addressing.md) · [Model management](docs/model-management.md) · [Roadmap](docs/roadmap.md)
+[Usage](docs/usage.md) · [OpenAI compatibility boundary](docs/openai-compatibility.md) · [Adapter contract](docs/adapter-spec.md) · [Result contract](docs/result-contract.md) · [Engines & addressing](docs/engines-and-addressing.md) · [Model management](docs/model-management.md) · [Product form](docs/product-form.md) · [Embedding & distribution](docs/embedding-and-distribution.md) · [Roadmap](docs/roadmap.md)
 
 ---
 
-Apache-2.0. Each model's license is its own — verify before commercial use (`asrkit show <model>` points to the source). Your audio and keys stay on your machine.
+Apache-2.0. ASRKit does not grant model licenses; verify them on the model or provider's official page before commercial use. ASRKit itself does not host audio; cloud models send audio and required credentials to the provider you select.

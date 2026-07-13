@@ -1,70 +1,71 @@
-# ASRKit 路线图 / 待办
+# ASRKit 路线图 / 当前执行队列
 
-> 活文档:记录**尚未做**的改进与**明确不做**的决定。初期"完善三组(输出格式/config/serve)"的详细计划见
-> [roadmap-cli-completeness.md](archive/roadmap-cli-completeness.md)(已全部完成)。
-> 版本策略见 [CHANGELOG](../CHANGELOG.md):0.x 阶段功能/修复默认走 PATCH,MINOR 只留破坏性/里程碑。
-
----
-
-## 已完成(近期)
-
-- **0.5.0** 接口内核极简化(base 只留接口+云端,引擎全 opt-in)。
-- **0.5.1** 加固(一轮 fresh-eyes 评审后):serve 不再卡死 + **按 model id 缓存 adapter**(本地模型不再每请求重载)、原子写 models.json、路径穿越防御、裸文件名不崩、插件告警、云端大文件守卫。
-- **W0 · 安全网(0.5.2 已发布)**:
-  - **`pull` 多格式**:`store.pull` 按内容(magic bytes)识别 tar.{bz2,gz,xz}/纯 tar/zip,不再硬编码 bz2;`add-model --url` 给任意压缩包都能解(zip 加同款防穿越)。
-  - **CI 加固(已完成)**:`ruff`(lint)+ `mypy` 入 CI(与 test 并行);`test` job 装 `.[cloud,serve,dev]` 让 **serve 测试不再 skip** + 出覆盖率;新增 `dev` extra。顺带修 2 个真·潜在 bug(transformers `None.strip()` 崩、cli 变量遮蔽 ArgumentParser)。
-  - **最小真实 E2E(已完成)**:`tests/test_e2e.py` + `.github/workflows/e2e.yml` nightly——`pull whisper-tiny` → 用其自带 test_wavs 做真实推理 → 断言无 error 且非空。默认 skip,`ASRKIT_E2E=1` 才跑。
-- **W1 · 批量输入 + 结果契约化(未发版)**:多文件/glob/目录递归/stdin(`-`)输入;`--batch` 强制聚合;批量 `-f json`=**NDJSON**(带 `file`/`model`/`schema_version`)、新增 **csv/tsv**(11 列)、`-o <目录>` 逐文件镜像;**分级退出码** `0/1/2/3/4`(批量优先级 `1>3>4`);契约文档 `docs/result-contract.md`;sherpa metrics 补 `duration_s`。批量复用同一 adapter(本地模型不每文件重载)。
-- **W2 · 云端重试 + 下载源可自定义(未发版)**:
-  - **云端 HTTP 健壮性(已完成)**:新 `asrkit/_http.py`——线程局部 `Session` + 分级重试/退避。**成本安全**:计费转写只重 `429`+`ConnectTimeout`,不重 5xx/读超时(避免重复计费);只读 doubao 轮询重全部。`ASRKIT_HTTP_RETRIES` 可调(默认 3);429 认 `Retry-After`。doubao 改用 uuid 幂等 `X-Api-Request-Id` 并 submit/query 复用;openai/elevenlabs 补 200MB 守卫。
-  - **下载源可自定义(已完成)**:`asrkit pull <model> --url <tarball>` 一次性覆盖(限 http/https,经 install 边界透传);HF 系引擎镜像用 `HF_ENDPOINT`(底层库自理,零代码)。**不做**持久 `download-base`/镜像配置(YAGNI)。
-- **W3 · 发现 + 元数据 + 体检(0.5.3 已发布)**:
-  - **字幕落地**:whisper 家族(faster-whisper / whispercpp / openai/whisper-1)返回 `segments`,`srt/vtt` 对这些模型可用(此前全模型只报错)。
-  - **选项诚实**:显式"忽略语言提示"的模型(如 SenseVoice)传 `--language` 给 warning 而非静默丢弃;`capabilities.language_hint` 三态判读;whispercpp 现透传 `--language`。
-  - **发现**:`asrkit list --lang/--arch` 筛选、`asrkit search <term>`、`asrkit list --ids`(裸 id,供补全)。
-  - **元数据修真**:广多语模型标 `capabilities.multilingual`(`--lang X` 作候选返回);SenseVoice 语言补全为 zh/en/ja/ko/yue。
-  - **shell 补全(已完成)**:`asrkit completion <bash|zsh|fish>` 输出补全脚本(子命令 + 动态 model 名 + 格式值)。
-  - **`asrkit doctor`(已完成)**:一条命令体检引擎/密钥(只报有无)/models 目录可写/config 完整;`--net` 加下载源/云端可达。硬问题(目录不可写/config 损坏)退非零;纯只读、零新依赖、网络 opt-in。
-- **W4 · 最小流式(0.5.3 已发布)**:`asrkit stream <model> <audio>` + `api.transcribe_stream` —— 对 sherpa online 模型逐块解码、边喂边出增量文本(live→stderr 覆盖行、final→stdout 可管道);**首次行使 `PartialResult` 契约**(只用 text+is_final,committed/partial 按契约留空)——1.0 前"契约行使一次"的关卡。文件分块、零新依赖。
-- **长跑健壮性(未发版)**:doubao 录音文件识别轮询从硬编码 30s 上限改为 wall-clock deadline + 退避(默认 300s,`ASRKIT_DOUBAO_POLL_TIMEOUT_S` 可配),长音频不再必然超时;`asrkit serve` 的 adapter 缓存从无界 dict 改为有界 LRU(默认 8,`ASRKIT_SERVE_CACHE` 可配),防长跑内存无界。
-- **可观测性 + 命令面(未发版)**:
-  - **`--verbose` / 日志(P3,已完成)**:引入标准 `logging`,run/transcribe/stream/serve 支持 `-v`(INFO)/`-vv`(DEBUG);点亮 `_http` 重试、serve 请求、转写 metrics。默认静默、作为库 import 零副作用。
-  - **`asrkit engine rm`(劝告版)(P4,已完成)**:打印手动 `pip uninstall <包>` + 共享依赖警告 + 重置默认引擎(若指向它);**绝不代跑 uninstall**。命令面对称(install ↔ rm)。
-- **流式弧线完成(P3 流式扩面,未发版)**:
-  - **E · 端点检测**:sherpa online 开 `enable_endpoint_detection`(rule3=300 防连续说话硬切),`PartialResult` 的 `committed`(已定稿段)/`partial`(当前假设)由静音端点填实、长会话自动分段。
-  - **C · 麦克风**:`asrkit stream <model> --mic` 实时转写(opt-in `asrkit[mic]`,Ctrl-C 停打印最终稿);新增 `api.transcribe_stream_mic`。
-  - **D · serve 流式端点(SSE)**:`POST /v1/audio/transcriptions` 加 `stream=true` → `text/event-stream`,OpenAI 兼容 `transcript.text.delta`/`.done` 事件(delta 由端点定稿驱动);客户端断连保证清理临时文件。
-  - 四种入口(文件 W4 / 分段 E / 麦克风 C / HTTP D)共用同一条 `transcribe_stream` + `PartialResult` 契约。**剩余留后续**:词级时间戳、serve WebSocket。
+> 当前事实快照:2026-07-13,已发布版本为 0.5.4(PyPI + tag)。发布历史只以 [CHANGELOG](../CHANGELOG.md) 为准;产品边界见 [product-form.md](product-form.md)。
+> 本文是**唯一当前执行队列**。历史评审、spec 和 plan 在 [archive/](archive/) 中保留原始时点,不再作为当前待办。
 
 ---
 
-## 待办(按优先级)
+## 已完成能力
 
-> P3(流式扩面 + `--verbose`)、P4(`engine rm`)已全部完成并归档到上方"已完成"。当前无未认领的核心待办。
+- **0.5.0**:基础安装收缩为接口 + 云端,全部本地引擎改为 opt-in extras。
+- **0.5.1**:serve 线程池与 adapter 缓存、原子配置写入、路径穿越和临时资源加固。
+- **0.5.2**:批量/目录/glob/stdin、NDJSON/csv/tsv、分级退出码、成本安全 HTTP 重试、下载源覆盖和多格式模型包。
+- **0.5.3**:segments/字幕、选项诚实告警、元数据筛选、搜索/补全/doctor、最小文件流式。
+- **0.5.4**:流式端点分段、麦克风、serve SSE、日志、`engine rm`、有界 LRU、豆包长音频轮询与 `sherpa/` 寻址正名。
 
-### 后续候选(按需,均非紧要)
-
-- **词级时间戳** —— 流式/批量的 word-level timestamps(sherpa/whisper 部分支持);有明确消费者再做。
-- **serve WebSocket 流式** —— SSE 已覆盖单向流式;双向/低延迟场景才需要 WS。
-- **专家评审遗留的打磨项** —— 见 `docs/expert-review-2026-07.md`(已修的两颗炸弹除外)。
-
----
-
-## 生态方向(独立项目,非本仓库)
-
-- **asrbench —— 评测/选型工具(独立 repo,依赖 asrkit,单向)。** 顶层设计见 [asrbench-blueprint.md](asrbench-blueprint.md)(定位/方法论/研究问题/论文路径)。 让开发者在自己的音频上、端云一起横评 ASR 模型并选型。**定案:新开项目,不加进 asrkit 模块**(否则打脸"接口内核极小"的定位;依赖方向 asrbench→asrkit)。asrkit 只管跑模型出文本+延迟/RTF/成本;asrbench 管它不做的:归一化正确的 WER/CER、多维对比、数据集、报告。老的 `asr_bench`(Flutter/真机)是**只读参考**,新项目干净重构。待定三岔路:有参考 vs 无参考、输出形态(CLI 表/HTML/榜单)、面向个人选型 vs 公开榜。
-
-## 明确不做(已讨论定案,勿重复起意)
-
-- **asrkit 自动 `pip uninstall` 引擎** —— 引擎是**共享 pip 包**,asrkit 无产权,删了会连累别的项目。装可帮(装对环境)、卸归用户。
-- **为"卸引擎"引入隔离环境** —— 引擎体积小(几十 MB,torch 除外),不卸也罢;占体积的是模型,而模型 `pull`/`rm` 已对称干净。隔离得不偿失。
-- **`engine disable` 开关** —— YAGNI:引擎既然不用卸,就不需要"不删包地拔"。
-- **把 base 依赖装回去** —— 定位是"接口内核极小",引擎按需装是刻意设计,不回退。
+当前注册表:71 个模型(61 local + 10 cloud),其中 sherpa 47 个;Python/CLI/HTTP 三个入口均已落地。HTTP 兼容范围见 [openai-compatibility.md](openai-compatibility.md)。
 
 ---
 
-## 所有权模型(一句话备忘)
+## 已完成、尚未发布的工程收口
 
-- **模型 = asrkit 独占**(下到 `~/.asrkit/models`)→ `pull` / `rm` 对称、干净。
-- **引擎 = 共享 pip 包** → `asrkit engine install`(帮你装对环境)/ 卸载归 `pip uninstall`(你的环境你做主)。
-- **云端 = 内置**(仅 `requests`)。
+1. **CLI 模块拆分**:`cli.py` 已收缩为入口与分发表,实现进入 `cli_commands/`;已锁定全部 14 个命令分发、帮助/退出码、`cli.api` mock seam 和可选依赖延迟导入,源码路径全量验证通过。
+2. **`add-model --model-dir` 外部软链**:允许 models root 内的 leaf symlink 指向有效外部目录;父路径软链、递归源目录、空/`.`/`..` ID 和 runtime `model_dir` 破坏性写删仍被拒绝;`rm` 只 unlink,不完整外链不被 `pull` 覆盖。已有 CLI 端到端与安全回归测试。
+3. **让真实 E2E 不能假绿**:真实测试已移出默认单测目录并由 nightly 显式调用;使用仓库固定、注明来源与许可的 LibriSpeech 音频和规范 `sherpa/whisper-tiny` 寻址;依赖、fixture、下载或推理任一失败都会直接使任务失败,不再存在 `skip` 成功路径。
+4. **锁住薄内核**:独立子进程强制从当前 `src/` 加载代码,隔离本机配置和第三方插件,覆盖注册表、五类 adapter 构造/安装探测、CLI 列表及 `server`/`mic` 轻量导入;任何 torch/transformers/sherpa/numpy/fastapi 等可选运行时的提前 import 都会直接失败。
+5. **统一开发验证入口**:pytest 配置固定优先加载当前 `src/`,冒烟测试断言 `asrkit.__file__` 指向本 checkout,CLI 子进程显式继承源码路径;CI 统一使用 `python -m` 命令并在 Python 3.13 构建 wheel、临时安装后验证 CLI 与模型注册。
+
+以上五项已经完成、通过完整 diff review 和全量验证,但尚未进入已发布版本。当前开发焦点转入 `asrkit-cloud` 产品形态验证。
+
+## P0 · `asrkit-cloud` 产品形态验证
+
+1. 抽出 cloud-only 加载入口,明确不装入本地引擎运行时。
+2. 定义 proposed embedded 契约:`--embedded --port 0`、ready NDJSON、父进程监控、显式 data dir 和优雅关停。
+3. 增加 loopback 强制、随机 bearer token、上传上限、并发/超时与断连清理。
+4. 先用 PyInstaller/Nuitka `onedir` 构建原型,在真正无系统 Python 的干净环境验证;`onefile` 后置。
+5. 用官方 OpenAI Python/Node SDK 验证已声明的兼容子集,并真实接通至少两家中国云厂。
+6. 接入一个真实桌面应用,验证随宿主启动、退出和升级。
+
+详细规范见 [embedding-and-distribution.md](embedding-and-distribution.md)。纯 Go 第二代必须等待冻结版获得真实采用后再决定。
+
+## P1 · 交付与供应链
+
+- 补齐本地模型的 `license`/官方来源数据;商用前不能依赖当前空字段。
+- 为可下载模型补 sha256 或可信 manifest;至少对缺校验和与明文 HTTP 源给醒目警告。
+- 增加模型 URL/资产健康检查,避免 47 条手维护下载源静默腐烂。
+- 增加 Windows 验证或在支持矩阵中明确未验证;二进制目标另需 macOS/Linux/Windows 构建与签名。
+- 增加 sdist 安装 smoke、依赖安全检查和更完整的发布产物校验；wheel 安装 smoke 已在当前源码落地。
+- 建 adapter/provider conformance fixtures,约束请求、响应、错误和重试语义。
+
+## P2 · 生态与专业字段
+
+- **asrbench**:保持独立仓库、单向依赖 `asrbench -> asrkit`;启动时机服从本路线图,先做小规模中文端云验收,不直接追公开大榜。
+- 词级时间戳、`ts_ms` 和更丰富的置信度:有明确消费者后做。
+- `enable_punctuation`/`cost_estimate` 等空心字段:要么填实,要么明确标为预留,不继续扩大未兑现契约。
+- WebSocket/Realtime:当前 SSE 已覆盖单向文件流式;双向低延迟需求明确后再立项。
+- 第三方 adapter 模板、兼容测试和插件目录:在核心契约经过真实消费者验证后推进。
+
+---
+
+## 明确不做
+
+- 自动 `pip uninstall` 引擎、为卸载引擎自建隔离环境、`engine disable`。
+- 把重引擎重新塞回 base 依赖。
+- 在核心中吞入 diarization、强制对齐、自研 VAD/降噪或 GUI。
+- 没有真实用户需求时按供应商名单扩充云厂长尾。
+- 在 `asrkit-cloud` 冻结版尚未被采用前重写 Go 或开发 `asrkit-sherpa` 原生口味。
+- 由 ASRKit 自动静默更新宿主应用携带的 Sidecar。
+
+## 完成标准
+
+下一阶段不是以“新增多少模型/命令”衡量,而以这些证据衡量:源码测试真实命中当前 checkout、OpenAI 客户端替换成功、真实 provider E2E 通过、三平台分发可启动、协议无破坏漂移、外部产品完成集成。
