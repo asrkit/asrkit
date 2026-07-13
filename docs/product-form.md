@@ -10,7 +10,7 @@
 
 ## 一句话定性
 
-**asrkit = 一个"统一语音转写协议"。** 旗舰交付物是一个**轻量、OpenAI 兼容、无需用户安装或管理 Python 的自包含网关**(`asrkit-cloud`),前置所有云厂;Python 用户额外享受本地引擎的统一管理。对外身份是 **"统一 STT 界的 ffmpeg + 冒充 OpenAI 端点"**。
+**asrkit = 一个"统一语音转写协议"。** 旗舰交付物是一个**轻量、OpenAI 兼容、无需用户安装或管理 Python 的自包含网关**(`asrkitd`),前置所有云厂;Python 用户额外享受本地引擎的统一管理。对外身份是 **"统一 STT 界的 ffmpeg + 冒充 OpenAI 端点"**。
 **不追求让用户管理 Python,只追求把统一协议送到任何语言的门口。** 第一代网关可以内嵌 CPython 冻结分发;只有真实部署证明有必要时,才在不改变 HTTP 契约的前提下替换为纯 Go 运行时。
 
 ## 核心原理:统一的是"协议",不是"打包"
@@ -45,7 +45,7 @@
 
 ## 杀手级细节:OpenAI 兼容 = 到处都能插
 
-脸 B 的目标是 **OpenAI transcription API 兼容子集**。对于只使用已兼容参数、且宿主已管理 Sidecar 生命周期的产品,通常只需切换 `base_url` 和 model string,无需重写业务转写流程。已发布的 0.5.4 只有 Python `asrkit serve`;当前源码已增加 cloud-only `asrkit-cloud serve` Python 入口,自包含二进制仍是下一阶段目标。兼容范围见 [openai-compatibility.md](openai-compatibility.md)。
+脸 B 的目标是 **OpenAI transcription API 兼容子集**。对于只使用已兼容参数、且宿主已管理 Sidecar 生命周期的产品,通常只需切换 `base_url` 和 model string,无需重写业务转写流程。已发布的 0.5.4 只有 Python `asrkit serve`;当前源码已增加未来 `asrkitd` 使用的 cloud-only 构建入口,自包含二进制仍是下一阶段目标。兼容范围见 [openai-compatibility.md](openai-compatibility.md)。
 
 ## 必须画死的边界(让一切自洽的关键)
 
@@ -107,7 +107,7 @@
 
 | 口味 | 内含 | 大小 | 场景 | 工程量 |
 |---|---|---|---|---|
-| **`asrkit-cloud`** ⭐ | 仅云端(requests+fastapi,第一代内嵌 CPython) | ~20-40MB | 默认集成物,插进任何产品,只吃云;目标机器无需安装 Python | 小(PyInstaller/Nuitka 冻结) |
+| **`asrkitd`** ⭐ | 仅云端(requests+fastapi,第一代内嵌 CPython) | ~20-40MB | 默认集成物,插进任何产品,只吃云;目标机器无需安装 Python | 小(PyInstaller/Nuitka 冻结) |
 | **`asrkit-sherpa`**(可选) | 云端 + sherpa **原生库**焊入 | 大些 | 要离线+可嵌入+零 Python 的产品 | **中大**:需把 sherpa 从 Python 绑定改为调 C-API |
 | transformers/faster-whisper | —— | ⛔ 不做二进制 | torch 是 GB 级,只走 pip 渠道 | —— |
 
@@ -117,9 +117,9 @@
 |---|---|---|---|
 | 统一协议 | model string + result/error schema + OpenAI HTTP 子集 | 所有人 | 稳定的跨语言边界 |
 | Python 发行物 | `pip install asrkit` | Python 用户 | 云端 + 全部可选本地引擎 |
-| 无安装发行物 | `asrkit-cloud` 平台二进制 / Docker | Node/Go/Rust/Java/Electron/服务端 | 云端 + OpenAI 兼容网关 |
+| 无安装发行物 | `asrkitd` 平台二进制 / Docker | Node/Go/Rust/Java/Electron/服务端 | 云端 + OpenAI 兼容网关 |
 
-非 Python 应用不链接 Python ABI,也不为每种语言维护一套 ASR SDK;它把 `asrkit-cloud` 当作私有 Sidecar 子进程,通过 loopback HTTP 调用。HTTP 是跨语言 ABI,内部实现可从冻结 Python 演进为 Go 而不影响宿主应用。
+非 Python 应用不链接 Python ABI,也不为每种语言维护一套 ASR SDK;它把 `asrkitd` 当作私有 Sidecar 子进程,通过 loopback HTTP 调用。HTTP 是跨语言 ABI,内部实现可从冻结 Python 演进为 Go 而不影响宿主应用。
 
 详细的启动握手、密钥传递、平台打包、发行矩阵、安全边界与演进方案见 [嵌入与无依赖分发规范](embedding-and-distribution.md)。
 
@@ -129,7 +129,7 @@
 |---|---|---|
 | Python API/CLI | 已可用 | 持续兼容 |
 | `asrkit serve` | 已可用;需 Python + serve extra,仅适合受信任本机 | 保留为 Python 入口 |
-| `asrkit-cloud` | 0.5.4 无；当前源码已有 cloud-only Python console entry,尚未发布 | cloud-only 自包含 Sidecar |
+| `asrkitd` | 0.5.4 无；当前源码已有内部构建入口,完整 wheel 不安装同名命令 | cloud-only 自包含 Sidecar |
 | embedded ready/随机端口/父进程监控/data dir | 尚未实现 | Sidecar 必备 |
 | 网关鉴权/上传上限/并发边界 | 尚未实现 | Sidecar 发布前完成 |
 | 纯 Go runtime | 尚未立项 | 冻结版获真实采用后再评估 |
@@ -141,8 +141,8 @@
 > 以下按"先证明形态成立,再锁住优势"排序。每条含足够上下文可直接动手。
 > **动手前先看第四部分的铁律**(尤其版本号 / 提交 / 不推送)。
 
-### ① [进行中 · 高价值] 完成 embedded 边界并冻结 `asrkit-cloud`
-- **已完成**:cloud-only registry profile、`asrkit-cloud serve` Python 入口、10 云模型隔离和 wheel console entry 验证。
+### ① [进行中 · 高价值] 完成 embedded 边界并冻结 `asrkitd`
+- **已完成**:cloud-only registry profile、`asrkitd` 内部构建入口、10 云模型隔离和 wheel 命令所有权验证。
 - **接下来**:先补 `--embedded --port 0` ready/退出契约、鉴权和资源限制,再用 PyInstaller(或 Nuitka)冻成自包含 `onedir`;跑通后评估 `onefile`。
 - **怎么验**:在一个真正未安装系统 Python 的干净环境里启动,`curl` 和官方 OpenAI SDK 打通一次云端转写(`POST /v1/audio/transcriptions`)。
 - **为什么**:这是给"用户无需安装或管理 Python"这个产品形态**背书的最小验证**。跑通了,`asrkit-sherpa` 那口味要不要投工程也就有底了。

@@ -1,8 +1,8 @@
 # ASRKit 嵌入与无依赖分发规范
 
-> 状态:**目标设计,第一条 cloud-only 纵切已在当前源码实现**(2026-07-13)。本文定义非 Python 产品未来如何嵌入 `asrkit-cloud`,以及第一代冻结 Python 实现如何在不改变用户接口的前提下演进为纯 Go 运行时。
+> 状态:**目标设计,第一条 cloud-only 纵切已在当前源码实现**(2026-07-13)。本文定义非 Python 产品未来如何嵌入 `asrkitd`,以及第一代冻结 Python 实现如何在不改变用户接口的前提下演进为纯 Go 运行时。
 > 北极星与边界见 [product-form.md](product-form.md);本文只讨论云端网关的分发和集成,不改变本地引擎仍以 Python 侧为主的决定。
-> 已发布的 0.5.4 只有 Python `asrkit serve`。当前未发布源码已新增 `asrkit-cloud serve` Python console entry 和只含 10 个云模型的 registry profile,但它仍需 Python 与 `serve` extra；尚无自包含二进制、embedded 握手、网关鉴权、上传限制或父进程监控。当前 HTTP 子集见 [openai-compatibility.md](openai-compatibility.md)。
+> 已发布的 0.5.4 只有 Python `asrkit serve`。当前未发布源码已新增未来 `asrkitd` 使用的内部构建入口和只含 10 个云模型的 registry profile；完整 Python wheel 不安装 `asrkitd` 命令。尚无自包含二进制、embedded 握手、网关鉴权、上传限制或父进程监控。当前 HTTP 子集见 [openai-compatibility.md](openai-compatibility.md)。
 
 ---
 
@@ -29,7 +29,7 @@
 两个发行物
 ├── asrkit (PyPI)
 │   └── Python API + CLI + 云端 + 可选本地引擎
-└── asrkit-cloud (平台二进制 / Docker)
+└── asrkitd (平台二进制 / Docker)
     └── 云端 provider + OpenAI-compatible Sidecar
 
 两类后端
@@ -37,7 +37,7 @@
 └── 本地:默认只属于 Python 发行物;非 Python 产品用自身原生引擎
 ```
 
-`asrkit-cloud` 是非 Python 产品的**目标旗舰集成物**。当前源码中的同名命令只是 cloud-only Python 入口,用于先锁定加载边界；完成冻结分发后,宿主应用才会把自包含产物放进资源目录,启动为私有子进程,读取 ready 消息,然后用 OpenAI SDK 或普通 HTTP 调用。
+`asrkitd` 是非 Python 产品的**目标旗舰集成物**。当前源码中的 cloud-only Python 模块用于先锁定加载边界,但不向完整 wheel 注册同名命令；完成冻结分发后,宿主应用才会把 `asrkitd` 自包含产物放进资源目录,启动为私有子进程,读取 ready 消息,然后用 OpenAI SDK 或普通 HTTP 调用。
 
 ## 三、宿主集成流程
 
@@ -46,12 +46,12 @@
 ASRKit 按 OS/架构发布独立产物:
 
 ```text
-asrkit-cloud-vX.Y.Z/
-├── asrkit-cloud-darwin-arm64
-├── asrkit-cloud-darwin-x64
-├── asrkit-cloud-linux-x64
-├── asrkit-cloud-linux-arm64
-├── asrkit-cloud-windows-x64.exe
+asrkitd-vX.Y.Z/
+├── asrkitd-darwin-arm64
+├── asrkitd-darwin-x64
+├── asrkitd-linux-x64
+├── asrkitd-linux-arm64
+├── asrkitd-windows-x64.exe
 ├── SHA256SUMS
 ├── LICENSE
 └── THIRD_PARTY_NOTICES
@@ -65,7 +65,7 @@ Electron/macOS 示例:
 MyProduct.app/
 └── Contents/
     ├── MacOS/MyProduct
-    └── Resources/asrkit/asrkit-cloud
+    └── Resources/asrkit/asrkitd
 ```
 
 Windows 示例:
@@ -73,7 +73,7 @@ Windows 示例:
 ```text
 MyProduct/
 ├── MyProduct.exe
-└── resources/asrkit-cloud.exe
+└── resources/asrkitd.exe
 ```
 
 ### 3.2 启动握手
@@ -81,7 +81,7 @@ MyProduct/
 嵌入模式使用随机空闲端口,避免固定端口冲突:
 
 ```bash
-asrkit-cloud serve \
+asrkitd \
   --embedded \
   --host 127.0.0.1 \
   --port 0 \
@@ -236,7 +236,7 @@ Docker 适合服务器和内网部署,不作为桌面嵌入的默认方案。镜
 第一代使用 PyInstaller/Nuitka,只打入:
 
 ```text
-asrkit-cloud
+asrkitd
 ├── CPython runtime
 ├── requests
 ├── FastAPI/Uvicorn/python-multipart
@@ -312,13 +312,13 @@ Python/Go 两套实现通过共享 conformance fixtures 防漂移:
 - 不以 C ABI/JNI/Node addon 作为主要跨语言边界;
 - 不把 torch/Transformers/faster-whisper 塞进默认 Sidecar;
 - 不在第一步重写 Go,先证明冻结版集成形态;
-- 不在 Web/iOS/Android 客户端内放云厂密钥;这些场景应调用部署在后端的 `asrkit-cloud`;
+- 不在 Web/iOS/Android 客户端内放云厂密钥;这些场景应调用部署在后端的 `asrkitd`;
 - 不让 Sidecar 自行静默更新;
 - 不在没有真实需求前开发 `asrkit-sherpa` 原生口味。
 
 ## 十二、实施与验收顺序
 
-1. **已完成（当前源码,尚未发布）**:抽出 cloud-only 加载 profile 和 `asrkit-cloud` Python console entry;
+1. **已完成（当前源码,尚未发布）**:抽出 cloud-only 加载 profile 和 `asrkitd` 内部构建入口,完整 wheel 只安装 `asrkit`;
 2. 定义 `--embedded --port 0` 启动/ready/退出契约;
 3. 增加随机 token、上传限制、父进程监控和显式 data dir;
 4. 用 PyInstaller `onedir` 构建首个原型;

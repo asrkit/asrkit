@@ -1,4 +1,4 @@
-"""Cloud-only ASRKit gateway command-line entry point."""
+"""Cloud-only ASRKit daemon command-line entry point."""
 from __future__ import annotations
 
 import argparse
@@ -10,25 +10,21 @@ def build_parser() -> argparse.ArgumentParser:
     from . import __version__
 
     parser = argparse.ArgumentParser(
-        prog="asrkit-cloud",
-        description="Run ASRKit's cloud-only OpenAI-compatible transcription gateway.",
+        prog="asrkitd",
+        description="Run ASRKit's standalone cloud transcription service.",
     )
-    parser.add_argument("-V", "--version", action="version", version=f"asrkit-cloud {__version__}")
-    sub = parser.add_subparsers(dest="cmd")
-    serve = sub.add_parser("serve", help="run the cloud-only transcription server")
-    serve.add_argument("--host", default="127.0.0.1", help="bind host (default: 127.0.0.1, local only)")
-    serve.add_argument("--port", type=int, default=11435, help="port (default: 11435)")
-    serve.add_argument("-v", "--verbose", action="count", default=0,
-                       help="verbose logging to stderr (-v INFO, -vv DEBUG)")
+    parser.add_argument("-V", "--version", action="version", version=f"asrkitd {__version__}")
+    parser.add_argument("--host", default="127.0.0.1",
+                        help="bind host (default: 127.0.0.1, local only)")
+    parser.add_argument("--port", type=int, default=11435, help="port (default: 11435)")
+    parser.add_argument("-v", "--verbose", action="count", default=0,
+                        help="verbose logging to stderr (-v INFO, -vv DEBUG)")
     return parser
 
 
 def main(argv: Optional[list] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    if args.cmd != "serve":
-        parser.print_help()
-        return 0
 
     from . import log, registry
 
@@ -44,7 +40,7 @@ def main(argv: Optional[list] = None) -> int:
     if args.host not in ("127.0.0.1", "localhost"):
         print(f"[warn] binding to {args.host} exposes the server to the network", file=sys.stderr)
     print(
-        f"asrkit-cloud serving on http://{args.host}:{args.port}  "
+        f"asrkitd serving on http://{args.host}:{args.port}  "
         "(cloud-only, OpenAI-compatible /v1)",
         file=sys.stderr,
     )

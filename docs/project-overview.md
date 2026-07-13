@@ -42,7 +42,7 @@
 - **引擎**:`engine list/install/default/rm`(rm 为劝告版,绝不代跑 pip uninstall)。
 - **配置**:`config set-key/get-key/set/list/path`(本地明文配置 0600、展示时打码)。
 - **服务**:`serve`(OpenAI 兼容 HTTP,支持 `stream=true` SSE)。
-- **云端专用入口**:`asrkit-cloud serve`(当前源码,尚未发布)在进程首次加载前锁定 cloud profile,只暴露 10 个内置云模型；目前仍需 Python + `serve` extra,不是自包含二进制。
+- **云端独立版构建入口**:`python -m asrkit.cloud_cli`(当前源码,尚未发布)在进程首次加载前锁定 cloud profile,只暴露 10 个内置云模型；完整 wheel 不安装 `asrkitd` 命令,该名称专留给未来自包含二进制。
 - **体检**:`doctor [--net]`(引擎/密钥/models目录/config;硬问题退非零)。
 - **补全**:`completion <bash|zsh|fish>`。
 
@@ -76,7 +76,7 @@
 路由   registry.py      full/cloud 进程 profile、provider→adapter、id→meta、别名、开放 provider、插件
 引擎   engines.py       引擎清单/安装状态/默认引擎解析
 门面   api.py           transcribe/pull/run/show/remove/list_models/transcribe_stream(_mic)
-CLI    cli.py + cli_commands/   完整 Python CLI；cloud_cli.py = cloud-only serve 入口(均尚未发布)
+CLI    cli.py + cli_commands/   完整 Python CLI；cloud_cli.py = asrkitd 的内部构建入口(均尚未发布)
 体检   doctor.py        asrkit doctor —— 引擎/密钥/models目录/config 体检
 补全   completion.py    asrkit completion <bash|zsh|fish>
 日志   log.py           标准 logging 封装,-v/-vv 分级
@@ -100,7 +100,7 @@ adapters/  本地4引擎(sherpa 通吃 16 个 config_type / faster-whisper / whi
 
 - **版本纪律**:升号必人类批准,默认 PATCH;已发布(tag/PyPI)永久冻结。见 [CLAUDE 准则 / CHANGELOG]。
 - **CI 双门**:`ruff` + `mypy` + Python 3.9/3.13 测试矩阵;nightly 用固定 LibriSpeech fixture 执行 `sherpa/whisper-tiny` 的真实下载与推理,依赖/样本/下载/推理失败均为硬失败。
-- **源码与产物双验**:普通 `python -m pytest` 强制命中当前 `src/`;CI 另从 wheel 临时安装目录启动完整 CLI 与 cloud CLI,检查 console entry 元数据和内置模型注册,避免“源码绿、安装包坏”。
+- **源码与产物双验**:普通 `python -m pytest` 强制命中当前 `src/`;CI 另从 wheel 临时安装目录启动完整 CLI 与 cloud 构建入口,检查命令所有权元数据和内置模型注册,避免“源码绿、安装包坏”。
 - **全留档**:CHANGELOG、结果契约文档、每个功能波的历史 spec + plan(`docs/archive/superpowers/`)。
 - **开发流程**(W1/W2 实践):spec → Codex 评审 → 实现计划 → subagent 逐任务实现 + 两段式评审(契约+质量)→ opus 终审 → 合并。
 
@@ -114,7 +114,7 @@ adapters/  本地4引擎(sherpa 通吃 16 个 config_type / faster-whisper / whi
 1. **契约空字段**:`enable_punctuation`/`cost_estimate`/word timestamps 尚未普遍兑现。
 2. **模型供应链**:下载 URL 手维护,license/sha256 覆盖不足,缺持续健康检查。
 3. **跨平台**:常规 CI 只有 Linux;Windows 尚未验证,未来 Sidecar 还需要三平台构建与签名。
-4. **HTTP 边界**:当前 `serve` 是受信任本机服务,无内置鉴权、限流和请求体上限；cloud-only Python 入口已落地,但自包含 `asrkit-cloud` 发行物与 embedded 安全边界仍未实现。
+4. **HTTP 边界**:当前 `serve` 是受信任本机服务,无内置鉴权、限流和请求体上限；cloud-only Python 入口已落地,但自包含 `asrkitd` 发行物与 embedded 安全边界仍未实现。
 
 ### 后续候选(按需,均非紧要,与 roadmap.md 一致)
 - **词级时间戳**:流式/批量的 word-level timestamps(sherpa/whisper 部分支持);有明确消费者再做。
@@ -131,7 +131,7 @@ adapters/  本地4引擎(sherpa 通吃 16 个 config_type / faster-whisper / whi
 | W4 | 最小流式(文件入口) | 已完成(0.5.3) |
 | 流式扩面 | 端点分段(E)/ 麦克风(C)/ serve SSE(D) | 已完成(0.5.4) |
 | 工程收口 | CLI + 可信性缺口 | 已完成并评审,尚未发布 |
-| 当前 P0 | `asrkit-cloud` 形态验证 | cloud-only 入口已完成；embedded 生命周期与安全边界下一步 |
+| 当前 P0 | `asrkitd` 形态验证 | cloud-only 入口已完成；embedded 生命周期与安全边界下一步 |
 | 生态 | asrbench / 插件 conformance / 专业字段 | P0 稳定后按需启动 |
 
 **1.0 门槛**(遥远且刻意):三样"项目宪法"——model string 寻址 / adapter 契约 / CLI 核心命令——稳定且愿背书。流式契约(W4 + 流式扩面)已首次完整行使,是 1.0 前必经关的已完成项。

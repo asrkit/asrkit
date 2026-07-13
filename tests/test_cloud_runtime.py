@@ -144,7 +144,7 @@ def test_default_profile_keeps_full_registry_behavior(tmp_path: Path) -> None:
     assert json.loads(proc.stdout) == {"count": 71, "profile": "full"}
 
 
-def test_cloud_cli_module_version_uses_current_source(tmp_path: Path) -> None:
+def test_asrkitd_module_version_uses_current_source(tmp_path: Path) -> None:
     proc = subprocess.run(
         [sys.executable, "-m", "asrkit.cloud_cli", "--version"],
         cwd=tmp_path,
@@ -154,11 +154,11 @@ def test_cloud_cli_module_version_uses_current_source(tmp_path: Path) -> None:
         text=True,
     )
 
-    assert proc.stdout.strip() == "asrkit-cloud 0.5.4"
+    assert proc.stdout.strip() == "asrkitd 0.5.4"
     assert proc.stderr == ""
 
 
-def test_cloud_cli_serve_locks_profile_before_dispatch(tmp_path: Path) -> None:
+def test_asrkitd_locks_profile_before_dispatch(tmp_path: Path) -> None:
     proc = _run_child(
         """
         import json
@@ -168,7 +168,7 @@ def test_cloud_cli_serve_locks_profile_before_dispatch(tmp_path: Path) -> None:
         called = {}
         server.serve = lambda *, host, port: called.update(host=host, port=port)
 
-        assert cloud_cli.main(["serve", "--host", "127.0.0.1", "--port", "0"]) == 0
+        assert cloud_cli.main(["--host", "127.0.0.1", "--port", "0"]) == 0
         metas = registry.list_metas()
         print(json.dumps({
             "called": called,
@@ -184,7 +184,7 @@ def test_cloud_cli_serve_locks_profile_before_dispatch(tmp_path: Path) -> None:
         "count": 10,
         "profile": "cloud",
     }
-    assert "asrkit-cloud serving" in proc.stderr
+    assert "asrkitd serving" in proc.stderr
     assert "cloud-only" in proc.stderr
 
 

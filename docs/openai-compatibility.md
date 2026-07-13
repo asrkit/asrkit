@@ -56,7 +56,7 @@ data: [DONE]
 - 上传内容当前一次性读入内存后写临时文件;
 - 只适合受信任本机集成,不得直接暴露公网或不受信任网络。
 
-目标中的 `asrkit-cloud` 将在发布前补齐 embedded 鉴权、上传/并发限制、ready 握手和父进程生命周期;目标设计见 [embedding-and-distribution.md](embedding-and-distribution.md)。在这些能力落地前,它们不属于当前功能。
+目标中的 `asrkitd` 将在发布前补齐 embedded 鉴权、上传/并发限制、ready 握手和父进程生命周期;目标设计见 [embedding-and-distribution.md](embedding-and-distribution.md)。在这些能力落地前,它们不属于当前功能。
 
 ## 兼容性验证原则
 

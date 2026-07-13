@@ -53,7 +53,6 @@ dev = ["ruff", "mypy", "pytest", "pytest-cov", "httpx"]
 
 [project.scripts]
 asrkit = "asrkit.cli:main"
-asrkit-cloud = "asrkit.cloud_cli:main"
 
 [project.urls]
 Homepage = "https://github.com/asrkit/asrkit"
