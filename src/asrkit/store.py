@@ -10,6 +10,7 @@ import glob
 import hashlib
 import os
 import shutil
+import stat
 import tarfile
 import tempfile
 import urllib.request
@@ -38,17 +39,48 @@ def models_root(config: dict | None = None) -> str:
     return os.path.expanduser("~/.asrkit/models")
 
 
+def _is_within(path: str, root: str) -> bool:
+    try:
+        return os.path.commonpath((os.path.normcase(path), os.path.normcase(root))) == os.path.normcase(root)
+    except ValueError:  # Windows 跨盘符
+        return False
+
+
+def managed_model_dir(model_id: str, config: dict | None = None) -> str:
+    """返回 store 管理的模型目录；允许 leaf symlink，但拒绝父路径软链和路径穿越。"""
+    folder = model_id.split("/", 1)[-1]
+    parts = folder.replace("\\", "/").split("/")
+    root = os.path.abspath(os.path.expanduser(models_root(config)))
+    if (not folder or "\\" in folder or os.path.isabs(folder)
+            or any(part in ("", ".", "..") for part in parts)):
+        raise ValueError(f"model id '{model_id}' escapes the models root; refusing")
+
+    dest = os.path.abspath(os.path.join(root, *parts))
+    if dest == root or not _is_within(dest, root):
+        raise ValueError(f"model id '{model_id}' escapes the models root; refusing")
+
+    # root 自身可以是用户配置的 symlink；其下到 leaf 父目录之间不允许再穿过 symlink。
+    parent = os.path.dirname(dest)
+    rel_parent = os.path.relpath(parent, root)
+    current = root
+    if rel_parent != os.curdir:
+        for part in rel_parent.split(os.sep):
+            current = os.path.join(current, part)
+            try:
+                mode = os.lstat(current).st_mode
+            except FileNotFoundError:
+                continue
+            if stat.S_ISLNK(mode):
+                raise ValueError(f"model id '{model_id}' escapes the models root; refusing")
+            if not stat.S_ISDIR(mode):
+                raise ValueError(f"model id '{model_id}' has a non-directory parent; refusing")
+    return dest
+
+
 def model_dir(meta: AdapterMeta, config: dict | None = None) -> str:
     if config and config.get("model_dir"):
         return config["model_dir"]
-    folder = meta.id.split("/", 1)[-1]
-    root = models_root(config)
-    d = os.path.join(root, folder)
-    # 防御纵深：拒绝 id 里的路径穿越（如 local/../../x），否则 rm/symlink 会越界操作
-    rroot = os.path.realpath(root)
-    if os.path.realpath(d) != rroot and not os.path.realpath(d).startswith(rroot + os.sep):
-        raise ValueError(f"model id '{meta.id}' escapes the models root; refusing")
-    return d
+    return managed_model_dir(meta.id, config)
 
 
 def _install_files_ok(meta: AdapterMeta, d: str) -> bool:
@@ -89,11 +121,16 @@ def dir_size(meta: AdapterMeta, config: dict | None = None) -> int:
 
 
 def remove(meta: AdapterMeta, config: dict | None = None):
-    """删除已下载的本地模型目录，返回被删路径（未安装则 None）。"""
-    d = model_dir(meta, config)
-    if os.path.isdir(d):
-        shutil.rmtree(d, ignore_errors=True)
+    """删除 store 管理的模型；leaf symlink 只 unlink，永不删除其外部目标。"""
+    d = managed_model_dir(meta.id, config)
+    if os.path.islink(d):
+        os.unlink(d)
         return d
+    if os.path.isdir(d):
+        shutil.rmtree(d)
+        return d
+    if os.path.lexists(d):
+        raise ValueError(f"managed model path is not a directory: {d}")
     return None
 
 
@@ -174,10 +211,16 @@ def pull(meta: AdapterMeta, config: dict | None = None, log=print, *, url: str |
     """下载并安装本地模型（原子）。已装则直接返回模型目录。url 覆盖 meta.download_url（限 http/https）。"""
     if meta.source != "local":
         raise ValueError(f"{meta.id} is not a local model; no pull needed")
-    dest = model_dir(meta, config)
+    if config and config.get("model_dir"):
+        raise ValueError("model_dir is a runtime-only override; pull only writes to the managed models root")
+    dest = managed_model_dir(meta.id, config)
     if is_installed(meta, config):
         log(f"already installed: {dest}")
         return dest
+    if os.path.islink(dest):
+        raise ValueError(
+            f"{meta.id} points to an incomplete external model directory; "
+            "fix its files or remove the link before pulling")
     effective_url = url or meta.download_url
     if not effective_url:
         raise ValueError(f"{meta.id} has no download URL")
@@ -206,8 +249,12 @@ def pull(meta: AdapterMeta, config: dict | None = None, log=print, *, url: str |
             for e in entries:
                 os.rename(e, os.path.join(staging, os.path.basename(e)))
 
+        if os.path.islink(dest):
+            raise ValueError(f"refusing to replace linked model directory: {dest}")
         if os.path.isdir(dest):
-            shutil.rmtree(dest, ignore_errors=True)
+            shutil.rmtree(dest)
+        elif os.path.lexists(dest):
+            raise ValueError(f"managed model path is not a directory: {dest}")
         os.rename(staging, dest)                            # 原子换入
 
         if not _install_files_ok(meta, dest):
