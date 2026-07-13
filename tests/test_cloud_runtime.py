@@ -76,6 +76,8 @@ def test_cloud_profile_loads_only_builtin_cloud_models(tmp_path: Path) -> None:
         assert ids == {CLOUD_IDS!r}
         assert all(meta.source == "cloud" for meta in metas)
         assert registry.active_profile() == "cloud"
+        assert "asrkit.profiles.cloud" in sys.modules
+        assert "asrkit.profiles.full" not in sys.modules
         assert registry.make_adapter(
             "openai/whisper-1", {{"api_key": "test-key"}}
         ).meta.id == "openai/whisper-1"
@@ -126,6 +128,7 @@ def test_default_profile_keeps_full_registry_behavior(tmp_path: Path) -> None:
         """
         import importlib.metadata
         import json
+        import sys
 
         importlib.metadata.entry_points = lambda **kwargs: ()
 
@@ -136,6 +139,7 @@ def test_default_profile_keeps_full_registry_behavior(tmp_path: Path) -> None:
         assert len(metas) == 71
         assert "sherpa/sensevoice" in ids
         assert "openai/whisper-1" in ids
+        assert "asrkit.profiles.full" in sys.modules
         print(json.dumps({"count": len(metas), "profile": registry.active_profile()}))
         """,
         tmp_path,
@@ -146,7 +150,7 @@ def test_default_profile_keeps_full_registry_behavior(tmp_path: Path) -> None:
 
 def test_asrkitd_module_version_uses_current_source(tmp_path: Path) -> None:
     proc = subprocess.run(
-        [sys.executable, "-m", "asrkit.cloud_cli", "--version"],
+        [sys.executable, "-m", "asrkit.daemon", "--version"],
         cwd=tmp_path,
         env=_source_env(tmp_path),
         check=True,
@@ -163,15 +167,18 @@ def test_asrkitd_locks_profile_before_dispatch(tmp_path: Path) -> None:
         """
         import json
 
-        from asrkit import cloud_cli, registry, server
+        from asrkit import registry, server
+        from asrkit.daemon import cli
 
         called = {}
-        server.serve = lambda *, host, port: called.update(host=host, port=port)
+        server.serve = lambda **kwargs: called.update(kwargs)
 
-        assert cloud_cli.main(["--host", "127.0.0.1", "--port", "0"]) == 0
+        assert cli.main(["--host", "127.0.0.1", "--port", "11436"]) == 0
         metas = registry.list_metas()
         print(json.dumps({
-            "called": called,
+            "host": called["host"],
+            "port": called["port"],
+            "max_concurrency": called["max_concurrency"],
             "count": len(metas),
             "profile": registry.active_profile(),
         }))
@@ -180,7 +187,9 @@ def test_asrkitd_locks_profile_before_dispatch(tmp_path: Path) -> None:
     )
 
     assert json.loads(proc.stdout) == {
-        "called": {"host": "127.0.0.1", "port": 0},
+        "host": "127.0.0.1",
+        "port": 11436,
+        "max_concurrency": 4,
         "count": 10,
         "profile": "cloud",
     }

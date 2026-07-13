@@ -164,25 +164,8 @@ def load_builtin() -> None:
         return
     if _profile is None:
         _profile = "full"
-    if _profile == "cloud":
-        from .adapters import (  # noqa: F401
-            cloud_dashscope,
-            cloud_doubao,
-            cloud_elevenlabs,
-            cloud_openai,
-        )
-    else:
-        from .adapters import (  # noqa: F401
-            cloud_dashscope,
-            cloud_doubao,
-            cloud_elevenlabs,
-            cloud_openai,
-            local_faster_whisper,
-            local_sherpa,
-            local_transformers,
-            local_whispercpp,
-            models_local,
-        )
+    from . import profiles
+    profiles.load(_profile)
     _loaded = True           # 先置位，防止插件回调 load_builtin 造成递归
     if _profile == "full":
         _load_plugins()      # 第三方引擎插件（entry-point）

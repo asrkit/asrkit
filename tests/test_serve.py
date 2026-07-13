@@ -1,6 +1,9 @@
 """0.5.0：asrkit serve —— OpenAI 兼容端点。需 asrkit[serve]，未装则跳过。"""
 import io
+import threading
+import time
 import wave
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -61,6 +64,123 @@ def test_unknown_model_404(client):
                     data={"model": "does/not-exist"},
                     files={"file": ("a.wav", _wav_bytes(), "audio/wav")})
     assert r.status_code == 404
+
+
+def test_secure_server_auth_and_health_metadata():
+    pytest.importorskip("fastapi")
+    pytest.importorskip("multipart")
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+
+    token = "x" * 32
+    app = server.build_app(
+        auth_token=token,
+        health_info={"version": "test", "protocol_version": 1, "distribution": "cloud"},
+    )
+    with TestClient(app) as secure:
+        assert secure.get("/health").json() == {
+            "status": "ok", "version": "test",
+            "protocol_version": 1, "distribution": "cloud",
+        }
+        unauthorized = secure.get("/v1/models")
+        assert unauthorized.status_code == 401
+        assert unauthorized.json() == {"error": {"message": "unauthorized"}}
+        assert unauthorized.headers["www-authenticate"] == "Bearer"
+        assert secure.get(
+            "/v1/models", headers={"Authorization": f"Bearer {token}"}).status_code == 200
+
+
+def test_upload_limit_returns_413_and_cleans_temp_dir(tmp_path):
+    pytest.importorskip("fastapi")
+    pytest.importorskip("multipart")
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+
+    app = server.build_app(max_upload_bytes=4, temp_dir=str(tmp_path))
+    with TestClient(app) as limited:
+        response = limited.post(
+            "/v1/audio/transcriptions",
+            data={"model": "stub/echo"},
+            files={"file": ("a.wav", b"12345", "audio/wav")},
+        )
+    assert response.status_code == 413
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_request_timeout_defers_cleanup_until_worker_finishes(tmp_path, monkeypatch):
+    pytest.importorskip("fastapi")
+    pytest.importorskip("multipart")
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+
+    calls = {"n": 0}
+
+    class _Adapter:
+        def transcribe(self, audio, opts):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                time.sleep(0.05)
+            return TranscribeResult(text="done")
+
+    monkeypatch.setattr(server, "_get_adapter", lambda model: _Adapter())
+    app = server.build_app(
+        max_concurrency=1, request_timeout_s=0.01, temp_dir=str(tmp_path))
+    with TestClient(app) as timed:
+        first = timed.post(
+            "/v1/audio/transcriptions",
+            data={"model": "stub/echo"},
+            files={"file": ("a.wav", b"audio", "audio/wav")},
+        )
+        assert first.status_code == 504
+        assert list(tmp_path.iterdir()) != []
+        deadline = time.time() + 2
+        while list(tmp_path.iterdir()) and time.time() < deadline:
+            time.sleep(0.01)
+        assert list(tmp_path.iterdir()) == []
+
+        second = timed.post(
+            "/v1/audio/transcriptions",
+            data={"model": "stub/echo"},
+            files={"file": ("a.wav", b"audio", "audio/wav")},
+        )
+        assert second.status_code == 200
+
+
+def test_concurrency_limit_rejects_without_queueing(tmp_path, monkeypatch):
+    pytest.importorskip("fastapi")
+    pytest.importorskip("multipart")
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+
+    started = threading.Event()
+    release = threading.Event()
+
+    class _Adapter:
+        def transcribe(self, audio, opts):
+            started.set()
+            assert release.wait(2)
+            return TranscribeResult(text="done")
+
+    monkeypatch.setattr(server, "_get_adapter", lambda model: _Adapter())
+    app = server.build_app(
+        max_concurrency=1, request_timeout_s=5, temp_dir=str(tmp_path))
+    with TestClient(app) as limited, ThreadPoolExecutor(max_workers=1) as pool:
+        first = pool.submit(
+            limited.post,
+            "/v1/audio/transcriptions",
+            data={"model": "stub/echo"},
+            files={"file": ("a.wav", b"audio", "audio/wav")},
+        )
+        assert started.wait(2)
+        second = limited.post(
+            "/v1/audio/transcriptions",
+            data={"model": "stub/echo"},
+            files={"file": ("a.wav", b"audio", "audio/wav")},
+        )
+        assert second.status_code == 429
+        release.set()
+        assert first.result(timeout=5).status_code == 200
+    assert list(tmp_path.iterdir()) == []
 
 
 def _reset_cache():

@@ -1,8 +1,8 @@
 # ASRKit 嵌入与无依赖分发规范
 
-> 状态:**目标设计,第一条 cloud-only 纵切已在当前源码实现**(2026-07-13)。本文定义非 Python 产品未来如何嵌入 `asrkitd`,以及第一代冻结 Python 实现如何在不改变用户接口的前提下演进为纯 Go 运行时。
+> 状态:**目标设计 + 当前源码契约**(2026-07-13)。cloud-only profile、embedded 生命周期和网关安全边界已在未发布源码实现；第一代自包含构建和无系统 Python 环境验证仍未完成。
 > 北极星与边界见 [product-form.md](product-form.md);本文只讨论云端网关的分发和集成,不改变本地引擎仍以 Python 侧为主的决定。
-> 已发布的 0.5.4 只有 Python `asrkit serve`。当前未发布源码已新增未来 `asrkitd` 使用的内部构建入口和只含 10 个云模型的 registry profile；完整 Python wheel 不安装 `asrkitd` 命令。尚无自包含二进制、embedded 握手、网关鉴权、上传限制或父进程监控。当前 HTTP 子集见 [openai-compatibility.md](openai-compatibility.md)。
+> 已发布的 0.5.4 只有 Python `asrkit serve`。当前未发布源码已把 `profiles/` 与 `daemon/` 物理分开，实现只含 10 个云模型的进程 profile、embedded 握手、Bearer 鉴权、资源限制和父进程监控；完整 Python wheel 仍不安装 `asrkitd` 命令。尚无自包含二进制。当前 HTTP 子集见 [openai-compatibility.md](openai-compatibility.md)。
 
 ---
 
@@ -37,7 +37,7 @@
 └── 本地:默认只属于 Python 发行物;非 Python 产品用自身原生引擎
 ```
 
-`asrkitd` 是非 Python 产品的**目标旗舰集成物**。当前源码中的 cloud-only Python 模块用于先锁定加载边界,但不向完整 wheel 注册同名命令；完成冻结分发后,宿主应用才会把 `asrkitd` 自包含产物放进资源目录,启动为私有子进程,读取 ready 消息,然后用 OpenAI SDK 或普通 HTTP 调用。
+`asrkitd` 是非 Python 产品的**目标旗舰集成物**。当前源码模块已能验证完整的 cloud-only Sidecar 协议,但不向完整 wheel 注册同名命令；完成冻结分发后,宿主应用才会把 `asrkitd` 自包含产物放进资源目录,启动为私有子进程,读取 ready 消息,然后用 OpenAI SDK 或普通 HTTP 调用。
 
 ## 三、宿主集成流程
 
@@ -81,6 +81,7 @@ MyProduct/
 嵌入模式使用随机空闲端口,避免固定端口冲突:
 
 ```bash
+ASRKIT_GATEWAY_TOKEN=<宿主每次启动生成的至少32字符随机值> \
 asrkitd \
   --embedded \
   --host 127.0.0.1 \
@@ -89,22 +90,30 @@ asrkitd \
   --data-dir <宿主应用数据目录>
 ```
 
-目标实现启动成功后,stdout 输出一条 NDJSON 控制消息:
+当前源码实现启动成功后,stdout 输出一条 NDJSON 控制消息:
 
 ```json
 {"event":"ready","base_url":"http://127.0.0.1:52137/v1","pid":23456,"protocol_version":1}
 ```
 
-`protocol_version: 1` 在此只是**proposed 示例值**,embedded 契约冻结前不构成现有承诺。
+`protocol_version: 1` 是当前未发布源码的 embedded 协议版本；只有随正式发行物发布后才成为公开兼容承诺。
 
 约定:
 
 - stdout 仅输出 `ready`/`shutdown` 等机器控制消息;
 - 日志全部写 stderr,不得污染握手通道;
 - `--port 0` 由操作系统选择空闲端口;
+- embedded 只接受精确的 `127.0.0.1` 或 `::1`;
+- token 只从 `ASRKIT_GATEWAY_TOKEN` 读取,不得通过命令行传递;
 - `--parent-pid` 对应进程消失时 Sidecar 自动退出;
 - 宿主正常退出时主动终止 Sidecar;
 - Sidecar 应响应 SIGTERM/Windows terminate 并清理临时文件。
+
+正常退出前会输出第二条控制消息,其中 reason 当前为 `signal`、`parent_exited` 或 `server_stopped`:
+
+```json
+{"event":"shutdown","reason":"parent_exited"}
+```
 
 ### 3.3 调用
 
@@ -153,7 +162,9 @@ DOUBAO_API_KEY=<secret>
 - 父进程消失后自动退出;
 - 默认不开放公网监听,不承担多租户网关职责。
 
-当前 `serve` 在完成鉴权、上传限制等边界前,只应描述为本机集成服务,不应宣传为公网生产网关。
+当前源码默认值为单次上传 200 MiB、最多 4 个活动转写、转写请求 300 秒、优雅关停 10 秒；CLI 可在受控范围内调整。并发超额立即返回 429,上传超额返回 413,转写超时返回 504。同步厂商调用超时后,临时文件和并发槽会保留到后台调用真正结束,避免仍在读取的音频被提前删除。
+
+已发布的 `asrkit serve` 仍只应描述为受信任本机服务,不应宣传为公网生产网关；上述鉴权和资源默认值属于当前未发布的 `asrkitd` 入口。
 
 ## 五、数据目录与生命周期
 
@@ -165,9 +176,9 @@ DOUBAO_API_KEY=<secret>
 └── logs/
 ```
 
-云端发行物不下载模型权重,因此不需要 models 目录。`--data-dir` 必须由宿主显式传入,避免 Sidecar 在不同产品之间共享全局状态。
+云端发行物不下载模型权重,因此不需要 models 目录。`--data-dir` 必须由宿主显式传入,避免 Sidecar 在不同产品之间共享全局状态。POSIX 上新目录会以 0700 创建；既有目录必须已经是 0700,daemon 不会擅自修改共享目录权限。
 
-目标 Sidecar 版本随宿主产品钉死和升级,不得自行静默更新。目标健康端点至少返回:
+Sidecar 版本随宿主产品钉死和升级,不得自行静默更新。当前源码的健康端点返回:
 
 ```json
 {
@@ -180,7 +191,7 @@ DOUBAO_API_KEY=<secret>
 
 宿主只接受经过自己验证的协议版本。
 
-以上 `protocol_version` 字段和响应结构均为 proposed;当前 0.5.4 `/health` 只返回 `{"status":"ok"}`。
+以上扩展字段属于当前未发布的 `asrkitd` 源码契约；已发布的 0.5.4 `asrkit serve` 的 `/health` 仍只返回 `{"status":"ok"}`。
 
 ## 六、平台打包
 
@@ -245,7 +256,22 @@ asrkitd
 └── gateway
 ```
 
-当前源码已经新增 cloud-only profile 和命令入口,显式只加载云端 adapter；不再仅依赖“本地重依赖目前恰好懒加载”。后续拆分语言中立 catalog 与 gateway 生命周期时,建议逐步收敛到以下源码边界:
+当前源码已经形成两条可冻结边界,不再仅依赖“本地重依赖目前恰好懒加载”:
+
+```text
+asrkit/
+├── profiles/
+│   ├── full.py       # Python 完整发行形态
+│   └── cloud.py      # asrkitd 仅云端形态
+├── daemon/
+│   ├── cli.py        # 独立入口参数
+│   ├── settings.py   # 参数归一与私有环境
+│   ├── security.py   # loopback/token/data-dir 约束
+│   └── lifecycle.py  # ready/shutdown/父进程监控
+└── server.py         # 两种入口共享的 HTTP 实现
+```
+
+后续拆分语言中立 catalog 时,可逐步收敛到以下长期边界:
 
 ```text
 asrkit/
@@ -318,9 +344,9 @@ Python/Go 两套实现通过共享 conformance fixtures 防漂移:
 
 ## 十二、实施与验收顺序
 
-1. **已完成（当前源码,尚未发布）**:抽出 cloud-only 加载 profile 和 `asrkitd` 内部构建入口,完整 wheel 只安装 `asrkit`;
-2. 定义 `--embedded --port 0` 启动/ready/退出契约;
-3. 增加随机 token、上传限制、父进程监控和显式 data dir;
+1. **已完成（当前源码,尚未发布）**:抽出 `full/cloud` 加载 profile 和 `asrkitd` 内部构建入口,完整 wheel 只安装 `asrkit`;
+2. **已完成（当前源码,尚未发布）**:实现 `--embedded --port 0`、ready/shutdown NDJSON、信号退出和父进程监控;
+3. **已完成（当前源码,尚未发布）**:强制 loopback、宿主随机 token、私有 data dir、上传/并发/请求/关停边界;
 4. 用 PyInstaller `onedir` 构建首个原型;
 5. 在无系统 Python 的干净环境验证启动与转写;
 6. 用 OpenAI Python/Node SDK 跑兼容测试;

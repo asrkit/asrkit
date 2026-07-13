@@ -8,7 +8,7 @@
 |---|---|---|
 | `POST` | `/v1/audio/transcriptions` | 已实现 |
 | `GET` | `/v1/models` | 已实现,仅返回基础 model list 结构 |
-| `GET` | `/health` | 已实现,仅返回 `{"status":"ok"}` |
+| `GET` | `/health` | 已实现；`asrkit serve` 返回 status,当前源码 daemon 另含 version/protocol/distribution |
 | `POST` | `/v1/audio/translations` | 未实现 |
 | WebSocket/Realtime transcription | — | 未实现 |
 
@@ -53,10 +53,10 @@ data: [DONE]
 
 - 默认绑定 `127.0.0.1`;
 - 没有内置鉴权、限流或请求体上限;
-- 上传内容当前一次性读入内存后写临时文件;
+- 上传内容分块写入临时文件,但不限制总大小;
 - 只适合受信任本机集成,不得直接暴露公网或不受信任网络。
 
-目标中的 `asrkitd` 将在发布前补齐 embedded 鉴权、上传/并发限制、ready 握手和父进程生命周期;目标设计见 [embedding-and-distribution.md](embedding-and-distribution.md)。在这些能力落地前,它们不属于当前功能。
+当前未发布源码的 `asrkitd` 模块已经实现 embedded 鉴权、上传/并发/超时限制、ready/shutdown 握手和父进程生命周期；这些能力尚未随自包含二进制发布,不能写成 0.5.4 的发行事实。详细契约见 [embedding-and-distribution.md](embedding-and-distribution.md)。
 
 ## 兼容性验证原则
 

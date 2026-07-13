@@ -461,13 +461,23 @@ list_models() -> [AdapterMeta];  show(model) -> AdapterMeta;  remove(model, *, c
 
 ### 6.6 serve HTTP 端点（OpenAI 兼容子集）
 
-兼容范围与已知差异见 [openai-compatibility.md](openai-compatibility.md)。当前服务默认只监听回环地址，但没有内置认证、限流或请求体大小限制，并会把上传文件读入内存；不要未经外层网关保护直接暴露到公网。
+兼容范围与已知差异见 [openai-compatibility.md](openai-compatibility.md)。已发布的 `asrkit serve` 默认只监听回环地址，但没有内置认证、限流或请求体大小限制；上传会分块写入临时文件。不要未经外层网关保护直接暴露到公网。
 
 当前未发布源码另提供未来 `asrkitd` 使用的 cloud-only 构建入口。它复用相同 HTTP server,但进程只注册 10 个内置云模型,不加载本地 adapter、用户模型或第三方插件。完整 Python wheel **不会**安装 `asrkitd` 命令,从而可与未来独立产物并存；冻结完成前可用下面的模块命令做开发验证:
 
 ```bash
-python -m asrkit.cloud_cli --host 127.0.0.1 --port 11435
+python -m asrkit.daemon --host 127.0.0.1 --port 11435
 ```
+
+embedded 开发验证由宿主生成每次启动 token,默认让系统选择端口；stdout 仅有 ready/shutdown NDJSON,运行日志写 stderr:
+
+```bash
+ASRKIT_GATEWAY_TOKEN=<至少32字符随机值> \
+python -m asrkit.daemon --embedded \
+  --parent-pid <宿主PID> --data-dir <私有可写目录>
+```
+
+embedded 强制 `127.0.0.1`/`::1`,默认限制为 200 MiB 上传、4 个活动转写、300 秒转写超时和 10 秒优雅关停；除 `/health` 外均需 `Authorization: Bearer <token>`。POSIX 上既有 data dir 必须已是 0700,daemon 不会修改共享目录权限。
 
 | 端点 | 说明 |
 |---|---|
@@ -490,6 +500,7 @@ python -m asrkit.cloud_cli --host 127.0.0.1 --port 11435
 | `ASRKIT_HTTP_RETRIES` | 云端重试次数（默认 3；0 不重试） |
 | `ASRKIT_DOUBAO_POLL_TIMEOUT_S` | doubao 轮询总超时秒数（默认 300） |
 | `ASRKIT_SERVE_CACHE` | serve adapter LRU 容量（默认 8） |
+| `ASRKIT_GATEWAY_TOKEN` | 当前源码 `asrkitd` 的 Bearer token；embedded 必填且至少 32 字符 |
 | `ASRKIT_VAD_MODEL` | `--segment` 用的 VAD 模型路径 |
 | `HF_ENDPOINT` | HF 系引擎镜像（底层库自理，如 `https://hf-mirror.com`） |
 

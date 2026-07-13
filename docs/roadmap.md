@@ -24,15 +24,16 @@
 3. **让真实 E2E 不能假绿**:真实测试已移出默认单测目录并由 nightly 显式调用;使用仓库固定、注明来源与许可的 LibriSpeech 音频和规范 `sherpa/whisper-tiny` 寻址;依赖、fixture、下载或推理任一失败都会直接使任务失败,不再存在 `skip` 成功路径。
 4. **锁住薄内核**:独立子进程强制从当前 `src/` 加载代码,隔离本机配置和第三方插件,覆盖注册表、五类 adapter 构造/安装探测、CLI 列表及 `server`/`mic` 轻量导入;任何 torch/transformers/sherpa/numpy/fastapi 等可选运行时的提前 import 都会直接失败。
 5. **统一开发验证入口**:pytest 配置固定优先加载当前 `src/`,冒烟测试断言 `asrkit.__file__` 指向本 checkout,CLI 子进程显式继承源码路径;CI 统一使用 `python -m` 命令并在 Python 3.13 构建 wheel、临时安装后验证 CLI 与模型注册。
-6. **cloud-only 第一条纵切**:当前源码新增进程级 `full/cloud` registry profile 与未来 `asrkitd` 使用的内部构建入口；cloud 子进程只加载 10 个内置云模型,跳过本地 adapter、模型表、用户模型和 entry-point 插件。隔离、HTTP model list、命令分发与 wheel 命令所有权均有回归验证；这仍不是自包含二进制。
+6. **cloud-only 与 daemon 边界**:当前源码已将 `full/cloud` 加载逻辑放入独立 `profiles/`,并建立 `daemon/` 命令、安全、设置和生命周期边界；cloud 子进程只加载 10 个内置云模型,跳过本地 adapter、模型表、用户模型和 entry-point 插件。隔离、HTTP model list、命令分发与 wheel 命令所有权均有回归验证；这仍不是自包含二进制。
+7. **embedded 与安全契约**:`--embedded` 默认随机端口,通过纯 stdout NDJSON 报告 ready/shutdown；强制 loopback、宿主 token、私有 data dir、父进程监控和信号优雅退出。网关已具备 200 MiB 上传、4 并发、300 秒转写和 10 秒关停默认边界,并覆盖 401/413/429/504 与临时文件清理。
 
-以上六项已经完成但尚未进入已发布版本。当前开发焦点转入 `asrkitd` embedded 生命周期与安全边界。
+以上七项已经完成但尚未进入已发布版本。当前开发焦点转入首个可分发 `asrkitd` 冻结构建。
 
 ## P0 · `asrkitd` 产品形态验证
 
 1. **已完成（当前源码,尚未发布）**:cloud-only 加载入口与 `asrkitd` 内部构建入口；只注册 10 个内置云模型,不加载本地引擎、插件或用户模型；完整 Python wheel 只占用 `asrkit` 命令。
-2. 定义 proposed embedded 契约:`--embedded --port 0`、ready NDJSON、父进程监控、显式 data dir 和优雅关停。
-3. 增加 loopback 强制、随机 bearer token、上传上限、并发/超时与断连清理。
+2. **已完成（当前源码,尚未发布）**:embedded 契约:`--embedded --port 0`、ready/shutdown NDJSON、父进程监控、显式 data dir 和信号优雅关停。
+3. **已完成（当前源码,尚未发布）**:loopback 强制、宿主随机 bearer token、上传上限、并发/超时与断连清理。
 4. 先用 PyInstaller/Nuitka `onedir` 构建原型,在真正无系统 Python 的干净环境验证;`onefile` 后置。
 5. 用官方 OpenAI Python/Node SDK 验证已声明的兼容子集,并真实接通至少两家中国云厂。
 6. 接入一个真实桌面应用,验证随宿主启动、退出和升级。

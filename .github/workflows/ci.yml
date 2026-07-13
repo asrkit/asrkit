@@ -44,6 +44,6 @@ jobs:
           cd "$RUNNER_TEMP"
           ASRKIT_WHEEL_INSTALL="$install_dir" PYTHONPATH="$install_dir" python -c 'import os; from pathlib import Path; import asrkit; p = Path(asrkit.__file__).resolve(); root = Path(os.environ["ASRKIT_WHEEL_INSTALL"]).resolve(); assert p.is_relative_to(root), p'
           PYTHONPATH="$install_dir" python -m asrkit.cli --version
-          PYTHONPATH="$install_dir" python -m asrkit.cloud_cli --version
+          PYTHONPATH="$install_dir" python -m asrkit.daemon --version
           PYTHONPATH="$install_dir" python -m asrkit.cli list --ids | grep -Fx "sherpa/whisper-tiny"
           ASRKIT_WHEEL_INSTALL="$install_dir" PYTHONPATH="$install_dir" python -c 'import os; from importlib.metadata import distribution; from pathlib import Path; d = distribution("asrkit"); root = Path(os.environ["ASRKIT_WHEEL_INSTALL"]).resolve(); assert Path(d.locate_file("")).resolve().is_relative_to(root); scripts = {e.name: e.value for e in d.entry_points if e.group == "console_scripts"}; assert scripts == {"asrkit": "asrkit.cli:main"}'

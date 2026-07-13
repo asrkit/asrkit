@@ -45,7 +45,7 @@
 
 ## 杀手级细节:OpenAI 兼容 = 到处都能插
 
-脸 B 的目标是 **OpenAI transcription API 兼容子集**。对于只使用已兼容参数、且宿主已管理 Sidecar 生命周期的产品,通常只需切换 `base_url` 和 model string,无需重写业务转写流程。已发布的 0.5.4 只有 Python `asrkit serve`;当前源码已增加未来 `asrkitd` 使用的 cloud-only 构建入口,自包含二进制仍是下一阶段目标。兼容范围见 [openai-compatibility.md](openai-compatibility.md)。
+脸 B 的目标是 **OpenAI transcription API 兼容子集**。对于只使用已兼容参数、且宿主已管理 Sidecar 生命周期的产品,通常只需切换 `base_url` 和 model string,无需重写业务转写流程。已发布的 0.5.4 只有 Python `asrkit serve`;当前源码已具备 cloud-only daemon、embedded 生命周期与安全契约,自包含二进制仍是下一阶段目标。兼容范围见 [openai-compatibility.md](openai-compatibility.md)。
 
 ## 必须画死的边界(让一切自洽的关键)
 
@@ -130,8 +130,8 @@
 | Python API/CLI | 已可用 | 持续兼容 |
 | `asrkit serve` | 已可用;需 Python + serve extra,仅适合受信任本机 | 保留为 Python 入口 |
 | `asrkitd` | 0.5.4 无；当前源码已有内部构建入口,完整 wheel 不安装同名命令 | cloud-only 自包含 Sidecar |
-| embedded ready/随机端口/父进程监控/data dir | 尚未实现 | Sidecar 必备 |
-| 网关鉴权/上传上限/并发边界 | 尚未实现 | Sidecar 发布前完成 |
+| embedded ready/随机端口/父进程监控/data dir | 当前源码已实现并有真实子进程回归 | 随冻结产物交付 |
+| 网关鉴权/上传上限/并发/超时边界 | 当前源码已实现并有 HTTP 回归 | 随冻结产物交付 |
 | 纯 Go runtime | 尚未立项 | 冻结版获真实采用后再评估 |
 
 ---
@@ -141,9 +141,9 @@
 > 以下按"先证明形态成立,再锁住优势"排序。每条含足够上下文可直接动手。
 > **动手前先看第四部分的铁律**(尤其版本号 / 提交 / 不推送)。
 
-### ① [进行中 · 高价值] 完成 embedded 边界并冻结 `asrkitd`
-- **已完成**:cloud-only registry profile、`asrkitd` 内部构建入口、10 云模型隔离和 wheel 命令所有权验证。
-- **接下来**:先补 `--embedded --port 0` ready/退出契约、鉴权和资源限制,再用 PyInstaller(或 Nuitka)冻成自包含 `onedir`;跑通后评估 `onefile`。
+### ① [进行中 · 高价值] 冻结并验证 `asrkitd`
+- **已完成**:`profiles/`/`daemon/` 边界、10 云模型隔离、wheel 命令所有权、`--embedded --port 0` ready/退出契约、鉴权和资源限制。
+- **接下来**:用 PyInstaller(或 Nuitka)冻成自包含 `onedir`,在无系统 Python 环境完成启动和真实云转写；跑通后评估 `onefile`。
 - **怎么验**:在一个真正未安装系统 Python 的干净环境里启动,`curl` 和官方 OpenAI SDK 打通一次云端转写(`POST /v1/audio/transcriptions`)。
 - **为什么**:这是给"用户无需安装或管理 Python"这个产品形态**背书的最小验证**。跑通了,`asrkit-sherpa` 那口味要不要投工程也就有底了。
 - **注意**:先做**云端专用小包**,别一上来就想把本地引擎塞进去。serve 入口见 `src/asrkit/server.py`(fastapi,已懒加载)。
