@@ -81,4 +81,6 @@ ignore_missing_imports = true
 # —— 测试（pytest）——
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# src-layout：普通 pytest 也必须命中当前工作树，不能回落到 site-packages 的旧版本。
+pythonpath = ["src"]
 addopts = "-q"

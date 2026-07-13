@@ -1,6 +1,7 @@
 """0.1.0 冒烟测试：不依赖 sherpa-onnx（CI 轻量），覆盖注册/寻址/安全/音频守卫。"""
 import io
 import tarfile
+from pathlib import Path
 
 import pytest
 
@@ -10,6 +11,11 @@ from asrkit import audio, cli, registry, store
 
 def test_version():
     assert asrkit.__version__ == "0.5.4"
+
+
+def test_imports_current_source_checkout():
+    expected = Path(__file__).resolve().parents[1] / "src" / "asrkit" / "__init__.py"
+    assert Path(asrkit.__file__).resolve() == expected.resolve()
 
 
 def test_list_models():

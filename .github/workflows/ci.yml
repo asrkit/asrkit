@@ -15,9 +15,9 @@ jobs:
           python-version: "3.12"
       - run: pip install ruff mypy
       - name: ruff (lint)
-        run: ruff check src tests
+        run: python -m ruff check src tests e2e
       - name: mypy (types)
-        run: mypy
+        run: python -m mypy
 
   test:
     runs-on: ubuntu-latest
@@ -32,4 +32,16 @@ jobs:
       # 装 cloud + serve extras + dev（httpx/pytest-cov）：让 serve 测试不再 skip、并出覆盖率。
       # 不装 sherpa-onnx（端侧真机推理放 e2e.yml nightly / 手动）。
       - run: pip install ".[cloud,serve,dev]"
-      - run: pytest --cov=asrkit --cov-report=term-missing
+      - run: python -m pytest --cov=asrkit --cov-report=term-missing
+      - name: wheel install smoke
+        if: matrix.python-version == '3.13'
+        shell: bash
+        run: |
+          wheel_dir="$RUNNER_TEMP/asrkit-wheel"
+          install_dir="$RUNNER_TEMP/asrkit-wheel-install"
+          python -m pip wheel . --no-deps --wheel-dir "$wheel_dir"
+          python -m pip install --no-deps --target "$install_dir" "$wheel_dir"/asrkit-*.whl
+          cd "$RUNNER_TEMP"
+          ASRKIT_WHEEL_INSTALL="$install_dir" PYTHONPATH="$install_dir" python -c 'import os; from pathlib import Path; import asrkit; p = Path(asrkit.__file__).resolve(); root = Path(os.environ["ASRKIT_WHEEL_INSTALL"]).resolve(); assert p.is_relative_to(root), p'
+          PYTHONPATH="$install_dir" python -m asrkit.cli --version
+          PYTHONPATH="$install_dir" python -m asrkit.cli list --ids | grep -Fx "sherpa/whisper-tiny"
