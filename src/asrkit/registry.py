@@ -12,6 +12,7 @@ from typing import Callable, Dict, List, Optional, Type
 
 from .types import AdapterMeta, BaseAdapter
 
+
 class ModelNotFoundError(Exception):
     """未注册的模型 id / 别名（用普通异常，str() 不会像 KeyError 那样加引号）。"""
 
@@ -20,6 +21,31 @@ _PROTOCOLS: Dict[str, Type[BaseAdapter]] = {}
 _MODELS: Dict[str, AdapterMeta] = {}
 _ALIASES: Dict[str, str] = {}   # 别名 -> 真实 id
 _OPEN: Dict[str, Callable[[str], AdapterMeta]] = {}   # 开放 provider 前缀 -> factory(model_str)->AdapterMeta（如 transformers/<任意 HF id>）
+
+_PROFILES = {"full", "cloud"}
+_profile: Optional[str] = None
+
+
+def configure_profile(profile: str) -> None:
+    """在首次加载前选择进程级注册表；一旦选择，不允许在同一进程切换。"""
+    global _profile
+    if profile not in _PROFILES:
+        raise ValueError(f"unknown registry profile '{profile}'")
+    if _profile is not None:
+        if _profile != profile:
+            raise RuntimeError(
+                f"registry profile is already '{_profile}'; cannot switch to '{profile}'")
+        return
+    if _PROTOCOLS or _MODELS or _OPEN:
+        raise RuntimeError(
+            "registry already contains adapter registrations; configure the profile "
+            "before importing adapter modules")
+    _profile = profile
+
+
+def active_profile() -> str:
+    """返回本进程的注册表 profile；未显式选择时保持既有 full 行为。"""
+    return _profile or "full"
 
 
 def register_protocol(provider: str):
@@ -133,23 +159,34 @@ _loaded = False
 
 
 def load_builtin() -> None:
-    global _loaded
+    global _loaded, _profile
     if _loaded:
         return
-    from .adapters import (  # noqa: F401
-        cloud_dashscope,
-        cloud_doubao,
-        cloud_elevenlabs,
-        cloud_openai,
-        local_faster_whisper,
-        local_sherpa,
-        local_transformers,
-        local_whispercpp,
-        models_local,
-    )
+    if _profile is None:
+        _profile = "full"
+    if _profile == "cloud":
+        from .adapters import (  # noqa: F401
+            cloud_dashscope,
+            cloud_doubao,
+            cloud_elevenlabs,
+            cloud_openai,
+        )
+    else:
+        from .adapters import (  # noqa: F401
+            cloud_dashscope,
+            cloud_doubao,
+            cloud_elevenlabs,
+            cloud_openai,
+            local_faster_whisper,
+            local_sherpa,
+            local_transformers,
+            local_whispercpp,
+            models_local,
+        )
     _loaded = True           # 先置位，防止插件回调 load_builtin 造成递归
-    _load_plugins()          # 第三方引擎插件（entry-point）
-    _load_user_models()      # 用户自定义模型（~/.asrkit/models.json）
+    if _profile == "full":
+        _load_plugins()      # 第三方引擎插件（entry-point）
+        _load_user_models()  # 用户自定义模型（~/.asrkit/models.json）
 
 
 def _load_plugins() -> None:

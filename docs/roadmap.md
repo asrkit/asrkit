@@ -24,12 +24,13 @@
 3. **让真实 E2E 不能假绿**:真实测试已移出默认单测目录并由 nightly 显式调用;使用仓库固定、注明来源与许可的 LibriSpeech 音频和规范 `sherpa/whisper-tiny` 寻址;依赖、fixture、下载或推理任一失败都会直接使任务失败,不再存在 `skip` 成功路径。
 4. **锁住薄内核**:独立子进程强制从当前 `src/` 加载代码,隔离本机配置和第三方插件,覆盖注册表、五类 adapter 构造/安装探测、CLI 列表及 `server`/`mic` 轻量导入;任何 torch/transformers/sherpa/numpy/fastapi 等可选运行时的提前 import 都会直接失败。
 5. **统一开发验证入口**:pytest 配置固定优先加载当前 `src/`,冒烟测试断言 `asrkit.__file__` 指向本 checkout,CLI 子进程显式继承源码路径;CI 统一使用 `python -m` 命令并在 Python 3.13 构建 wheel、临时安装后验证 CLI 与模型注册。
+6. **cloud-only 第一条纵切**:当前源码新增进程级 `full/cloud` registry profile 与 `asrkit-cloud serve` Python console entry；cloud 子进程只加载 10 个内置云模型,跳过本地 adapter、模型表、用户模型和 entry-point 插件。隔离、HTTP model list、命令分发与 wheel entry-point 均有回归测试；这仍不是自包含二进制。
 
-以上五项已经完成、通过完整 diff review 和全量验证,但尚未进入已发布版本。当前开发焦点转入 `asrkit-cloud` 产品形态验证。
+以上六项已经完成但尚未进入已发布版本。当前开发焦点转入 `asrkit-cloud` embedded 生命周期与安全边界。
 
 ## P0 · `asrkit-cloud` 产品形态验证
 
-1. 抽出 cloud-only 加载入口,明确不装入本地引擎运行时。
+1. **已完成（当前源码,尚未发布）**:cloud-only 加载入口与 `asrkit-cloud` Python console entry；只注册 10 个内置云模型,不加载本地引擎、插件或用户模型。
 2. 定义 proposed embedded 契约:`--embedded --port 0`、ready NDJSON、父进程监控、显式 data dir 和优雅关停。
 3. 增加 loopback 强制、随机 bearer token、上传上限、并发/超时与断连清理。
 4. 先用 PyInstaller/Nuitka `onedir` 构建原型,在真正无系统 Python 的干净环境验证;`onefile` 后置。

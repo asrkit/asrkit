@@ -45,7 +45,7 @@
 
 ## 杀手级细节:OpenAI 兼容 = 到处都能插
 
-脸 B 的目标是 **OpenAI transcription API 兼容子集**。对于只使用已兼容参数、且宿主已管理 Sidecar 生命周期的产品,通常只需切换 `base_url` 和 model string,无需重写业务转写流程。当前已交付的是 Python `asrkit serve`;自包含 `asrkit-cloud` 仍是下一阶段目标,兼容范围见 [openai-compatibility.md](openai-compatibility.md)。
+脸 B 的目标是 **OpenAI transcription API 兼容子集**。对于只使用已兼容参数、且宿主已管理 Sidecar 生命周期的产品,通常只需切换 `base_url` 和 model string,无需重写业务转写流程。已发布的 0.5.4 只有 Python `asrkit serve`;当前源码已增加 cloud-only `asrkit-cloud serve` Python 入口,自包含二进制仍是下一阶段目标。兼容范围见 [openai-compatibility.md](openai-compatibility.md)。
 
 ## 必须画死的边界(让一切自洽的关键)
 
@@ -88,7 +88,8 @@
 - 独立子进程固定从当前 `src/` 加载,隔离本机配置和第三方 entry-point,覆盖内置注册表、五类 adapter 构造/安装探测、普通 CLI 列表及 `server`/`mic` 模块导入。
 - **torch/transformers/sherpa/numpy/soundfile/fastapi 等可选运行时一个都不加载**;测试同时用 import guard 主动阻断回归,不只事后检查 `sys.modules`。
 - 基础依赖 `requests` 会随云端 adapter 的 `_http` 注册路径加载,这是 base 安装契约内的允许成本;“requests 也始终懒加载”的旧描述不准确,已纠正。
-- 结论:薄内核属性已达成且有 CI 护栏;这里保证的是**可选重运行时惰性**,不是“注册表绝对零模块加载”。
+- `tests/test_cloud_runtime.py` 另用独立进程证明 cloud profile 只有 10 个云模型,不会导入本地 adapter、`models_local`、用户模型或 entry-point 插件。
+- 结论:薄内核属性已达成且有 CI 护栏;这里保证的是**可选重运行时惰性 + cloud 进程加载隔离**,不是“注册表绝对零模块加载”。
 
 ## 分发形态:模型 vs 引擎运行时的关键区分
 
@@ -124,11 +125,11 @@
 
 ### 当前可用性 vs 目标形态
 
-| 能力 | 当前(0.5.4) | 目标 |
+| 能力 | 已发布 0.5.4 / 当前源码 | 目标 |
 |---|---|---|
 | Python API/CLI | 已可用 | 持续兼容 |
 | `asrkit serve` | 已可用;需 Python + serve extra,仅适合受信任本机 | 保留为 Python 入口 |
-| `asrkit-cloud` | **尚未实现/发布** | cloud-only 自包含 Sidecar |
+| `asrkit-cloud` | 0.5.4 无；当前源码已有 cloud-only Python console entry,尚未发布 | cloud-only 自包含 Sidecar |
 | embedded ready/随机端口/父进程监控/data dir | 尚未实现 | Sidecar 必备 |
 | 网关鉴权/上传上限/并发边界 | 尚未实现 | Sidecar 发布前完成 |
 | 纯 Go runtime | 尚未立项 | 冻结版获真实采用后再评估 |
@@ -140,8 +141,9 @@
 > 以下按"先证明形态成立,再锁住优势"排序。每条含足够上下文可直接动手。
 > **动手前先看第四部分的铁律**(尤其版本号 / 提交 / 不推送)。
 
-### ① [验证 · 高价值] 冻结 `asrkit-cloud` 分发物并跑通
-- **做什么**:用 PyInstaller(或 Nuitka)把 cloud-only serve 先冻成自包含 `onedir`;跑通后再评估 `onefile`。
+### ① [进行中 · 高价值] 完成 embedded 边界并冻结 `asrkit-cloud`
+- **已完成**:cloud-only registry profile、`asrkit-cloud serve` Python 入口、10 云模型隔离和 wheel console entry 验证。
+- **接下来**:先补 `--embedded --port 0` ready/退出契约、鉴权和资源限制,再用 PyInstaller(或 Nuitka)冻成自包含 `onedir`;跑通后评估 `onefile`。
 - **怎么验**:在一个真正未安装系统 Python 的干净环境里启动,`curl` 和官方 OpenAI SDK 打通一次云端转写(`POST /v1/audio/transcriptions`)。
 - **为什么**:这是给"用户无需安装或管理 Python"这个产品形态**背书的最小验证**。跑通了,`asrkit-sherpa` 那口味要不要投工程也就有底了。
 - **注意**:先做**云端专用小包**,别一上来就想把本地引擎塞进去。serve 入口见 `src/asrkit/server.py`(fastapi,已懒加载)。

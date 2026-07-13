@@ -1,8 +1,8 @@
 # ASRKit 嵌入与无依赖分发规范
 
-> 状态:**目标设计,尚未实现**(2026-07-13)。本文定义非 Python 产品未来如何嵌入 `asrkit-cloud`,以及第一代冻结 Python 实现如何在不改变用户接口的前提下演进为纯 Go 运行时。
+> 状态:**目标设计,第一条 cloud-only 纵切已在当前源码实现**(2026-07-13)。本文定义非 Python 产品未来如何嵌入 `asrkit-cloud`,以及第一代冻结 Python 实现如何在不改变用户接口的前提下演进为纯 Go 运行时。
 > 北极星与边界见 [product-form.md](product-form.md);本文只讨论云端网关的分发和集成,不改变本地引擎仍以 Python 侧为主的决定。
-> 当前 0.5.4 只有 Python `asrkit serve`;尚无 cloud-only 二进制、embedded 握手、网关鉴权、上传限制或父进程监控。当前 HTTP 子集见 [openai-compatibility.md](openai-compatibility.md)。
+> 已发布的 0.5.4 只有 Python `asrkit serve`。当前未发布源码已新增 `asrkit-cloud serve` Python console entry 和只含 10 个云模型的 registry profile,但它仍需 Python 与 `serve` extra；尚无自包含二进制、embedded 握手、网关鉴权、上传限制或父进程监控。当前 HTTP 子集见 [openai-compatibility.md](openai-compatibility.md)。
 
 ---
 
@@ -37,7 +37,7 @@
 └── 本地:默认只属于 Python 发行物;非 Python 产品用自身原生引擎
 ```
 
-`asrkit-cloud` 是非 Python 产品的**目标旗舰集成物**。落地后,宿主应用把它放进资源目录,启动为私有子进程,读取 ready 消息,然后用 OpenAI SDK 或普通 HTTP 调用。
+`asrkit-cloud` 是非 Python 产品的**目标旗舰集成物**。当前源码中的同名命令只是 cloud-only Python 入口,用于先锁定加载边界；完成冻结分发后,宿主应用才会把自包含产物放进资源目录,启动为私有子进程,读取 ready 消息,然后用 OpenAI SDK 或普通 HTTP 调用。
 
 ## 三、宿主集成流程
 
@@ -245,7 +245,7 @@ asrkit-cloud
 └── gateway
 ```
 
-必须新增 cloud-only 入口,显式只加载云端 adapter;不能仅依赖“本地重依赖目前恰好懒加载”。建议源码边界:
+当前源码已经新增 cloud-only profile 和命令入口,显式只加载云端 adapter；不再仅依赖“本地重依赖目前恰好懒加载”。后续拆分语言中立 catalog 与 gateway 生命周期时,建议逐步收敛到以下源码边界:
 
 ```text
 asrkit/
@@ -318,7 +318,7 @@ Python/Go 两套实现通过共享 conformance fixtures 防漂移:
 
 ## 十二、实施与验收顺序
 
-1. 抽出 cloud-only 加载入口和语言中立 model catalog;
+1. **已完成（当前源码,尚未发布）**:抽出 cloud-only 加载 profile 和 `asrkit-cloud` Python console entry;
 2. 定义 `--embedded --port 0` 启动/ready/退出契约;
 3. 增加随机 token、上传限制、父进程监控和显式 data dir;
 4. 用 PyInstaller `onedir` 构建首个原型;
@@ -327,6 +327,7 @@ Python/Go 两套实现通过共享 conformance fixtures 防漂移:
 7. 接入一个真实桌面应用,验证随应用启动/退出/升级;
 8. 至少真实接通两家中国云厂;
 9. 建立 macOS/Windows/Linux 构建、签名、校验和与 smoke test;
-10. 根据真实数据决定是否开发纯 Go 第二代。
+10. 在冻结边界稳定后抽出语言中立 model catalog 和 conformance fixtures;
+11. 根据真实数据决定是否开发纯 Go 第二代。
 
 最终用户体验应始终只有五步:**随应用携带二进制 → 启动 → 读取 base URL → 用 OpenAI HTTP 调用 → 随应用退出**。

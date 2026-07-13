@@ -463,6 +463,12 @@ list_models() -> [AdapterMeta];  show(model) -> AdapterMeta;  remove(model, *, c
 
 兼容范围与已知差异见 [openai-compatibility.md](openai-compatibility.md)。当前服务默认只监听回环地址，但没有内置认证、限流或请求体大小限制，并会把上传文件读入内存；不要未经外层网关保护直接暴露到公网。
 
+当前未发布源码另提供 `asrkit-cloud serve` Python console entry。它复用相同 HTTP server,但进程只注册 10 个内置云模型,不加载本地 adapter、用户模型或第三方插件。这个入口目前仍需要 Python 和 `asrkit[serve]`;它是未来自包含 Sidecar 的加载边界,不是已经冻结好的无依赖二进制。
+
+```bash
+asrkit-cloud serve --host 127.0.0.1 --port 11435
+```
+
 | 端点 | 说明 |
 |---|---|
 | `POST /v1/audio/transcriptions` | 表单 `file/model/language/response_format/stream`；`response_format`=json/verbose_json/text/srt/vtt |

@@ -18,6 +18,7 @@
 - **薄内核回归保护**：在隔离子进程中从当前 `src/` 加载包，覆盖内置注册表、五类 adapter、安装探测、CLI 列表及 `server`/`mic` 轻量模块；主动阻断 torch、transformers、sherpa、numpy、FastAPI 等可选运行时的提前导入。
 - **nightly E2E 不再假绿**：真实推理改用仓库固定、注明 CC BY 4.0 来源的 LibriSpeech 音频；测试移出默认单测目录并由 nightly 显式调用，依赖缺失、fixture 缺失、模型下载或推理失败都直接失败，不再 `skip`。
 - **开发验证命中当前源码**：pytest 固定将 `src/` 放在导入路径首位，并断言 `asrkit.__file__` 来自当前 checkout；子进程测试显式继承源码路径，CI 统一使用 `python -m` 入口并新增 wheel 临时安装、CLI 和模型注册 smoke。
+- **cloud-only 运行入口**：新增 `asrkit-cloud serve` Python console entry；进程启动前将 registry 锁定为 `cloud` profile，只加载 10 个内置云模型和对应 adapter，明确跳过本地引擎、用户模型与第三方插件。当前入口仍需要 Python 与 `serve` extra，自包含二进制和 embedded 生命周期尚未实现。
 
 ### 修复
 - **`add-model --model-dir` 外部目录可用**：models root 内允许最后一级软链指向已有外部模型目录，`show`/运行时安装判断可正常跟随；`rm` 只 unlink 软链，绝不递归删除外部目标。
