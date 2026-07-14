@@ -1,7 +1,7 @@
 """`asrkit serve` —— OpenAI 兼容的本地转写服务（LiteLLM proxy 那一半）。
 
 暴露 `POST /v1/audio/transcriptions`、`GET /v1/models`、`GET /health`。
-默认 `asrkit serve` 暴露全部端云模型；`asrkitd` 进程只加载云端模型。
+默认 `asrkit serve` 暴露全部端云模型；`asrkit-cloud` 进程只加载云端模型。
 
 fastapi/uvicorn 走可选 extra（`pip install "asrkit[serve]"`）；本模块顶层不 import 它们，
 故基础安装导入本模块不崩，仅在真正 build_app/serve 时才需要。透明原则：上传原始字节落临时文件。

@@ -1,4 +1,4 @@
-"""asrkitd 使用的 cloud-only adapter 集。"""
+"""asrkit-cloud 使用的 cloud-only adapter 集。"""
 from __future__ import annotations
 
 

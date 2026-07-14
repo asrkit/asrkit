@@ -56,7 +56,7 @@ data: [DONE]
 - 上传内容分块写入临时文件,但不限制总大小;
 - 只适合受信任本机集成,不得直接暴露公网或不受信任网络。
 
-当前未发布源码的 `asrkitd` 模块已经实现 embedded 鉴权、上传/并发/超时限制、ready/shutdown 握手和父进程生命周期；这些能力尚未随自包含二进制发布,不能写成 0.5.4 的发行事实。详细契约见 [embedding-and-distribution.md](embedding-and-distribution.md)。
+当前未发布源码的 `asrkit-cloud` 模块已经实现 embedded 鉴权、上传/并发/超时限制、ready/shutdown 握手和父进程生命周期；这些能力尚未随自包含二进制发布,不能写成 0.5.4 的发行事实。详细契约见 [embedding-and-distribution.md](embedding-and-distribution.md)。
 
 ## 兼容性验证原则
 

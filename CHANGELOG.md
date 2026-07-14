@@ -18,7 +18,7 @@
 - **薄内核回归保护**：在隔离子进程中从当前 `src/` 加载包，覆盖内置注册表、五类 adapter、安装探测、CLI 列表及 `server`/`mic` 轻量模块；主动阻断 torch、transformers、sherpa、numpy、FastAPI 等可选运行时的提前导入。
 - **nightly E2E 不再假绿**：真实推理改用仓库固定、注明 CC BY 4.0 来源的 LibriSpeech 音频；测试移出默认单测目录并由 nightly 显式调用，依赖缺失、fixture 缺失、模型下载或推理失败都直接失败，不再 `skip`。
 - **开发验证命中当前源码**：pytest 固定将 `src/` 放在导入路径首位，并断言 `asrkit.__file__` 来自当前 checkout；子进程测试显式继承源码路径，CI 统一使用 `python -m` 入口并新增 wheel 临时安装、CLI 和模型注册 smoke。
-- **cloud-only 运行边界**：新增独立 `profiles/full.py` 与 `profiles/cloud.py`；未来 `asrkitd` 的内部构建入口在进程启动前锁定 cloud profile，只加载 10 个内置云模型和对应 adapter，明确跳过本地引擎、用户模型与第三方插件。完整 Python wheel 只安装 `asrkit`，不占用未来独立产物的 `asrkitd` 命令。
+- **cloud-only 运行边界**：新增独立 `profiles/full.py` 与 `profiles/cloud.py`；未来 `asrkit-cloud` 的内部构建入口在进程启动前锁定 cloud profile，只加载 10 个内置云模型和对应 adapter，明确跳过本地引擎、用户模型与第三方插件。完整 Python wheel 只安装 `asrkit`，不占用未来独立产物的 `asrkit-cloud` 命令。
 - **embedded 与安全契约**：建立 `daemon/` 命令、设置、安全和生命周期边界；支持随机端口 ready/shutdown NDJSON、父进程监控、SIGTERM 优雅退出、私有 data dir 与扩展健康元数据。embedded 强制 loopback 和至少 32 字符的宿主 token，并提供上传大小、活动并发、转写超时和关停超时限制；自包含二进制仍未实现。
 
 ### 修复
@@ -26,7 +26,7 @@
 - **模型路径安全**：无效来源不再写入注册表或创建断链；拒绝空模型名、`.`/`..`、父目录软链逃逸、包含目标链接的递归源目录，以及通过 runtime `model_dir` 覆盖让 `pull`/`remove` 写删外部目录。不完整外链不会被 `pull` 隐式替换。
 
 ### 文档
-- 统一当前实现、目标产品形态和历史归档的边界；新增 OpenAI HTTP 兼容子集与非 Python Sidecar 分发规范，并修正模型数量、流式示例、隐私、许可证和密钥存储等过时描述。
+- 统一当前实现、目标产品形态和历史归档的边界；新增 OpenAI HTTP 兼容子集与非 Python Sidecar 分发规范，明确单仓库多发行物和 `npm install asrkit` 的 Node/Electron 集成目标，并修正模型数量、流式示例、隐私、许可证和密钥存储等过时描述。
 
 ## [0.5.4] - 2026-07-08
 

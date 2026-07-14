@@ -27,18 +27,21 @@
 6. **cloud-only 与 daemon 边界**:当前源码已将 `full/cloud` 加载逻辑放入独立 `profiles/`,并建立 `daemon/` 命令、安全、设置和生命周期边界；cloud 子进程只加载 10 个内置云模型,跳过本地 adapter、模型表、用户模型和 entry-point 插件。隔离、HTTP model list、命令分发与 wheel 命令所有权均有回归验证；这仍不是自包含二进制。
 7. **embedded 与安全契约**:`--embedded` 默认随机端口,通过纯 stdout NDJSON 报告 ready/shutdown；强制 loopback、宿主 token、私有 data dir、父进程监控和信号优雅退出。网关已具备 200 MiB 上传、4 并发、300 秒转写和 10 秒关停默认边界,并覆盖 401/413/429/504 与临时文件清理。
 
-以上七项已经完成但尚未进入已发布版本。当前开发焦点转入首个可分发 `asrkitd` 冻结构建。
+以上七项已经完成但尚未进入已发布版本。当前开发焦点转入首个可分发 `asrkit-cloud` 冻结构建。
 
-## P0 · `asrkitd` 产品形态验证
+## P0 · `asrkit-cloud` 产品形态验证
 
-1. **已完成（当前源码,尚未发布）**:cloud-only 加载入口与 `asrkitd` 内部构建入口；只注册 10 个内置云模型,不加载本地引擎、插件或用户模型；完整 Python wheel 只占用 `asrkit` 命令。
+1. **已完成（当前源码,尚未发布）**:cloud-only 加载入口与 `asrkit-cloud` 内部构建入口；只注册 10 个内置云模型,不加载本地引擎、插件或用户模型；完整 Python wheel 只占用 `asrkit` 命令。
 2. **已完成（当前源码,尚未发布）**:embedded 契约:`--embedded --port 0`、ready/shutdown NDJSON、父进程监控、显式 data dir 和信号优雅关停。
 3. **已完成（当前源码,尚未发布）**:loopback 强制、宿主随机 bearer token、上传上限、并发/超时与断连清理。
 4. 先用 PyInstaller/Nuitka `onedir` 构建原型,在真正无系统 Python 的干净环境验证;`onefile` 后置。
-5. 用官方 OpenAI Python/Node SDK 验证已声明的兼容子集,并真实接通至少两家中国云厂。
-6. 接入一个真实桌面应用,验证随宿主启动、退出和升级。
+5. 建立 macOS arm64/x64、Windows x64、Linux glibc arm64/x64 构建和 smoke matrix;签名、SHA256、SBOM 与第三方许可证属于交付物的一部分。
+6. 在同一仓库实现 npm `asrkit` 薄 SDK,通过内部 `@asrkit/cloud-<platform>` 包按 OS/CPU/libc 携带运行时;不复制云厂 adapter,不使用首版 `postinstall` 下载。
+7. 验证 npm/pnpm、Node 和 Electron `extraResources` 集成,让产品开发者只需安装 `asrkit`,无需手工选择或管理二进制。
+8. 用官方 OpenAI Python/Node SDK 验证已声明的兼容子集,并真实接通至少两家中国云厂。
+9. 接入一个真实桌面应用,验证随宿主启动、退出和升级。
 
-详细规范见 [embedding-and-distribution.md](embedding-and-distribution.md)。纯 Go 第二代必须等待冻结版获得真实采用后再决定。
+详细规范见 [embedding-and-distribution.md](embedding-and-distribution.md)。源码保持单仓库,PyPI/npm/平台运行时/Docker 是同一项目的不同产物。纯 Go 第二代必须等待冻结版获得真实采用后再决定。
 
 ## P1 · 交付与供应链
 
@@ -46,6 +49,7 @@
 - 为可下载模型补 sha256 或可信 manifest;至少对缺校验和与明文 HTTP 源给醒目警告。
 - 增加模型 URL/资产健康检查,避免 47 条手维护下载源静默腐烂。
 - 增加 Windows 验证或在支持矩阵中明确未验证;二进制目标另需 macOS/Linux/Windows 构建与签名。
+- npm 平台包使用精确版本、平台元数据和发布 provenance;主包后发,不得指向缺失平台产物。
 - 增加 sdist 安装 smoke、依赖安全检查和更完整的发布产物校验；wheel 安装 smoke 已在当前源码落地。
 - 建 adapter/provider conformance fixtures,约束请求、响应、错误和重试语义。
 
@@ -65,9 +69,10 @@
 - 把重引擎重新塞回 base 依赖。
 - 在核心中吞入 diarization、强制对齐、自研 VAD/降噪或 GUI。
 - 没有真实用户需求时按供应商名单扩充云厂长尾。
-- 在 `asrkitd` 冻结版尚未被采用前重写 Go 或开发 `asrkit-sherpa` 原生口味。
+- 把不同发行物拆成需要同步 adapter、catalog 和契约的独立 Git 仓库。
+- 在 `asrkit-cloud` 冻结版尚未被采用前重写 Go 或开发 `asrkit-sherpa` 原生口味。
 - 由 ASRKit 自动静默更新宿主应用携带的 Sidecar。
 
 ## 完成标准
 
-下一阶段不是以“新增多少模型/命令”衡量,而以这些证据衡量:源码测试真实命中当前 checkout、OpenAI 客户端替换成功、真实 provider E2E 通过、三平台分发可启动、协议无破坏漂移、外部产品完成集成。
+下一阶段不是以“新增多少模型/命令”衡量,而以这些证据衡量:源码测试真实命中当前 checkout、OpenAI 客户端替换成功、真实 provider E2E 通过、主流平台分发可启动、`npm install asrkit` 能在 Node/Electron 完成生命周期、协议无破坏漂移、外部产品完成集成。

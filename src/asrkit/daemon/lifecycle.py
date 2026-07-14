@@ -1,4 +1,4 @@
-"""asrkitd embedded 启动握手、父进程监控与优雅退出。"""
+"""asrkit-cloud embedded 启动握手、父进程监控与优雅退出。"""
 from __future__ import annotations
 
 import asyncio
@@ -40,7 +40,7 @@ def _bound_port(uvicorn_server) -> int:
     for listener in getattr(uvicorn_server, "servers", ()):
         for sock in getattr(listener, "sockets", ()) or ():
             return int(sock.getsockname()[1])
-    raise RuntimeError("asrkitd started without a bound socket")
+    raise RuntimeError("asrkit-cloud started without a bound socket")
 
 
 async def monitor_parent(parent_pid: int, uvicorn_server, interval_s: float = 1.0) -> str:
@@ -83,7 +83,7 @@ async def _serve_embedded(settings: DaemonSettings, version: str) -> int:
     try:
         import uvicorn
     except ImportError as exc:
-        raise RuntimeError('asrkitd needs serve dependencies; install "asrkit[serve]"') from exc
+        raise RuntimeError('asrkit-cloud needs serve dependencies; install "asrkit[serve]"') from exc
 
     from .. import server
 
@@ -108,8 +108,8 @@ async def _serve_embedded(settings: DaemonSettings, version: str) -> int:
             if server_task.done():
                 error = server_task.exception()
                 if error:
-                    raise RuntimeError("asrkitd failed before becoming ready") from error
-                raise RuntimeError("asrkitd stopped before becoming ready")
+                    raise RuntimeError("asrkit-cloud failed before becoming ready") from error
+                raise RuntimeError("asrkit-cloud stopped before becoming ready")
             await asyncio.sleep(0.01)
 
         port = _bound_port(daemon)

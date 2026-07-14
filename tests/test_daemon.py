@@ -1,4 +1,4 @@
-"""asrkitd embedded 生命周期与安全配置契约。"""
+"""asrkit-cloud embedded 生命周期与安全配置契约。"""
 from __future__ import annotations
 
 import asyncio

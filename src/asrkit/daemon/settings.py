@@ -1,4 +1,4 @@
-"""asrkitd 参数归一与 embedded 配置验证。"""
+"""asrkit-cloud 参数归一与 embedded 配置验证。"""
 from __future__ import annotations
 
 import os

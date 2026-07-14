@@ -10,7 +10,7 @@
 
 ## 一句话定性
 
-**asrkit = 一个"统一语音转写协议"。** 旗舰交付物是一个**轻量、OpenAI 兼容、无需用户安装或管理 Python 的自包含网关**(`asrkitd`),前置所有云厂;Python 用户额外享受本地引擎的统一管理。对外身份是 **"统一 STT 界的 ffmpeg + 冒充 OpenAI 端点"**。
+**asrkit = 一个"统一语音转写协议"。** 跨语言底座是一个**轻量、OpenAI 兼容、无需用户安装或管理 Python 的自包含云端网关**(`asrkit-cloud`),但产品开发者应优先通过生态包接入,例如 Node/Electron 只需 `npm install asrkit`;Python 用户额外享受本地引擎的统一管理。对外身份是 **"统一 STT 界的 ffmpeg + 冒充 OpenAI 端点"**。
 **不追求让用户管理 Python,只追求把统一协议送到任何语言的门口。** 第一代网关可以内嵌 CPython 冻结分发;只有真实部署证明有必要时,才在不改变 HTTP 契约的前提下替换为纯 Go 运行时。
 
 ## 核心原理:统一的是"协议",不是"打包"
@@ -52,9 +52,10 @@
 "sherpa 不用 Python 那就别用"——这条**由消费者决定,不由 asrkit 决定**:
 
 - **Python 应用消费** → 所有引擎(含 sherpa)走 Python 绑定。反正已在 Python 里,sherpa 顺便走 Python **零额外成本**。
-- **非 Python 应用消费** → 走脸 B(HTTP 二进制),只拿**云端 + 统一**。想要本地 sherpa?它**自己原生绑 sherpa(像 Orca 那样)更优**,不该穿过 asrkit 的 Python serve。
+- **非 Python 应用消费云端** → 使用 `asrkit-cloud`,只拿**云端 + 统一协议**。
+- **非 Python 应用消费本地模型** → 宿主自己原生绑 sherpa(像 Orca 那样),或使用未来的 `asrkit-sherpa` 原生运行时;两者都不穿过 Python `asrkit serve`或 `asrkit-cloud`。
 
-> **边界:asrkit 的跨语言价值 = 云端广度 + 统一协议(经 HTTP)。本地引擎是 Python 侧的赠品,不参与跨语言。** 这条画死,"割裂感"就消失。
+> **边界:`asrkit-cloud` 的跨语言价值 = 云端广度 + 统一协议(经 HTTP)。本地原生能力必须是另一个独立运行时,不混入云端产物。**
 
 ---
 
@@ -107,19 +108,32 @@
 
 | 口味 | 内含 | 大小 | 场景 | 工程量 |
 |---|---|---|---|---|
-| **`asrkitd`** ⭐ | 仅云端(requests+fastapi,第一代内嵌 CPython) | ~20-40MB | 默认集成物,插进任何产品,只吃云;目标机器无需安装 Python | 小(PyInstaller/Nuitka 冻结) |
-| **`asrkit-sherpa`**(可选) | 云端 + sherpa **原生库**焊入 | 大些 | 要离线+可嵌入+零 Python 的产品 | **中大**:需把 sherpa 从 Python 绑定改为调 C-API |
+| **`asrkit-cloud`** ⭐ | 仅云端(requests+fastapi,第一代内嵌 CPython) | ~20-40MB | 默认集成物,插进任何产品,只吃云;目标机器无需安装 Python | 小(PyInstaller/Nuitka 冻结) |
+| **`asrkit-sherpa`**(候选) | 仅本地 sherpa 原生运行时 + ASRKit 协议适配 | 大些 | 要离线+可嵌入+零 Python 的产品 | **中大**:需直接基于 sherpa C/C++ API 实现 |
 | transformers/faster-whisper | —— | ⛔ 不做二进制 | torch 是 GB 级,只走 pip 渠道 | —— |
 
-## 最终交付定案:一份协议、两个发行物、两类后端
+### 家族命名规则
+
+- GitHub 只维护一个 `asrkit` 源码仓库,统一承载协议、adapter、各运行时源码、构建和一致性测试;
+- PyPI 与 npm 都使用 `asrkit` 作为各自生态的首要安装入口;
+- 独立运行时统一使用 `asrkit-<能力>`,如 `asrkit-cloud`、候选的 `asrkit-sherpa`和未来可能的 `asrkit-whisper`;
+- 运行时发行包与可执行命令按能力命名,但它们是同一仓库生成的不同产物,不是多个 Git 项目;
+- 内部实现目录可按职责命名(如 `daemon/`),不作为对外产品名;
+- 各发行物在用户机器上相互独立、按需安装,源码则共享协议、adapter 和契约测试,避免跨仓库同步。
+
+`asrkitd` 不再作为对外名称:它会暗示“ASRKit 唯一守护进程”,无法与今后的多运行时家族平行扩展。
+
+## 最终交付定案:一份协议、核心发行物、可扩展运行时家族
 
 | 层 | 交付物 | 面向谁 | 能力 |
 |---|---|---|---|
 | 统一协议 | model string + result/error schema + OpenAI HTTP 子集 | 所有人 | 稳定的跨语言边界 |
 | Python 发行物 | `pip install asrkit` | Python 用户 | 云端 + 全部可选本地引擎 |
-| 无安装发行物 | `asrkitd` 平台二进制 / Docker | Node/Go/Rust/Java/Electron/服务端 | 云端 + OpenAI 兼容网关 |
+| Node 发行物 | `npm install asrkit` | Node/Electron/桌面产品 | 自动选择平台运行时、管理 Sidecar、提供 JS API |
+| 云端运行时 | `asrkit-cloud` 平台产物 / Docker | npm 内部平台包、Go/Rust/Java/服务端 | 云端 + OpenAI 兼容网关 |
+| 本地原生运行时(候选) | `asrkit-sherpa` 平台二进制 | 需要离线 ASR 的非 Python 产品 | sherpa 本地模型 + 同一协议 |
 
-非 Python 应用不链接 Python ABI,也不为每种语言维护一套 ASR SDK;它把 `asrkitd` 当作私有 Sidecar 子进程,通过 loopback HTTP 调用。HTTP 是跨语言 ABI,内部实现可从冻结 Python 演进为 Go 而不影响宿主应用。
+非 Python 应用不链接 Python ABI,也不为每种语言重写云厂 adapter。Node/Electron 用户只安装 `asrkit` npm 包,由包内启动器选择并管理对应平台的 `asrkit-cloud`;其它语言可以直接携带同一平台产物并通过 loopback HTTP 调用。HTTP 是跨语言 ABI,内部实现可从冻结 Python 演进为 Go 而不影响宿主应用。
 
 详细的启动握手、密钥传递、平台打包、发行矩阵、安全边界与演进方案见 [嵌入与无依赖分发规范](embedding-and-distribution.md)。
 
@@ -129,7 +143,8 @@
 |---|---|---|
 | Python API/CLI | 已可用 | 持续兼容 |
 | `asrkit serve` | 已可用;需 Python + serve extra,仅适合受信任本机 | 保留为 Python 入口 |
-| `asrkitd` | 0.5.4 无；当前源码已有内部构建入口,完整 wheel 不安装同名命令 | cloud-only 自包含 Sidecar |
+| `asrkit-cloud` | 0.5.4 无；当前源码已有内部构建入口,完整 wheel 不安装同名命令 | cloud-only 自包含 Sidecar |
+| npm `asrkit` | 尚未实现 | 单一 Node/Electron 安装入口 + 平台运行时包 |
 | embedded ready/随机端口/父进程监控/data dir | 当前源码已实现并有真实子进程回归 | 随冻结产物交付 |
 | 网关鉴权/上传上限/并发/超时边界 | 当前源码已实现并有 HTTP 回归 | 随冻结产物交付 |
 | 纯 Go runtime | 尚未立项 | 冻结版获真实采用后再评估 |
@@ -141,9 +156,10 @@
 > 以下按"先证明形态成立,再锁住优势"排序。每条含足够上下文可直接动手。
 > **动手前先看第四部分的铁律**(尤其版本号 / 提交 / 不推送)。
 
-### ① [进行中 · 高价值] 冻结并验证 `asrkitd`
+### ① [进行中 · 高价值] 冻结并验证 `asrkit-cloud`
 - **已完成**:`profiles/`/`daemon/` 边界、10 云模型隔离、wheel 命令所有权、`--embedded --port 0` ready/退出契约、鉴权和资源限制。
 - **接下来**:用 PyInstaller(或 Nuitka)冻成自包含 `onedir`,在无系统 Python 环境完成启动和真实云转写；跑通后评估 `onefile`。
+- **随后**:在同一仓库实现 npm `asrkit` 薄 SDK和平台包,让 Node/Electron 用户不感知二进制选择、启动与关停细节。
 - **怎么验**:在一个真正未安装系统 Python 的干净环境里启动,`curl` 和官方 OpenAI SDK 打通一次云端转写(`POST /v1/audio/transcriptions`)。
 - **为什么**:这是给"用户无需安装或管理 Python"这个产品形态**背书的最小验证**。跑通了,`asrkit-sherpa` 那口味要不要投工程也就有底了。
 - **注意**:先做**云端专用小包**,别一上来就想把本地引擎塞进去。serve 入口见 `src/asrkit/server.py`(fastapi,已懒加载)。

@@ -1,4 +1,4 @@
-"""asrkitd 的本机绑定、token 与数据目录安全约束。"""
+"""asrkit-cloud 的本机绑定、token 与数据目录安全约束。"""
 from __future__ import annotations
 
 import os
@@ -14,12 +14,12 @@ MIN_TOKEN_LENGTH = 32
 
 
 class SecurityError(ValueError):
-    """不满足 asrkitd 安全约束的配置。"""
+    """不满足 asrkit-cloud 安全约束的配置。"""
 
 
 def require_loopback(host: str) -> None:
     if host not in ("127.0.0.1", "::1"):
-        raise SecurityError("asrkitd only binds to 127.0.0.1 or ::1")
+        raise SecurityError("asrkit-cloud only binds to 127.0.0.1 or ::1")
 
 
 def validate_token(token: Optional[str], *, required: bool) -> Optional[str]:

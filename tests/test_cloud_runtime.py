@@ -148,7 +148,7 @@ def test_default_profile_keeps_full_registry_behavior(tmp_path: Path) -> None:
     assert json.loads(proc.stdout) == {"count": 71, "profile": "full"}
 
 
-def test_asrkitd_module_version_uses_current_source(tmp_path: Path) -> None:
+def test_asrkit_cloud_module_version_uses_current_source(tmp_path: Path) -> None:
     proc = subprocess.run(
         [sys.executable, "-m", "asrkit.daemon", "--version"],
         cwd=tmp_path,
@@ -158,11 +158,11 @@ def test_asrkitd_module_version_uses_current_source(tmp_path: Path) -> None:
         text=True,
     )
 
-    assert proc.stdout.strip() == "asrkitd 0.5.4"
+    assert proc.stdout.strip() == "asrkit-cloud 0.5.4"
     assert proc.stderr == ""
 
 
-def test_asrkitd_locks_profile_before_dispatch(tmp_path: Path) -> None:
+def test_asrkit_cloud_locks_profile_before_dispatch(tmp_path: Path) -> None:
     proc = _run_child(
         """
         import json
@@ -193,7 +193,7 @@ def test_asrkitd_locks_profile_before_dispatch(tmp_path: Path) -> None:
         "count": 10,
         "profile": "cloud",
     }
-    assert "asrkitd serving" in proc.stderr
+    assert "asrkit-cloud serving" in proc.stderr
     assert "cloud-only" in proc.stderr
 
 

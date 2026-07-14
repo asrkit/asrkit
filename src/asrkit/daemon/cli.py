@@ -1,4 +1,4 @@
-"""asrkitd 命令入口。"""
+"""asrkit-cloud 命令入口。"""
 from __future__ import annotations
 
 import argparse
@@ -20,10 +20,10 @@ def build_parser() -> argparse.ArgumentParser:
     from .. import __version__
 
     parser = argparse.ArgumentParser(
-        prog="asrkitd",
+        prog="asrkit-cloud",
         description="Run ASRKit's standalone cloud transcription service.",
     )
-    parser.add_argument("-V", "--version", action="version", version=f"asrkitd {__version__}")
+    parser.add_argument("-V", "--version", action="version", version=f"asrkit-cloud {__version__}")
     parser.add_argument("--embedded", action="store_true",
                         help="enable machine-readable lifecycle and hardened local defaults")
     parser.add_argument("--host", default="127.0.0.1",
@@ -86,7 +86,7 @@ def main(argv: Optional[list] = None) -> int:
 
         from .. import server
         print(
-            f"asrkitd serving on http://{settings.host}:{settings.port}  "
+            f"asrkit-cloud serving on http://{settings.host}:{settings.port}  "
             "(cloud-only, OpenAI-compatible /v1)",
             file=sys.stderr,
         )
