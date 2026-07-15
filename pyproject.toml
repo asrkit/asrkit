@@ -44,6 +44,8 @@ local = ["asrkit[sherpa]"]                 # “本地默认体验” = sherpa
 engines = ["asrkit[sherpa]", "asrkit[whispercpp]", "asrkit[faster-whisper]", "asrkit[transformers]"]
 # —— 本地 OpenAI 兼容服务：asrkit serve ——
 serve = ["fastapi", "uvicorn", "python-multipart"]
+# —— asrkit-cloud 自包含 onedir 构建（不进入普通用户安装）——
+cloud-build = ["fastapi", "uvicorn", "python-multipart", "pyinstaller>=6,<7"]
 # —— 全家桶 ——
 all = ["asrkit[engines]", "asrkit[serve]"]
 # 云端内置，无需 extra；保留空别名兼容旧命令

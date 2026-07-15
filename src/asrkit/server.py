@@ -111,6 +111,11 @@ def _missing_deps_msg() -> str:
     return ('serve needs extra deps. Run: pip install "asrkit[serve]"')
 
 
+def _uvicorn_transport_options():
+    """固定为项目实际使用的 HTTP/asyncio 栈，避免探测未声明的可选加速器。"""
+    return {"loop": "asyncio", "http": "h11", "ws": "none"}
+
+
 def build_app(*, auth_token=None, max_upload_bytes=None, max_concurrency=None,
               request_timeout_s=None, temp_dir=None, health_info=None):
     """构造并返回 FastAPI app（延迟 import；缺依赖抛友好 RuntimeError）。"""
@@ -367,7 +372,7 @@ def serve(host: str = "127.0.0.1", port: int = 11435,
     except ImportError as e:
         raise RuntimeError(_missing_deps_msg()) from e
     app = build_app(**app_options)
-    options = {}
+    options = _uvicorn_transport_options()
     if shutdown_timeout_s is not None:
         options["timeout_graceful_shutdown"] = shutdown_timeout_s
     uvicorn.run(app, host=host, port=port, **options)

@@ -1,8 +1,8 @@
 # ASRKit 嵌入与无依赖分发规范
 
-> 状态:**目标设计 + 当前源码契约**(2026-07-14)。cloud-only profile、embedded 生命周期和网关安全边界已在未发布源码实现；第一代自包含构建、npm 入口和无系统 Python 环境验证仍未完成。
+> 状态:**目标设计 + 当前源码契约**(2026-07-15)。cloud-only profile、embedded 生命周期、网关安全边界和 macOS arm64 PyInstaller `onedir` 原型已在未发布源码实现；真正无 Python 的干净宿主、真实云转写、跨平台发行和 npm 入口仍未完成。
 > 北极星与边界见 [product-form.md](product-form.md);本文只讨论云端网关的分发和集成,不改变本地引擎仍以 Python 侧为主的决定。
-> 已发布的 0.5.4 只有 Python `asrkit serve`。当前未发布源码已把 `profiles/` 与 `daemon/` 物理分开，实现只含 10 个云模型的进程 profile、embedded 握手、Bearer 鉴权、资源限制和父进程监控；完整 Python wheel 仍不安装 `asrkit-cloud` 命令。尚无自包含二进制。当前 HTTP 子集见 [openai-compatibility.md](openai-compatibility.md)。
+> 已发布的 0.5.4 只有 Python `asrkit serve`。当前未发布源码已把 `profiles/` 与 `daemon/` 物理分开，实现只含 10 个云模型的进程 profile、embedded 握手、Bearer 鉴权、资源限制和父进程监控；完整 Python wheel 仍不安装 `asrkit-cloud` 命令。仓库现可构建自包含原型,但尚无正式发布的二进制。当前 HTTP 子集见 [openai-compatibility.md](openai-compatibility.md)。
 
 ---
 
@@ -404,6 +404,8 @@ asrkit/
 
 PyInstaller `onedir` 更容易诊断且启动稳定,原型优先使用;跑通后再评估 `onefile`。物理上一个目录同样满足“无需安装和管理依赖”。
 
+当前原型通过 `python packaging/cloud/bootstrap.py` 构建。bootstrap 在已忽略的 `build/` 下创建隔离 venv,避免开发机已有的可选包进入产物；spec 排除完整 CLI、本地 adapter 及 Torch/Sherpa/Numpy 等重依赖,并将 Uvicorn 固定为 asyncio+h11 的纯 HTTP 栈。2026-07-15 的 macOS arm64 本机证据为约 32 MiB/84 文件,动态库无开发机绝对路径引用；详细命令和 smoke 边界见 [`packaging/cloud/README.md`](../packaging/cloud/README.md)。这只是原型证据,不能代替真正无 Python 的干净机器、签名公证和真实 provider 转写。
+
 ## 九、第二代:可选纯 Go 运行时
 
 只有以下证据出现后才值得重写:
@@ -470,7 +472,7 @@ Python/Go 两套实现通过共享 conformance fixtures 防漂移:
 1. **已完成（当前源码,尚未发布）**:抽出 `full/cloud` 加载 profile 和 `asrkit-cloud` 内部构建入口,完整 wheel 只安装 `asrkit`;
 2. **已完成（当前源码,尚未发布）**:实现 `--embedded --port 0`、ready/shutdown NDJSON、信号退出和父进程监控;
 3. **已完成（当前源码,尚未发布）**:强制 loopback、宿主随机 token、私有 data dir、上传/并发/请求/关停边界;
-4. 用 PyInstaller `onedir` 构建首个原型;
+4. **已完成（macOS arm64 本机原型）**:用隔离 venv 和 PyInstaller `onedir` 构建,并通过干净子进程 smoke;
 5. 在无系统 Python 的干净环境验证启动与转写;
 6. 建立 macOS arm64/x64、Windows x64、Linux glibc arm64/x64 构建、签名、校验和与 smoke test;
 7. 在同一仓库新增 npm `asrkit` 薄 SDK 和内部平台包,封装选择、启动、ready、调用与关停;

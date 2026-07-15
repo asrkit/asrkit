@@ -97,6 +97,7 @@ async def _serve_embedded(settings: DaemonSettings, version: str) -> int:
         port=settings.port,
         access_log=False,
         timeout_graceful_shutdown=settings.shutdown_timeout_s,
+        **server._uvicorn_transport_options(),
     )
     daemon = _embedded_server_type(uvicorn)(config)
     server_task = asyncio.create_task(daemon.serve())

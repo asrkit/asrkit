@@ -17,7 +17,6 @@ def client(monkeypatch):
     pytest.importorskip("multipart")  # python-multipart
     pytest.importorskip("httpx")      # TestClient 依赖（CI 装 asrkit[dev] 提供）
     from fastapi.testclient import TestClient
-    from asrkit import server
 
     # 注册一个 stub adapter/模型，避免真实推理
     @registry.register_protocol("stub-serve")
@@ -29,6 +28,14 @@ def client(monkeypatch):
         id="stub/echo", provider="stub-serve", vendor="stub", name="Stub",
         source="cloud", modes=["batch"], langs=["en"]))
     return TestClient(server.build_app())
+
+
+def test_uvicorn_transport_is_explicit_and_http_only():
+    assert server._uvicorn_transport_options() == {
+        "loop": "asyncio",
+        "http": "h11",
+        "ws": "none",
+    }
 
 
 def _wav_bytes():
