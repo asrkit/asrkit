@@ -1,4 +1,5 @@
 """0.5.0：asrkit serve —— OpenAI 兼容端点。需 asrkit[serve]，未装则跳过。"""
+import asyncio
 import io
 import threading
 import time
@@ -36,6 +37,26 @@ def test_uvicorn_transport_is_explicit_and_http_only():
         "http": "h11",
         "ws": "none",
     }
+
+
+def test_request_limiter_creates_semaphore_inside_running_loop(monkeypatch):
+    created = []
+    semaphore = asyncio.Semaphore
+
+    def tracked(limit):
+        created.append(limit)
+        return semaphore(limit)
+
+    monkeypatch.setattr(server.asyncio, "Semaphore", tracked)
+    limiter = server._RequestLimiter(2)
+    assert created == []
+
+    async def acquire_and_release():
+        assert await limiter.try_acquire() is True
+        limiter.release()
+
+    asyncio.run(acquire_and_release())
+    assert created == [2]
 
 
 def _wav_bytes():

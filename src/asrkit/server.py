@@ -44,9 +44,13 @@ class _RequestLimiter:
     """立即拒绝超额请求；不建立无界等待队列。"""
 
     def __init__(self, limit):
-        self._semaphore = asyncio.Semaphore(limit) if limit else None
+        self._limit = limit
+        self._semaphore = None
 
     async def try_acquire(self):
+        if self._limit and self._semaphore is None:
+            # Python 3.9 的 Semaphore 构造时就绑定事件循环，必须延迟到请求协程内。
+            self._semaphore = asyncio.Semaphore(self._limit)
         if self._semaphore is None:
             return True
         if self._semaphore.locked():

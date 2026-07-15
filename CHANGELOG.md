@@ -24,6 +24,7 @@
 - **Linux 无 Python 验证入口**：新增 Linux x64 GitHub Actions 构建与 Debian clean-container smoke；目标容器明确不含 `python`/`python3`,以只读根目录和最小权限验证 embedded HTTP 生命周期，并生成可复现 tar.gz、SHA256 和临时 CI artifact。首次远端运行、真实云转写、正式签名/SBOM/许可证清单仍待完成。
 
 ### 修复
+- **Python 3.9 serve 事件循环兼容**：请求限流器不再于 `build_app()` 阶段提前创建并绑定 `asyncio.Semaphore`，改为首次请求时在运行中的事件循环内懒创建；避免前序测试或宿主关闭默认 loop 后构建应用时报 `There is no current event loop`。
 - **`add-model --model-dir` 外部目录可用**：models root 内允许最后一级软链指向已有外部模型目录，`show`/运行时安装判断可正常跟随；`rm` 只 unlink 软链，绝不递归删除外部目标。
 - **模型路径安全**：无效来源不再写入注册表或创建断链；拒绝空模型名、`.`/`..`、父目录软链逃逸、包含目标链接的递归源目录，以及通过 runtime `model_dir` 覆盖让 `pull`/`remove` 写删外部目录。不完整外链不会被 `pull` 隐式替换。
 
