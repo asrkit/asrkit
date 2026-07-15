@@ -157,8 +157,8 @@
 > **动手前先看第四部分的铁律**(尤其版本号 / 提交 / 不推送)。
 
 ### ① [进行中 · 高价值] 冻结并验证 `asrkit-cloud`
-- **已完成**:`profiles/`/`daemon/` 边界、10 云模型隔离、wheel 命令所有权、`--embedded --port 0` ready/退出契约、鉴权和资源限制；macOS arm64 已用隔离 venv 构建约 32 MiB 的 PyInstaller `onedir`,并通过无开发环境 PATH 的 frozen smoke。
-- **接下来**:在真正未安装系统 Python 的干净宿主完成启动和真实云转写,随后建立 macOS x64、Windows x64、Linux glibc arm64/x64 构建矩阵；`onefile` 后置。
+- **已完成**:`profiles/`/`daemon/` 边界、10 云模型隔离、wheel 命令所有权、`--embedded --port 0` ready/退出契约、鉴权和资源限制；macOS arm64 已用隔离 venv 构建约 32 MiB 的 PyInstaller `onedir`,Linux x64 已在无 Python 的只读 Debian 容器通过完整 HTTP/生命周期 smoke。
+- **接下来**:以受控密钥完成真实云转写,随后建立 macOS x64、Windows x64、Linux glibc arm64/x64 构建矩阵；`onefile` 后置。
 - **随后**:在同一仓库实现 npm `asrkit` 薄 SDK和平台包,让 Node/Electron 用户不感知二进制选择、启动与关停细节。
 - **怎么验**:在一个真正未安装系统 Python 的干净环境里启动,`curl` 和官方 OpenAI SDK 打通一次云端转写(`POST /v1/audio/transcriptions`)。
 - **为什么**:这是给"用户无需安装或管理 Python"这个产品形态**背书的最小验证**。跑通了,`asrkit-sherpa` 那口味要不要投工程也就有底了。

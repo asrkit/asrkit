@@ -28,7 +28,7 @@
 7. **embedded 与安全契约**:`--embedded` 默认随机端口,通过纯 stdout NDJSON 报告 ready/shutdown；强制 loopback、宿主 token、私有 data dir、父进程监控和信号优雅退出。网关已具备 200 MiB 上传、4 并发、300 秒转写和 10 秒关停默认边界,并覆盖 401/413/429/504 与临时文件清理。
 8. **macOS arm64 冻结原型**:已建立隔离 venv、PyInstaller `onedir` spec、自定义 Uvicorn HTTP hook 和冻结产物 smoke；约 32 MiB 的本地产物已在清除 Python/Conda/ASRKit 环境并收缩 PATH 的子进程中通过 version/help、ready/shutdown、health、鉴权、10 云模型和父进程退出验证。产物不包含本地 adapter 或其重依赖,动态库无开发机绝对路径引用。
 
-以上八项已经完成但尚未进入已发布版本。当前开发焦点转入真正干净宿主和跨平台的 `asrkit-cloud` 发行验证。
+以上八项已经完成但尚未进入已发布版本。Linux x64 已进一步取得无 Python 干净宿主证据；当前开发焦点转入真实云转写和其余平台的发行验证。
 
 ## P0 · `asrkit-cloud` 产品形态验证
 
@@ -36,7 +36,7 @@
 2. **已完成（当前源码,尚未发布）**:embedded 契约:`--embedded --port 0`、ready/shutdown NDJSON、父进程监控、显式 data dir 和信号优雅关停。
 3. **已完成（当前源码,尚未发布）**:loopback 强制、宿主随机 bearer token、上传上限、并发/超时与断连清理。
 4. **已完成（macOS arm64 本机原型）**:用隔离环境构建 PyInstaller `onedir`,以干净子进程 smoke 锁定运行目录、HTTP 栈、cloud-only 模型和 embedded 生命周期；`onefile` 后置。
-5. **自动化入口已完成,远端证据待跑**:Linux x64 工作流会构建 onedir,放入不含 Python 的只读 Debian 容器验证完整 embedded HTTP 生命周期,并生成可复现 tar.gz 与 SHA256；仍需在远端 runner 首次跑通,并以受控密钥完成至少一次真实云转写。
+5. **Linux x64 无 Python 验证已完成**:GitHub Actions [run 29396109425](https://github.com/asrkit/asrkit/actions/runs/29396109425) 已构建 onedir,并在不含 Python 的只读 Debian 容器通过完整 embedded HTTP 生命周期；可复现 tar.gz、SHA256 和临时 artifact 均已生成。仍需以受控密钥完成真实云转写,并验证其余平台。
 6. 建立 macOS arm64/x64、Windows x64、Linux glibc arm64/x64 构建和 smoke matrix;签名、SHA256、SBOM 与第三方许可证属于交付物的一部分。
 7. 在同一仓库实现 npm `asrkit` 薄 SDK,通过内部 `@asrkit/cloud-<platform>` 包按 OS/CPU/libc 携带运行时;不复制云厂 adapter,不使用首版 `postinstall` 下载。
 8. 验证 npm/pnpm、Node 和 Electron `extraResources` 集成,让产品开发者只需安装 `asrkit`,无需手工选择或管理二进制。

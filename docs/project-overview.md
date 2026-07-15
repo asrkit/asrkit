@@ -114,7 +114,7 @@ adapters/  本地4引擎(sherpa 通吃 16 个 config_type / faster-whisper / whi
 1. **契约空字段**:`enable_punctuation`/`cost_estimate`/word timestamps 尚未普遍兑现。
 2. **模型供应链**:下载 URL 手维护,license/sha256 覆盖不足,缺持续健康检查。
 3. **跨平台**:常规 CI 只有 Linux;Windows 尚未验证,未来 Sidecar 还需要三平台构建与签名。
-4. **HTTP 分发**:已发布的 `serve` 仍是无鉴权/限流/请求体上限的受信任本机服务；当前源码的 `asrkit-cloud` 已具备 embedded 安全边界和 macOS arm64 `onedir` 原型,但真正无 Python 的干净宿主、真实云转写、三平台构建与签名仍未完成。
+4. **HTTP 分发**:已发布的 `serve` 仍是无鉴权/限流/请求体上限的受信任本机服务；当前源码的 `asrkit-cloud` 已具备 embedded 安全边界、macOS arm64 原型和 Linux x64 无 Python Debian 验证,但真实云转写、其余平台构建与签名仍未完成。
 
 ### 后续候选(按需,均非紧要,与 roadmap.md 一致)
 - **词级时间戳**:流式/批量的 word-level timestamps(sherpa/whisper 部分支持);有明确消费者再做。
@@ -131,7 +131,7 @@ adapters/  本地4引擎(sherpa 通吃 16 个 config_type / faster-whisper / whi
 | W4 | 最小流式(文件入口) | 已完成(0.5.3) |
 | 流式扩面 | 端点分段(E)/ 麦克风(C)/ serve SSE(D) | 已完成(0.5.4) |
 | 工程收口 | CLI + 可信性缺口 | 已完成并评审,尚未发布 |
-| 当前 P0 | `asrkit-cloud` 形态验证 | profiles/daemon/embedded/安全和 macOS arm64 onedir 原型已完成；干净宿主、平台矩阵与 npm `asrkit` 下一步 |
+| 当前 P0 | `asrkit-cloud` 形态验证 | profiles/daemon/embedded/安全、macOS arm64 原型和 Linux x64 无 Python验证已完成；真实云转写、平台矩阵与 npm `asrkit` 下一步 |
 | 生态 | asrbench / 插件 conformance / 专业字段 | P0 稳定后按需启动 |
 
 **1.0 门槛**(遥远且刻意):三样"项目宪法"——model string 寻址 / adapter 契约 / CLI 核心命令——稳定且愿背书。流式契约(W4 + 流式扩面)已首次完整行使,是 1.0 前必经关的已完成项。
@@ -152,4 +152,4 @@ adapters/  本地4引擎(sherpa 通吃 16 个 config_type / faster-whisper / whi
 
 ---
 
-> 一句话:**cloud-only、embedded、安全边界和首个 macOS arm64 onedir 已落地；下一刀是在真正干净宿主完成真实转写并建立平台矩阵,再用 npm `asrkit` 隐藏平台选择和生命周期。**
+> 一句话:**cloud-only、embedded、安全边界、macOS arm64 原型和 Linux x64 无 Python验证已落地；下一刀是真实云转写和其余平台矩阵,再用 npm `asrkit` 隐藏平台选择和生命周期。**
