@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import importlib.util
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -58,3 +60,22 @@ def test_cloud_bootstrap_uses_platform_venv_python(tmp_path, monkeypatch):
 
     monkeypatch.setattr(bootstrap.os, "name", "posix")
     assert bootstrap.environment_python(tmp_path) == tmp_path / "bin" / "python"
+
+
+def test_linux_container_smoke_has_valid_bash_syntax():
+    bash = shutil.which("bash")
+    if bash is None:
+        return
+    subprocess.run(
+        [bash, "-n", str(ROOT / "packaging" / "cloud" / "smoke-linux-container.sh")],
+        check=True,
+    )
+
+
+def test_cloud_runtime_workflow_connects_build_clean_smoke_and_artifact():
+    workflow = (ROOT / ".github" / "workflows" / "cloud-runtime.yml").read_text()
+
+    assert "python packaging/cloud/build.py" in workflow
+    assert "smoke-linux-container.sh dist/asrkit-cloud" in workflow
+    assert "actions/upload-artifact@v4" in workflow
+    assert "sha256sum" in workflow

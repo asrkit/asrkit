@@ -1,0 +1,65 @@
+name: Cloud runtime
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cloud-runtime.yml"
+      - "packaging/cloud/**"
+      - "pyproject.toml"
+      - "src/asrkit/**"
+      - "tests/test_cloud_packaging.py"
+      - "tests/test_cloud_runtime.py"
+      - "tests/test_daemon.py"
+  pull_request:
+    paths:
+      - ".github/workflows/cloud-runtime.yml"
+      - "packaging/cloud/**"
+      - "pyproject.toml"
+      - "src/asrkit/**"
+      - "tests/test_cloud_packaging.py"
+      - "tests/test_cloud_runtime.py"
+      - "tests/test_daemon.py"
+
+jobs:
+  linux-x64:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install cloud build dependencies
+        run: python -m pip install ".[cloud-build]"
+      - name: Build and smoke frozen runtime
+        run: python packaging/cloud/build.py
+      - name: Verify in Debian without Python
+        run: bash packaging/cloud/smoke-linux-container.sh dist/asrkit-cloud
+      - name: Package reproducible archive
+        id: artifact
+        shell: bash
+        run: |
+          version="$(PYTHONPATH=src python -c 'import asrkit; print(asrkit.__version__)')"
+          archive="asrkit-cloud-v${version}-linux-x64-gnu.tar.gz"
+          mkdir -p artifacts
+          tar \
+            --sort=name \
+            --mtime='UTC 1970-01-01' \
+            --owner=0 \
+            --group=0 \
+            --numeric-owner \
+            -C dist \
+            -czf "artifacts/$archive" \
+            asrkit-cloud
+          (cd artifacts && sha256sum "$archive" >"$archive.sha256")
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: asrkit-cloud-v${{ steps.artifact.outputs.version }}-linux-x64-gnu
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14

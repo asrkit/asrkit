@@ -36,7 +36,7 @@
 2. **已完成（当前源码,尚未发布）**:embedded 契约:`--embedded --port 0`、ready/shutdown NDJSON、父进程监控、显式 data dir 和信号优雅关停。
 3. **已完成（当前源码,尚未发布）**:loopback 强制、宿主随机 bearer token、上传上限、并发/超时与断连清理。
 4. **已完成（macOS arm64 本机原型）**:用隔离环境构建 PyInstaller `onedir`,以干净子进程 smoke 锁定运行目录、HTTP 栈、cloud-only 模型和 embedded 生命周期；`onefile` 后置。
-5. 在真正未安装系统 Python 的干净宿主完成启动和至少一次真实云转写,形成可移植性证据。
+5. **自动化入口已完成,远端证据待跑**:Linux x64 工作流会构建 onedir,放入不含 Python 的只读 Debian 容器验证完整 embedded HTTP 生命周期,并生成可复现 tar.gz 与 SHA256；仍需在远端 runner 首次跑通,并以受控密钥完成至少一次真实云转写。
 6. 建立 macOS arm64/x64、Windows x64、Linux glibc arm64/x64 构建和 smoke matrix;签名、SHA256、SBOM 与第三方许可证属于交付物的一部分。
 7. 在同一仓库实现 npm `asrkit` 薄 SDK,通过内部 `@asrkit/cloud-<platform>` 包按 OS/CPU/libc 携带运行时;不复制云厂 adapter,不使用首版 `postinstall` 下载。
 8. 验证 npm/pnpm、Node 和 Electron `extraResources` 集成,让产品开发者只需安装 `asrkit`,无需手工选择或管理二进制。

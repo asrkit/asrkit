@@ -36,6 +36,16 @@ dist/asrkit-cloud/
 python packaging/cloud/smoke.py dist/asrkit-cloud/asrkit-cloud
 ```
 
+## Linux 无 Python 容器验证
+
+Linux x64 产物需要再进入不含 Python 的最小 Debian 容器：
+
+```bash
+bash packaging/cloud/smoke-linux-container.sh dist/asrkit-cloud
+```
+
+该脚本要求 Linux Docker host。目标容器使用只读根文件系统、空的临时数据卷、`--cap-drop ALL` 和 host loopback 网络；容器内先确认不存在 `python`/`python3`,再验证 ready、health、鉴权、模型列表、multipart 转写路由和 SIGTERM shutdown。CI 入口见 `.github/workflows/cloud-runtime.yml`,并生成可复现 tar.gz、SHA256 和 14 天临时 artifact；它不发布 Release。
+
 ## 边界
 
 - `entrypoint.py` 只转发到 `asrkit.daemon.cli:main`，不复制运行逻辑。
@@ -43,4 +53,5 @@ python packaging/cloud/smoke.py dist/asrkit-cloud/asrkit-cloud
 - 自定义 Uvicorn hook 只保留 asyncio + h11 HTTP 栈，不携带 worker、WebSocket 和可选加速器。
 - spec 排除本地 adapter、模型管理命令及其重依赖。
 - `dist/`、`build/` 已由仓库忽略，二进制不进入源码提交。
-- 当前脚本只建立可重复原型；签名、公证、SHA256、SBOM、第三方许可证清单和跨平台 CI 属于后续平台矩阵工作。
+- 当前脚本只建立可重复原型；签名、公证、SBOM、第三方许可证清单和完整跨平台矩阵属于后续工作。
+- Linux 原型工作流已生成 SHA256,但正式发布所需的签名、SBOM、第三方许可证清单和长期 provenance 仍未完成。
