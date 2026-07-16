@@ -100,6 +100,7 @@ def _metas():
             download_url=f"{_BASE}/{asset}.tar.bz2",
             base=_BASE_OVERRIDE.get(folder, folder),
             tag=_TAG_OVERRIDE.get(folder, "int8"),
+            cache_owner="asrkit",
         ))
     return out
 

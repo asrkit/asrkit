@@ -18,6 +18,9 @@ class OpenAICompatible(BaseAdapter):
     def is_configured(self) -> bool:
         return bool(self.config.get("api_key"))
 
+    def supports_concurrent_calls(self) -> bool:
+        return True
+
     def transcribe(self, audio: AudioInput, opts: TranscribeOptions) -> TranscribeResult:
         try:
             key = self.config.get("api_key", "")
@@ -83,6 +86,7 @@ register_model(AdapterMeta(
         "api_key": {"type": "secret", "required": True, "label": "SiliconFlow API Key"},
         "base_url": {"type": "string", "required": False, "label": "Base URL override"},
     },
+    cache_owner="none",
 ))
 
 register_model(AdapterMeta(
@@ -97,6 +101,7 @@ register_model(AdapterMeta(
     default_base_url="https://api.siliconflow.cn/v1",
     model="TeleAI/TeleSpeechASR",
     config_schema={"api_key": {"type": "secret", "required": True, "label": "SiliconFlow API Key"}},
+    cache_owner="none",
 ))
 
 register_model(AdapterMeta(
@@ -113,4 +118,5 @@ register_model(AdapterMeta(
     model="whisper-1",
     capabilities={"language_hint": "supported", "segment_timestamps": True, "multilingual": True},
     config_schema={"api_key": {"type": "secret", "required": True, "label": "OpenAI API Key"}},
+    cache_owner="none",
 ))

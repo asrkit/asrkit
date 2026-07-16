@@ -8,13 +8,16 @@ from .shared import add_transcribe_flags, add_verbose, batch_code, cfg, opts, pr
 
 
 def add_parsers(sub) -> None:
-    rp = sub.add_parser("run", help="download if missing, then transcribe (Ollama-style)")
+    rp = sub.add_parser(
+        "run",
+        help="prepare through the adapter if needed, then transcribe",
+    )
     rp.add_argument("model")
     rp.add_argument("audio", nargs="+")
     add_transcribe_flags(rp)
     add_verbose(rp)
 
-    tp = sub.add_parser("transcribe", help="transcribe only (no auto-download)")
+    tp = sub.add_parser("transcribe", help="transcribe without adapter preparation")
     tp.add_argument("audio", nargs="+")
     tp.add_argument("-m", "--model", required=True)
     tp.add_argument("--model-dir", default=None)

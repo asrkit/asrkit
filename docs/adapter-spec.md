@@ -75,7 +75,17 @@ class BaseAdapter:
     def transcribe_stream(
         self, chunks: Iterable[np.ndarray], opts: "TranscribeOptions"
     ) -> Iterator["PartialResult"]: ...          # 收 chunks（不是 AudioInput），yield 中间/最终结果
+
+    # —— 运行时并发与生命周期 ——
+    def supports_concurrent_calls(self) -> bool: return False  # 保守默认:同一实例串行
+    def close(self) -> None: ...                            # 默认 no-op;释放模型/session 等资源
+
+    # —— 模型缓存所有权 ——
+    def cache_state(self) -> "ModelCacheState": ...
+    def remove_cached_model(self) -> Optional[str]: ...     # 仅 owner=asrkit 可删除
 ```
+
+`serve` 为每个 app 创建独立 adapter manager。相同规范 model id 的构造会 single-flight；默认 adapter 在完整 batch 调用或 streaming 迭代期间串行，只有明确返回 `True` 的实现才允许同一实例并发。活跃 lease 不会被 LRU 淘汰；淘汰与 shutdown 调用 `close()`。第三方旧 adapter 缺少并发 hook 时同样按 `False` 处理。
 
 ```python
 @dataclass
@@ -131,6 +141,7 @@ class AdapterMeta:
     sha256: str = ""              # tarball 校验和（目标字段；当前内置下载项尚未普遍填充）
     tag: str = ""                 # 精度标签（int8/fp32），Ollama 式 base:tag 寻址
     base: str = ""                # 逻辑模型名（多精度共享一个 base）
+    cache_owner: str = "unknown"  # "asrkit" | "engine" | "none" | "unknown"
 ```
 
 > **改动依据评审 🔴#4 / 🟡#9**：`id` 不再是可解析的二段式，改为不透明唯一串；`provider`（协议）、`vendor`（账号）、`model`（厂商 model 名）、`resource_id` 各自独立——因为火山同一 `bigmodel` 有三条目、DashScope 一个账号挂多协议，二段式 id 表达不了。原 `default_model_id` 并入 `model`。
@@ -189,7 +200,17 @@ class PartialResult:
 
 ---
 
-## 6. pull 契约（本地模型，Ollama 式即拉即用）
+## 6. pull / cache 契约（本地模型）
+
+```python
+@dataclass(frozen=True)
+class ModelCacheState:
+    owner: str                    # asrkit | engine | none | unknown
+    cached: Optional[bool]        # None = ASRKit 不知道外部缓存事实
+    removable: bool
+    location: Optional[str]
+    size_bytes: Optional[int]
+```
 
 ```python
 download_url  = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/<file>.tar.bz2"
@@ -198,8 +219,12 @@ install_files = ["encoder.onnx", "decoder.onnx", "tokens.txt"]   # 精确名
 install_files = ["*encoder*.onnx", "*decoder*.onnx", "<tokenizer_dir>/"]
 ```
 
-- `asrkit pull <id>`：下载 → 解压 →（可选）重命名为规范名。
+- `cache_owner="asrkit"`：`pull` 下载 → 解压 →（可选）重命名为规范名；`rm` 可安全进入 ASRKit store。
+- `cache_owner="engine"`：adapter 可在 `install()` 中委托引擎/HuggingFace 等上游获取模型,但 `cached` 默认未知且 `rm` 必须拒绝。
+- `cache_owner="none"`：云端等无本地缓存；`cache_owner="unknown"`：第三方默认值,在插件明确所有权前 `rm` 必须拒绝。
 - **安装检测可插拔**：默认"`install_files` 全部命中（支持 glob/目录）即已安装"；LLM 架构模型（`qwen3Asr`/`funasrNano`/`moonshineV2`/`omnilingualCtc`/`fireRedAed`——用 HF tokenizer 目录 + 通配文件名）可**重写 `is_installed()`**。
+
+`is_installed()` 是为兼容保留的 adapter-defined legacy installed/readiness hook,语义随引擎而异(sherpa 检查受管模型文件,外部引擎通常检查运行时包),不是缓存探测。`list --installed` 继续使用它；`list --json` 保留布尔 `installed`,另增 `cached/cache_owner/removable`。任何调用方都不得从 `installed` 推断权重缓存。
 
 > **改动依据评审 🔴#1**：原"固定 canonical_files + 全存在"表达不了你 registry 里 5 个用 glob+tokenizer 目录的模型（`worker.py:_find`/`_find_tokenizer_dir`）——你自有模型集已违反旧写法。故 `canonical_files`→`install_files`（支持 glob/目录），`is_installed` 改为可插拔、重命名可关闭。
 
@@ -215,7 +240,7 @@ install_files = ["*encoder*.onnx", "*decoder*.onnx", "<tokenizer_dir>/"]
 
 ## 8. 错误处理约定
 
-- adapter **不抛异常给用户**；捕获后填 `error`（`"类型: 信息"`），`text=""`。*依据：worker/CloudResult/AsrResult 全是此模式。*
+- adapter 的**转写路径**不抛异常给用户；捕获后填 `error`（`"类型: 信息"`），`text=""`。模型管理 hook 可抛 `ValueError` 明确拒绝不安全的删除等操作，由 API/CLI 边界转成英文错误。*依据：worker/CloudResult/AsrResult 全是结果对象模式。*
 - 流式握手失败：`connect` 返回 False 并置错误；流式过程错误走 `PartialResult.error`。
 - HTTP ≥300 视为错误，`error` 带截断响应体（≤200 字符）。
 

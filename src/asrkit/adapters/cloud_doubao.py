@@ -45,6 +45,9 @@ class Doubao(BaseAdapter):
         c = self.config
         return bool(c.get("api_key") or (c.get("app_key") and c.get("access_key")))
 
+    def supports_concurrent_calls(self) -> bool:
+        return True
+
     def transcribe(self, audio: AudioInput, opts: TranscribeOptions) -> TranscribeResult:
         try:
             c = self.config
@@ -116,4 +119,5 @@ for _mid, _name, _rid, _price in [
     register_model(AdapterMeta(
         id=_mid, provider="doubao", vendor="doubao", name=_name, source="cloud",
         modes=["batch"], langs=["zh", "en"], model_kind="asr", pricing=_price,
-        default_base_url=_BASE, model="bigmodel", resource_id=_rid, config_schema=_SCHEMA))
+        default_base_url=_BASE, model="bigmodel", resource_id=_rid, config_schema=_SCHEMA,
+        cache_owner="none"))

@@ -46,7 +46,13 @@ def handle(a) -> int:
         if a.name == "default-engine":
             config.set_default("engine", a.value)
         else:
-            config.set_setting("models_root", a.value)
+            from .. import store
+            try:
+                root = store.validate_models_root(a.value)
+            except ValueError as exc:
+                print(f"[error] {exc}", file=sys.stderr)
+                return 1
+            config.set_setting("models_root", root)
         print(f"✓ {a.name} → {a.value}")
         return 0
     if a.ccmd == "list":

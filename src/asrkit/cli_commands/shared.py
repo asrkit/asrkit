@@ -63,9 +63,7 @@ def print_result(r, fmt="txt", output=None) -> int:
 
 
 def emit_model_rows(rows, as_json) -> int:
-    """渲染 [(AdapterMeta, inst)] 列表。list 与 search 共用。格式与既有 list 逐字一致。"""
-    from .. import store
-
+    """渲染 [(AdapterMeta, inst)] 列表；机器格式只做向后兼容增量。"""
     def _human(n):
         size = float(n)
         for unit in ("B", "KB", "MB", "GB"):
@@ -78,22 +76,32 @@ def emit_model_rows(rows, as_json) -> int:
 
         out = []
         for m, inst in rows:
+            state = model_cache_state(m)
             d: dict = {"id": m.id, "name": m.name, "source": m.source,
                        "provider": m.provider, "vendor": m.vendor, "langs": m.langs,
-                       "model_kind": m.model_kind}
+                       "model_kind": m.model_kind,
+                       "cached": state.cached,
+                       "cache_owner": state.owner,
+                       "removable": state.removable}
             if m.source == "local":
                 d["installed"] = bool(inst)
-                d["size_bytes"] = store.dir_size(m) if inst else 0
+                # 保留既有字段语义：运行时未就绪始终报 0，残留文件只由 cached 表达。
+                d["size_bytes"] = (
+                    state.size_bytes
+                    if inst and state.size_bytes is not None
+                    else 0
+                )
             out.append(d)
         print(_json.dumps(out, ensure_ascii=False, indent=2))
         return 0
     for m, inst in rows:
+        state = model_cache_state(m)
         if m.source == "cloud":
             mark, flag, size = " ", "☁️ ", ""
         else:
             mark = "✓" if inst else " "
             flag = "💻"
-            size = _human(store.dir_size(m)) if inst else ""
+            size = _human(state.size_bytes) if inst and state.size_bytes else ""
         print(f"{mark} {flag} {m.id:26s} {size:>9s}  {m.name}")
     return 0
 
@@ -144,3 +152,18 @@ def installed(m) -> bool:
         return registry.make_adapter(m.id).is_installed()
     except Exception:
         return False
+
+
+def model_cache_state(m):
+    """CLI 的安全缓存视图；adapter 故障不能退回猜测或直接检查共享缓存。"""
+    from .. import registry
+    from ..types import ModelCacheState
+
+    try:
+        return registry.make_adapter(m.id).cache_state()
+    except Exception:
+        owner = "none" if m.source == "cloud" else m.cache_owner
+        if owner not in {"asrkit", "engine", "none", "unknown"}:
+            owner = "unknown"
+        cached = False if owner == "none" else None
+        return ModelCacheState(owner, cached, False, None, None)

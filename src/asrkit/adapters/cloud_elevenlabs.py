@@ -14,6 +14,9 @@ class ElevenLabs(BaseAdapter):
     def is_configured(self) -> bool:
         return bool(self.config.get("api_key"))
 
+    def supports_concurrent_calls(self) -> bool:
+        return True
+
     def transcribe(self, audio: AudioInput, opts: TranscribeOptions) -> TranscribeResult:
         try:
             key = self.config.get("api_key", "")
@@ -46,4 +49,5 @@ register_model(AdapterMeta(
     id="elevenlabs/scribe-v1", provider="elevenlabs", vendor="elevenlabs", name="ElevenLabs Scribe v1",
     source="cloud", modes=["batch"], langs=["zh", "en"], model_kind="asr",
     default_base_url="https://api.elevenlabs.io/v1/speech-to-text", model="scribe_v1",
-    config_schema={"api_key": {"type": "secret", "required": True, "label": "ElevenLabs API Key"}}))
+    config_schema={"api_key": {"type": "secret", "required": True, "label": "ElevenLabs API Key"}},
+    cache_owner="none"))

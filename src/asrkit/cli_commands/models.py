@@ -4,13 +4,17 @@ from __future__ import annotations
 import os
 import sys
 
-from .shared import emit_model_rows, installed
+from .shared import emit_model_rows, installed, model_cache_state
 
 
 def add_parsers(sub) -> None:
-    lp = sub.add_parser("list", help="list models (✓ = installed)")
+    lp = sub.add_parser("list", help="list models (✓ = adapter readiness)")
     lp.add_argument("--json", action="store_true", help="machine-readable output")
-    lp.add_argument("--installed", action="store_true", help="only installed local models")
+    lp.add_argument(
+        "--installed",
+        action="store_true",
+        help="only local models whose adapter reports ready",
+    )
     lp.add_argument("--ids", action="store_true", help="print bare model ids (one per line, for scripts/completion)")
     lp.add_argument("--source", default=None, choices=("cloud", "local"), help="filter by source")
     lp.add_argument("--lang", default=None, help="only models supporting this language (e.g. ja)")
@@ -26,12 +30,12 @@ def add_parsers(sub) -> None:
     sh = sub.add_parser("show", help="show model details")
     sh.add_argument("model")
 
-    pp = sub.add_parser("pull", help="download a local model")
+    pp = sub.add_parser("pull", help="acquire a model through its adapter")
     pp.add_argument("model")
     pp.add_argument("--url", default=None,
-                    help="download from this URL instead of the model's default (http/https)")
+                    help="override an ASRKit-managed download URL (http/https)")
 
-    rmp = sub.add_parser("rm", help="remove a downloaded local model")
+    rmp = sub.add_parser("rm", help="remove an ASRKit-managed model cache")
     rmp.add_argument("model")
 
 
@@ -126,6 +130,11 @@ def _show(a) -> int:
     print(f"langs:    {', '.join(m.langs)}")
     print(f"multilingual: {'yes' if (m.capabilities or {}).get('multilingual') else 'no'}")
     print(f"modes:    {', '.join(m.modes)}")
+    state = model_cache_state(m)
+    cached = "unknown" if state.cached is None else ("yes" if state.cached else "no")
+    print(f"cache:    {cached}  (owner={state.owner}, removable={'yes' if state.removable else 'no'})")
+    if state.location:
+        print(f"cache dir:{state.location}")
     if m.source == "local":
         print(f"arch:     {m.config_type}")
         print(f"precision:{m.tag or '—'}  (base={m.base or m.id.split('/')[-1]})")
@@ -151,22 +160,15 @@ def _pull(a) -> int:
 
 
 def _rm(a) -> int:
-    from .. import registry, store
+    from .. import registry
 
     try:
-        m = registry.resolve(a.model)
+        model_id = registry.resolve(a.model).id
+        d = a._api.remove(model_id)
     except Exception as e:
         print(f"[error] {e}", file=sys.stderr)
         return 1
-    if m.source != "local":
-        print("[error] only local models can be removed", file=sys.stderr)
-        return 1
-    try:
-        d = store.remove(m)
-    except (OSError, ValueError) as e:
-        print(f"[error] {e}", file=sys.stderr)
-        return 1
-    print(f"✓ removed {m.id} → {d}" if d else f"{m.id} not installed; nothing to remove")
+    print(f"✓ removed {model_id} → {d}" if d else f"{model_id} not cached; nothing to remove")
     return 0
 
 
@@ -187,6 +189,7 @@ def _add_model(a) -> int:
         entry["sha256"] = a.sha256
 
     try:
+        store.validate_models_root(store.models_root())
         managed_dest = store.managed_model_dir(mid)
     except ValueError as e:
         print(f"[error] {e}", file=sys.stderr)

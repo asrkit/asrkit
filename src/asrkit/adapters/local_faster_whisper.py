@@ -29,6 +29,9 @@ class FasterWhisper(BaseAdapter):
     def is_installed(self) -> bool:
         return _available()
 
+    def close(self) -> None:
+        self._model = None
+
     def install(self, log=print, url=None) -> str:
         if not _available():
             raise RuntimeError(_INSTALL_HINT)
@@ -89,6 +92,7 @@ register_models([
         model=name,
         capabilities={"language_hint": "supported", "segment_timestamps": True,
                       **({"multilingual": True} if not is_english_only(langs) else {})},
+        cache_owner="engine",
         # faster-whisper 自带长音频分块，无 30s 窗口限制，故不设 max_input_duration_s
     )
     for name, disp, langs in _FW

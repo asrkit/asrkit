@@ -2,6 +2,7 @@
 import json as _json
 
 from asrkit import cli, registry
+from asrkit.cli_commands import models as model_commands
 
 
 def _run(args, capsys):
@@ -60,7 +61,33 @@ def test_list_no_filter_json_shape(capsys):
     data = _json.loads(out)
     pz = next(d for d in data if d["id"] == "sherpa/paraformer-zh")
     assert set(pz) >= {"id", "name", "source", "provider", "vendor", "langs",
-                       "model_kind", "installed", "size_bytes"}
+                       "model_kind", "installed", "size_bytes", "cached",
+                       "cache_owner", "removable"}
+    assert isinstance(pz["installed"], bool)
+    assert isinstance(pz["cached"], bool)
+    assert pz["cache_owner"] == "asrkit" and pz["removable"] is True
+
+    external = next(d for d in data if d["id"] == "faster-whisper/tiny")
+    assert isinstance(external["installed"], bool)
+    assert external["cached"] is None
+    assert external["cache_owner"] == "engine" and external["removable"] is False
+
+    cloud = next(d for d in data if d["id"] == "openai/whisper-1")
+    assert cloud["cached"] is False
+    assert cloud["cache_owner"] == "none" and cloud["removable"] is False
+
+
+def test_installed_filter_keeps_runtime_readiness_semantics(monkeypatch, capsys):
+    monkeypatch.setattr(
+        model_commands,
+        "installed",
+        lambda meta: meta.id == "faster-whisper/tiny",
+    )
+
+    rc, out = _run(["list", "--installed", "--ids"], capsys)
+
+    assert rc == 0
+    assert out.splitlines() == ["faster-whisper/tiny"]
 
 
 def test_search_matches_id_name(capsys):

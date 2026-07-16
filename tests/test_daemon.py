@@ -7,6 +7,7 @@ import os
 import queue
 import subprocess
 import sys
+import tempfile
 import threading
 import urllib.error
 import urllib.request
@@ -47,8 +48,88 @@ def test_embedded_settings_use_private_data_dir_and_random_port(tmp_path, monkey
     assert (Path(settings.data_dir) / "logs").is_dir()
 
     monkeypatch.setenv("ASRKIT_CONFIG", "/should/not/be/used.json")
+    monkeypatch.setenv("TMPDIR", "/should/not/be/used-tmpdir")
+    monkeypatch.setenv("TEMP", "/should/not/be/used-temp")
+    monkeypatch.setenv("TMP", "/should/not/be/used-tmp")
+    monkeypatch.setattr(tempfile, "tempdir", tempfile.tempdir)
     activate_environment(settings)
     assert os.environ["ASRKIT_CONFIG"] == str(Path(settings.data_dir) / "config.json")
+    assert os.environ["TMPDIR"] == settings.temp_dir
+    assert os.environ["TEMP"] == settings.temp_dir
+    assert os.environ["TMP"] == settings.temp_dir
+    assert tempfile.tempdir == settings.temp_dir
+
+
+def test_non_embedded_environment_does_not_change_tempfile_globals(
+    tmp_path, monkeypatch,
+):
+    sentinel = str(tmp_path / "system-temp")
+    monkeypatch.setenv("ASRKIT_CONFIG", str(tmp_path / "original-config.json"))
+    monkeypatch.setenv("TMPDIR", sentinel)
+    monkeypatch.setenv("TEMP", sentinel)
+    monkeypatch.setenv("TMP", sentinel)
+    monkeypatch.setattr(tempfile, "tempdir", sentinel)
+    settings = resolve_settings(
+        embedded=False,
+        host="127.0.0.1",
+        port=11435,
+        parent_pid=None,
+        data_dir=str(tmp_path / "data"),
+        token=None,
+    )
+
+    activate_environment(settings)
+
+    assert os.environ["TMPDIR"] == sentinel
+    assert os.environ["TEMP"] == sentinel
+    assert os.environ["TMP"] == sentinel
+    assert tempfile.tempdir == sentinel
+
+
+def test_prepare_data_dir_does_not_destroy_existing_write_probe(tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(mode=0o700)
+    probe = data_dir / ".write-probe"
+    probe.write_bytes(b"keep this content")
+
+    settings = _embedded_settings(tmp_path, data_dir=str(data_dir))
+
+    assert settings.data_dir == str(data_dir)
+    assert probe.read_bytes() == b"keep this content"
+    assert not list(data_dir.glob(".asrkit-write-probe-*"))
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX symlink contract")
+def test_prepare_data_dir_does_not_follow_existing_write_probe_symlink(tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(mode=0o700)
+    target = tmp_path / "outside.txt"
+    target.write_bytes(b"outside content")
+    probe = data_dir / ".write-probe"
+    probe.symlink_to(target)
+
+    _embedded_settings(tmp_path, data_dir=str(data_dir))
+
+    assert probe.is_symlink()
+    assert target.read_bytes() == b"outside content"
+    assert not list(data_dir.glob(".asrkit-write-probe-*"))
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX symlink contract")
+@pytest.mark.parametrize("private_name", ["tmp", "logs"])
+def test_prepare_data_dir_rejects_symlinked_private_subdirectory(
+    tmp_path, private_name,
+):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(mode=0o700)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (data_dir / private_name).symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(SecurityError, match="must not be a symlink"):
+        _embedded_settings(tmp_path, data_dir=str(data_dir))
+
+    assert not (outside / ".asrkit-write-probe").exists()
 
 
 @pytest.mark.parametrize(

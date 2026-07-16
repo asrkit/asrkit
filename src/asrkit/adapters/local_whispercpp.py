@@ -29,6 +29,9 @@ class WhisperCpp(BaseAdapter):
     def is_installed(self) -> bool:
         return _available()
 
+    def close(self) -> None:
+        self._model = None
+
     def install(self, log=print, url=None) -> str:
         if not _available():
             raise RuntimeError(_INSTALL_HINT)
@@ -83,6 +86,7 @@ register_models([
         name=disp, source="local", modes=["batch"], langs=langs,
         model_kind="asr", config_type="whisper", model=name,
         capabilities={"language_hint": "supported", "segment_timestamps": True,
-                      **({"multilingual": True} if not is_english_only(langs) else {})})
+                      **({"multilingual": True} if not is_english_only(langs) else {})},
+        cache_owner="engine")
     for name, disp, langs in _WC
 ])

@@ -9,9 +9,9 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/asrkit/asrkit/actions/workflows/ci.yml/badge.svg)](https://github.com/asrkit/asrkit/actions)
 
-ASRKit is to speech recognition what **Ollama + LiteLLM** are to LLMs: models pull-and-go, one addressing scheme across on-device and cloud, plus an optional OpenAI-compatible local server. **The core is just a thin interface** — the base install depends only on `requests`; engines install on demand, models download on demand. No torch for things you don't use.
+ASRKit is to speech recognition what **Ollama + LiteLLM** are to LLMs: ASRKit-managed models pull-and-go, one addressing scheme across on-device and cloud, plus an optional OpenAI-compatible local server. **The core is just a thin interface** — the base install depends only on `requests`; engines install on demand, while external engine-owned caches remain under their engine's control. No torch for things you don't use.
 
-It brings an uncommon combination under one interface: Chinese SOTA on-device models (SenseVoice / Paraformer / FireRed / TeleSpeech — 47 pull-and-go models) + major China cloud providers (DashScope / Doubao / SiliconFlow) + the Whisper family + open addressing for HuggingFace ASR models.
+It brings an uncommon combination under one interface: Chinese SOTA on-device models (SenseVoice / Paraformer / FireRed / TeleSpeech — 47 ASRKit-managed sherpa models) + major China cloud providers (DashScope / Doubao / SiliconFlow) + the Whisper family + open addressing for HuggingFace ASR models.
 
 > ⚠️ **Early beta, under active development.** The core interface is usable, but we're still iterating — addressing/APIs may shift slightly between minor versions. Try it and tell us what breaks.
 
@@ -120,18 +120,18 @@ asrkit completion zsh        # bash/zsh/fish completion (model names complete dy
 
 > Prefer `asrkit engine install <name>` for engines (runs the right `pip install` for you, no quoting). When installing an extra with pip directly, zsh needs quotes around `asrkit[serve]` and friends: `pip install 'asrkit[serve]'`.
 
-> **Ownership model:** engines are **shared pip packages** — `asrkit engine install <name>` installs into the right environment for you; uninstall with your own `pip uninstall` (shared packages, your env, your call). Models are **asrkit-owned** — `pull` to download, `rm` to delete, clean and symmetric.
+> **Ownership model:** engines are **shared pip packages** — `asrkit engine install <name>` installs into the right environment for you; uninstall with your own `pip uninstall`. Only models whose adapter declares `cache_owner="asrkit"` have the symmetric ASRKit-store `pull`/`rm` lifecycle. Engine-owned caches (for example HuggingFace or whisper.cpp caches) stay with that engine; `rm` refuses to delete them. Third-party adapters default to `cache_owner="unknown"`, which is also non-removable until the plugin explicitly declares ownership.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `asrkit list` | list all models (✓ = installed); filter with `--lang/--arch`, bare ids with `--ids` |
+| `asrkit list` | list all models (✓ = adapter-defined legacy installed/readiness signal); filter with `--lang/--arch`, bare ids with `--ids`; JSON also reports `cached`, `cache_owner`, and `removable` |
 | `asrkit search <term>` | search models by id/name |
-| `asrkit run <model> <audio>` | download if missing, then transcribe |
+| `asrkit run <model> <audio>` | ensure adapter readiness, then transcribe; ASRKit-managed sherpa models are pulled when absent |
 | `asrkit transcribe <audio…> -m <model>` | transcribe only; multiple files / dir / glob / `-` (stdin), `--batch`; `--format txt/json/srt/vtt/csv/tsv`, `-o`, `--language` |
 | `asrkit stream <model> <audio>` | streaming transcription (sherpa online models) |
-| `asrkit pull <model> [--url …]` / `rm <model>` | download (`--url` overrides the source) / remove an on-device model |
+| `asrkit pull <model> [--url …]` / `rm <model>` | acquire a model through its adapter / remove only an ASRKit-owned cache (`--url` is for ASRKit-managed downloads) |
 | `asrkit show <model>` | model details |
 | `asrkit engine list` / `install <name>` / `default <name>` / `rm <name>` | manage engines (`rm` is advisory: prints uninstall instructions, never runs `pip uninstall`) |
 | `asrkit config set-key <vendor> <KEY>` / `list` | store keys / default engine / models dir |
@@ -166,7 +166,7 @@ Three ways to supply a key (highest priority first): `--api-key` > env var `<VEN
 
 `asrkit serve` starts a local server. OpenAI SDK apps that use ASRKit's supported fields, agents, and ordinary HTTP clients can change `base_url` and reach registered on-device or cloud models through one endpoint. **The caller needs zero asrkit deps, just HTTP.** See the [compatibility boundary](docs/openai-compatibility.md).
 
-> **Security boundary:** the current server is for trusted local integration. It has no built-in authentication, rate limiting, or request-body limit. Do not expose it directly to the public internet or an untrusted network; add authentication, upload limits, and access control at the reverse proxy first.
+> **Security boundary:** the ordinary CLI still has no built-in authentication, but it defaults to a 200 MiB upload limit, 4 active transcriptions, a 300-second timeout, and rejects browser-origin transcription requests. It remains a trusted-local service: do not expose it directly to the public internet or an untrusted network; put authentication and exact access controls at the gateway first.
 
 ```bash
 pip install 'asrkit[serve]'
@@ -180,6 +180,8 @@ c.audio.transcriptions.create(model="sherpa/sensevoice", file=open("a.wav", "rb"
 ```
 - Endpoints: `POST /v1/audio/transcriptions` (`response_format`: json/verbose_json/text/srt/vtt), `GET /v1/models`, `GET /health`.
 - Streaming: add `stream=true` to the same endpoint → `text/event-stream`, OpenAI-compatible `transcript.text.delta` (partial) / `transcript.text.done` (final) events; temp files are cleaned up automatically on disconnect. Only streaming models are supported — requesting `stream=true` on a non-streaming model errors out.
+- Runtime lifecycle: each app owns a capacity-target adapter LRU and a fixed worker pool. Construction is single-flight per canonical model id; adapters are serialized by default unless they opt into concurrent calls, and active requests pin an adapter until batch or SSE work really finishes. Normal `asrkit serve` defaults to 200 MiB uploads, 4 active transcriptions, and a 300-second timeout; direct `build_app()` embedders should set their own limits. Eviction and app shutdown call the adapter's `close()` hook.
+- Loopback browser defense: transcription POSTs carrying a non-empty `Origin` header are rejected by default, preventing an arbitrary web page from triggering local inference or configured cloud billing. Put an authenticated gateway with an exact CORS allowlist in front when browser access is intentional.
 - Cloud keys can come from a **plaintext config file protected with 0600 permissions**, so no per-request key is needed; use environment variables if you do not want credentials persisted. Transparent: raw bytes uploaded, no decoding.
 
 ## Extend it

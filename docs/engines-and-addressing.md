@@ -76,9 +76,9 @@ asrkit run sherpa/whisper-small a.wav
 asrkit run whispercpp/small a.wav
 asrkit run faster-whisper/small a.wav
 
-# pull / rm / show / 云端 同一套 来源/模型
-asrkit pull whispercpp/small
-asrkit rm   faster-whisper/large-v3
+# pull / show / 云端使用同一套 来源/模型；rm 还受缓存所有权约束
+asrkit pull sherpa/whisper-small
+asrkit rm   sherpa/whisper-small
 asrkit run  siliconflow/sensevoice a.wav --api-key <KEY>
 ```
 
@@ -100,6 +100,12 @@ asrkit run  siliconflow/sensevoice a.wav --api-key <KEY>
 - ASRKit 自己下载和删除的 sherpa 模型平铺在 `~/.asrkit/models/<id 去掉首段 namespace>/`。
 - faster-whisper/Transformers 等由上游 HuggingFace 生态管理缓存,不进入 `~/.asrkit/models`。
 - whisper.cpp adapter 也遵循其上游模型获取方式;当前没有一套统一的 `<engine>/<model>` 本地目录树。
+- `cache_owner` 明确记录所有权：sherpa/用户模型为 `asrkit`，上述外部缓存为 `engine`，云模型为 `none`，未声明的第三方 adapter 默认为 `unknown`。
+- `asrkit rm` 只接受 `cache_owner=asrkit`。对 `engine/unknown` 返回英文指引且不调用本地 store；上游缓存请使用对应引擎自己的管理工具。
+
+`is_installed()` 仍是兼容的 adapter-defined legacy installed/readiness hook,语义随引擎而异：sherpa 检查受管模型文件,外部引擎通常检查运行时包。它不代表权重一定已缓存；机器可读输出用独立的 `cached: true|false|null` 表达缓存事实,不能用 `installed` 推断。
+
+Python 侧的冻结值对象 `ModelCacheState` 同时给出 `owner/cached/removable/location/size_bytes`。`BaseAdapter.cache_state()` 和 `remove_cached_model()` 是查询/删除边界；只有 owner 为 `asrkit` 时默认实现才进入 ASRKit store。外部引擎仍可在自己的 `install()` 中委托上游下载,但其缓存不会因此变成 ASRKit 资产。
 
 未来若统一多引擎模型资产,必须先定义所有权、迁移和 `rm` 安全语义;不能只按目录美观重排公开存储契约。
 
@@ -116,7 +122,7 @@ asrkit run  siliconflow/sensevoice a.wav --api-key <KEY>
 
 ## 七、现状 vs 路线，以及"不破坏"保证
 
-**现状（已实现，0.3.0）**：四个本地引擎——**sherpa-onnx（默认）**、**faster-whisper**、**transformers（含 torch）**、**whisper.cpp**；+ **entry-point 第三方引擎插件**；+ **sherpa 用户模型注册表**（模型开放）。寻址 `sherpa/<model>` / `faster-whisper/<model>` / `whispercpp/<model>` / **`transformers/<任意 HF id>`** + 裸名简写 + `:tag`；云端同样使用 `<source>/<model>`。`asrkit engine list/install` 管理引擎；`is_installed`/`install` 下沉各 adapter。
+**现状（已实现，0.3.0）**：四个本地引擎——**sherpa-onnx（默认）**、**faster-whisper**、**transformers（含 torch）**、**whisper.cpp**；+ **entry-point 第三方引擎插件**；+ **sherpa 用户模型注册表**（模型开放）。寻址 `sherpa/<model>` / `faster-whisper/<model>` / `whispercpp/<model>` / **`transformers/<任意 HF id>`** + 裸名简写 + `:tag`；云端同样使用 `<source>/<model>`。`asrkit engine list/install` 管理引擎；legacy installed/readiness、缓存状态和安全删除分别由 `is_installed`、`cache_state`、`remove_cached_model` 表达。
 
 **路线（未实现）**：新增有真实需求的引擎(如 vLLM ASR runtime)、插件 conformance kit,以及更完整的第三方 adapter 发现/兼容治理。whisper.cpp、transformers、entry-point 插件和 `local/ -> sherpa/` 历史别名均已实现,不再属于路线项。
 
@@ -133,7 +139,7 @@ asrkit run  siliconflow/sensevoice a.wav --api-key <KEY>
 | | 模型（model） | 引擎（engine） |
 |---|---|---|
 | 是什么 | 权重文件（`.onnx` 等） | Python 包（sherpa-onnx / faster-whisper / pywhispercpp） |
-| 怎么获取 | `asrkit pull`（下文件 → `~/.asrkit/models`） | **`pip` 安装**（有依赖树） |
+| 怎么获取 | sherpa 由 `asrkit pull` 下载到 `~/.asrkit/models`；其它引擎可委托上游缓存 | **`pip` 安装**（有依赖树） |
 
 **默认（0.5.0 起）**：`pip install asrkit` 只装**接口 + 云端**（仅 `requests`，秒装）；**所有本地引擎都是 opt-in extra**（含默认的 sherpa：`pip install "asrkit[local]"`）。避免基础安装被 onnx/torch/ctranslate2 等撑爆——ASRKit 是接口，引擎按需挂。
 
@@ -175,8 +181,7 @@ asrkit engine rm faster-whisper       # 卸载引擎                      （现
 
 ```bash
 asrkit engine install faster-whisper
-asrkit pull faster-whisper/large-v3
-asrkit run  faster-whisper/large-v3 a.wav
+asrkit run faster-whisper/large-v3 a.wav   # 首次使用由 faster-whisper/HF 管理下载与缓存
 
 # 没装该引擎就用它 → 友好报错（带安装命令），不是 ModuleNotFoundError
 asrkit run faster-whisper/small a.wav
@@ -235,11 +240,14 @@ from asrkit.types import AdapterMeta, BaseAdapter, TranscribeResult
 @register_protocol("vosk")
 class Vosk(BaseAdapter):
     def is_installed(self): ...
+    def supports_concurrent_calls(self): return False  # 默认即 False;仅无共享可变状态时返回 True
     def install(self, log=print): ...
     def transcribe(self, audio, opts): ...
+    def close(self): ...                              # LRU 淘汰/app shutdown 时释放资源
 
 register_models([AdapterMeta(id="vosk/small-en", provider="vosk", vendor="vosk",
-    name="Vosk small (en)", source="local", modes=["batch"], langs=["en"])])
+    name="Vosk small (en)", source="local", modes=["batch"], langs=["en"],
+    cache_owner="unknown")])  # 默认 unknown;只有确实使用 ASRKit store 时才声明 asrkit
 ```
 2. 在你的 `pyproject.toml` 声明 entry point：
 ```toml

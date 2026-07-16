@@ -35,6 +35,7 @@ def _meta_for(model_str: str) -> AdapterMeta:
         model_kind="asr",
         config_type="hf-asr",
         model=model_str,
+        cache_owner="engine",
     )
 
 
@@ -46,6 +47,9 @@ class Transformers(BaseAdapter):
 
     def is_installed(self) -> bool:
         return _available()
+
+    def close(self) -> None:
+        self._pipe = None
 
     def install(self, log=print, url=None) -> str:
         if not _available():

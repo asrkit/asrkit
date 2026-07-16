@@ -32,11 +32,11 @@
 ## 三、已建成的能力
 
 ### CLI
-- **转写**:`run`(缺则下载再转)/ `transcribe`(只转);多文件/glob/目录递归/stdin(`-`)/`--batch`;
+- **转写**:`run`(adapter 未就绪时先按其契约准备再转)/ `transcribe`(不主动准备);多文件/glob/目录递归/stdin(`-`)/`--batch`;
   格式 txt/json/srt/vtt/csv/tsv + `-o` + `--language`;`-v/-vv` 详细日志。
 - **流式**:`stream <model> <audio>`(文件分块)/ `stream <model> --mic`(麦克风,opt-in `asrkit[mic]`);
   端点检测驱动 committed/partial 分段;共用 `transcribe_stream` + `PartialResult` 契约。
-- **模型生命周期**:`pull`(`--url` 换源、tar.*/zip 多格式自动识别)/ `rm` / `show`
+- **模型生命周期**:`pull`(`--url` 换源、tar.*/zip 多格式自动识别)/ 所有权安全的 `rm` / `show`
   (显示 multilingual/modes)/ `list`(`--json/--installed/--source/--lang/--arch/--ids`)/
   `search <term>`(id/name 子串)/ `add-model`。
 - **引擎**:`engine list/install/default/rm`(rm 为劝告版,绝不代跑 pip uninstall)。
@@ -64,7 +64,8 @@
 3. **model string 寻址**:精确 id → `base:tag` 别名(默认 int8)→ 裸名补默认引擎前缀 / 开放 provider 动态合成。
 
 ### 所有权模型
-- **模型 = asrkit 独占**(pull/rm 对称)· **引擎 = 共享 pip 包**(帮装不代卸)· **云端 = 内置**(仅 requests)。
+- **ASRKit 缓存**:`cache_owner=asrkit`,由 `pull/rm` 对称管理。**外部引擎缓存**:`cache_owner=engine`,可由 adapter 委托下载,但 `rm` 拒绝碰共享资产。**云端**:`none`。第三方 adapter 未声明时默认 `unknown`,同样拒删。
+- `installed` 是 adapter-defined legacy installed/readiness signal,语义随引擎而异(sherpa 检模型文件,外部引擎通常检查运行时包),不能推断模型缓存；`ModelCacheState`/`list --json` 的 `cached`、`cache_owner`、`removable` 才表达缓存事实。
 
 ---
 
@@ -87,12 +88,12 @@ HTTP   _http.py         线程局部 Session + 分级重试(成本安全)
 持久   config / usermodels / store   本地配置、用户模型表、pull/rm(原子/防穿越/多格式)
 音频   audio.py         零处理内核 + 格式守卫
 输出   formats.py       txt/json/srt/vtt 渲染 + result_dict
-服务   server.py        OpenAI 兼容 /v1(adapter 缓存 LRU + 线程池 + SSE + 可选鉴权/资源限制)
+服务   server.py + _adapter_manager.py   OpenAI 兼容 /v1(app-scoped LRU + single-flight + adapter 并发/close 生命周期 + SSE + 可选鉴权/资源限制)
 adapters/  本地4引擎(sherpa 通吃 16 个 config_type / faster-whisper / whispercpp / transformers 开放)
            云端6协议(openai / doubao / qwen / qwen-omni / funasr-flash / elevenlabs)
 ```
 
-**关键约定**:adapter 从不抛异常,错误进 `TranscribeResult.error`;插件走 entry-point(`asrkit.adapters`),坏插件不连坐。
+**关键约定**:转写错误进 `TranscribeResult.error`;模型管理 hook 可用 `ValueError` 明确拒绝不安全操作。`BaseAdapter` 默认不允许同实例并发并提供 no-op `close()`；插件走 entry-point(`asrkit.adapters`),坏插件不连坐。
 
 ---
 
@@ -114,7 +115,7 @@ adapters/  本地4引擎(sherpa 通吃 16 个 config_type / faster-whisper / whi
 1. **契约空字段**:`enable_punctuation`/`cost_estimate`/word timestamps 尚未普遍兑现。
 2. **模型供应链**:下载 URL 手维护,license/sha256 覆盖不足,缺持续健康检查。
 3. **跨平台**:常规 CI 只有 Linux;Windows 尚未验证,未来 Sidecar 还需要三平台构建与签名。
-4. **HTTP 分发**:已发布的 `serve` 仍是无鉴权/限流/请求体上限的受信任本机服务；当前源码的 `asrkit-cloud` 已具备 embedded 安全边界、macOS arm64 原型和 Linux x64 无 Python Debian 验证,但真实云转写、其余平台构建与签名仍未完成。
+4. **HTTP 分发**:普通 `serve` 仍无内置鉴权、只定位受信任本机，但当前源码已有上传/并发/超时上界和浏览器 `Origin` 防护；`asrkit-cloud` 另具备 embedded token、macOS arm64 原型和 Linux x64 无 Python Debian 验证,但真实云转写、其余平台构建与签名仍未完成。
 
 ### 后续候选(按需,均非紧要,与 roadmap.md 一致)
 - **词级时间戳**:流式/批量的 word-level timestamps(sherpa/whisper 部分支持);有明确消费者再做。

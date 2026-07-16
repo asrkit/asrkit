@@ -101,6 +101,15 @@ def test_root_and_nested_commands_keep_help_behavior(capsys):
     assert "{set-key,get-key,set,list,path}" in config_help
 
 
+def test_config_rejects_unsafe_models_root_without_writing(tmp_path, monkeypatch, capsys):
+    config_file = tmp_path / "config.json"
+    monkeypatch.setenv("ASRKIT_CONFIG", str(config_file))
+
+    assert cli.main(["config", "set", "models-root", str(Path.home())]) == 1
+    assert "refusing unsafe models root" in capsys.readouterr().err
+    assert not config_file.exists()
+
+
 def test_argparse_help_and_usage_exit_codes(capsys):
     with pytest.raises(SystemExit) as help_exit:
         cli.main(["--help"])
@@ -111,6 +120,49 @@ def test_argparse_help_and_usage_exit_codes(capsys):
         cli.main(["not-a-command"])
     assert usage_exit.value.code == 2
     assert "invalid choice" in capsys.readouterr().err
+
+
+def test_serve_cli_passes_safe_resource_limits_and_overrides(monkeypatch, capsys):
+    from asrkit import server
+
+    calls = []
+    monkeypatch.setattr(server, "serve", lambda **kwargs: calls.append(kwargs))
+
+    assert cli.main(["serve"]) == 0
+    assert calls[-1] == {
+        "host": "127.0.0.1",
+        "port": 11435,
+        "max_upload_bytes": 200 * 1024 * 1024,
+        "max_concurrency": 4,
+        "request_timeout_s": 300.0,
+    }
+
+    assert cli.main([
+        "serve", "--max-upload-mb", "12", "--max-concurrency", "3",
+        "--request-timeout", "45",
+    ]) == 0
+    assert calls[-1]["max_upload_bytes"] == 12 * 1024 * 1024
+    assert calls[-1]["max_concurrency"] == 3
+    assert calls[-1]["request_timeout_s"] == 45.0
+    capsys.readouterr()
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--max-upload-mb", "0"],
+        ["--max-concurrency", "0"],
+        ["--request-timeout", "0"],
+    ],
+)
+def test_serve_cli_rejects_unsafe_resource_limits(monkeypatch, capsys, args):
+    from asrkit import server
+
+    monkeypatch.setattr(
+        server, "serve", lambda **kwargs: pytest.fail("invalid limits must fail first"))
+
+    assert cli.main(["serve", *args]) == 2
+    assert "[error]" in capsys.readouterr().err
 
 
 def test_python_module_entrypoint_reports_version():

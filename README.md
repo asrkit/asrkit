@@ -120,18 +120,18 @@ asrkit completion zsh        # bash/zsh/fish 补全脚本(动态补全模型名)
 
 > 引擎优先用 `asrkit engine install <名>`(替你跑对 `pip install`,且免引号)。直接用 pip 装 extra 时,zsh 里 `asrkit[serve]` 这类要加引号:`pip install 'asrkit[serve]'`。
 
-> **所有权模型:** 引擎是**共享 pip 包** —— `asrkit engine install <名>` 帮你装到对的环境,卸载用你自己的 `pip uninstall`(共享包,你的环境你做主)。模型是 **asrkit 独占** —— `pull` 下载、`rm` 删除,干净对称。
+> **所有权模型:** 引擎是**共享 pip 包** —— `asrkit engine install <名>` 帮你装到对的环境,卸载用你自己的 `pip uninstall`(共享包,你的环境你做主)。只有 `cache_owner=asrkit` 的受管模型由 `pull`/`rm` 对称管理；外部引擎共享缓存和未知所有权缓存均拒绝删除。`asrkit list --json` 的 `cached`、`cache_owner`、`removable` 是缓存事实，不能从 legacy `installed` 字段推断。
 
 ## 命令
 
 | 命令 | 作用 |
 |---|---|
-| `asrkit list` | 列出所有模型(✓ = 已安装);`--lang/--arch` 筛选、`--ids` 出裸 id |
+| `asrkit list` | 列出所有模型(✓ = adapter 定义的 legacy 就绪信号，不等同于已缓存);`--lang/--arch` 筛选、`--ids` 出裸 id |
 | `asrkit search <词>` | 按 id/name 搜索模型 |
-| `asrkit run <模型> <音频>` | 缺则下载,然后识别 |
+| `asrkit run <模型> <音频>` | adapter 未就绪时先准备（ASRKit 受管下载或委托外部引擎），再识别 |
 | `asrkit transcribe <音频…> -m <模型>` | 只识别(不自动下载);多文件/目录/glob/`-`(stdin)、`--batch`;`--format txt/json/srt/vtt/csv/tsv`、`-o`、`--language` |
 | `asrkit stream <模型> <音频>` | 流式转写(sherpa online 模型) |
-| `asrkit pull <模型> [--url …]` / `rm <模型>` | 下载(可 `--url` 换源) / 删除端侧模型 |
+| `asrkit pull <模型> [--url …]` / `rm <模型>` | 通过 adapter 获取模型 / 仅删除 ASRKit 明确拥有的缓存（`--url` 仅用于 ASRKit 受管下载） |
 | `asrkit show <模型>` | 模型详情 |
 | `asrkit engine list` / `install <名>` / `default <名>` / `rm <名>` | 管理引擎(`rm` 为劝告版:打印卸载指引,绝不代跑 `pip uninstall`) |
 | `asrkit config set-key <厂商> <KEY>` / `list` | 存密钥 / 默认引擎 / models 目录 |
@@ -166,7 +166,7 @@ asrkit completion zsh        # bash/zsh/fish 补全脚本(动态补全模型名)
 
 `asrkit serve` 起一个本地服务。使用 ASRKit 已兼容字段的 OpenAI SDK 应用(或 Agent、任意语言客户端)改 `base_url` 后,即可通过统一端点调用注册表中的端云模型。**调用方零 asrkit 依赖,只发 HTTP。**完整兼容边界见 [文档](docs/openai-compatibility.md)。
 
-> **安全边界:**当前服务仅面向受信任的本机集成,没有内置鉴权、限流或请求体上限。不要把它直接暴露到公网或不受信任网络;如需反向代理,必须在外层加鉴权、上传大小限制和访问控制。
+> **安全边界:**当前服务仅面向受信任的本机集成，普通 CLI 仍无内置鉴权，但已有 200 MiB 上传、4 并发、300 秒超时默认边界，并拒绝浏览器 `Origin` 转写请求。不要把它直接暴露到公网或不受信任网络；如需反向代理，必须在外层加鉴权和精确访问控制。
 
 ```bash
 pip install 'asrkit[serve]'
@@ -180,6 +180,8 @@ c.audio.transcriptions.create(model="sherpa/sensevoice", file=open("a.wav", "rb"
 ```
 - 端点:`POST /v1/audio/transcriptions`(`response_format` 支持 json/verbose_json/text/srt/vtt)、`GET /v1/models`、`GET /health`。
 - 流式:同一端点加 `stream=true` → `text/event-stream`,OpenAI 兼容 `transcript.text.delta`(增量)/ `transcript.text.done`(定稿)事件;断连自动清理临时文件。仅 streaming 模型支持,非流式模型请求 `stream=true` 会报错。
+- 运行边界:普通 `asrkit serve` 默认单次上传 200 MiB、最多 4 个活动转写、300 秒超时;adapter 缓存是 app-scoped、同模型 single-flight，活跃请求 pin 住实例，淘汰/关停调用 `close()`。
+- 浏览器防护:转写 POST 默认拒绝非空 `Origin`，避免恶意网页通过 loopback 触发本地推理或云端计费;确需浏览器访问时应使用带鉴权和精确 CORS allowlist 的前置网关。
 - 云端密钥可从权限为 0600 的**明文配置文件**读取,无需每次传;不希望落盘时应使用环境变量。透明原则:原始字节上传,不解码。
 
 ## 扩展

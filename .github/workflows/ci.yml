@@ -5,17 +5,22 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install ruff mypy
       - name: ruff (lint)
-        run: python -m ruff check src tests e2e
+        run: python -m ruff check src tests e2e packaging
       - name: mypy (types)
         run: python -m mypy
 
@@ -26,24 +31,56 @@ jobs:
         python-version: ["3.9", "3.13"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       # 装 cloud + serve extras + dev（httpx/pytest-cov）：让 serve 测试不再 skip、并出覆盖率。
       # 不装 sherpa-onnx（端侧真机推理放 e2e.yml nightly / 手动）。
-      - run: pip install ".[cloud,serve,dev]"
+      - run: pip install ".[cloud,serve,dev]" build hatchling
       - run: python -m pytest --cov=asrkit --cov-report=term-missing
-      - name: wheel install smoke
+      - name: build, audit, rebuild, and smoke release artifacts
         if: matrix.python-version == '3.13'
         shell: bash
         run: |
-          wheel_dir="$RUNNER_TEMP/asrkit-wheel"
-          install_dir="$RUNNER_TEMP/asrkit-wheel-install"
-          python -m pip wheel . --no-deps --wheel-dir "$wheel_dir"
-          python -m pip install --no-deps --target "$install_dir" "$wheel_dir"/asrkit-*.whl
-          cd "$RUNNER_TEMP"
-          ASRKIT_WHEEL_INSTALL="$install_dir" PYTHONPATH="$install_dir" python -c 'import os; from pathlib import Path; import asrkit; p = Path(asrkit.__file__).resolve(); root = Path(os.environ["ASRKIT_WHEEL_INSTALL"]).resolve(); assert p.is_relative_to(root), p'
-          PYTHONPATH="$install_dir" python -m asrkit.cli --version
-          PYTHONPATH="$install_dir" python -m asrkit.daemon --version
-          PYTHONPATH="$install_dir" python -m asrkit.cli list --ids | grep -Fx "sherpa/whisper-tiny"
-          ASRKIT_WHEEL_INSTALL="$install_dir" PYTHONPATH="$install_dir" python -c 'import os; from importlib.metadata import distribution; from pathlib import Path; d = distribution("asrkit"); root = Path(os.environ["ASRKIT_WHEEL_INSTALL"]).resolve(); assert Path(d.locate_file("")).resolve().is_relative_to(root); scripts = {e.name: e.value for e in d.entry_points if e.group == "console_scripts"}; assert scripts == {"asrkit": "asrkit.cli:main"}'
+          set -euo pipefail
+          source_dir="$RUNNER_TEMP/asrkit-artifacts-source"
+          rebuilt_dir="$RUNNER_TEMP/asrkit-artifacts-rebuilt"
+          mkdir -p "$source_dir" "$rebuilt_dir"
+          shopt -s nullglob
+
+          python -m build --sdist --no-isolation --outdir "$source_dir" .
+          python -m build --wheel --no-isolation --outdir "$source_dir" .
+          source_wheels=("$source_dir"/asrkit-*.whl)
+          sdists=("$source_dir"/asrkit-*.tar.gz)
+          test "${#source_wheels[@]}" -eq 1
+          test "${#sdists[@]}" -eq 1
+          python packaging/audit_artifacts.py "${source_wheels[0]}" "${sdists[0]}"
+
+          python -m pip wheel "${sdists[0]}" \
+            --no-deps \
+            --no-build-isolation \
+            --wheel-dir "$rebuilt_dir"
+          rebuilt_wheels=("$rebuilt_dir"/asrkit-*.whl)
+          test "${#rebuilt_wheels[@]}" -eq 1
+          python packaging/audit_artifacts.py \
+            "${rebuilt_wheels[0]}" \
+            --compare-wheels "${source_wheels[0]}" "${rebuilt_wheels[0]}"
+
+          index=0
+          for wheel in "${source_wheels[0]}" "${rebuilt_wheels[0]}"; do
+            install_dir="$RUNNER_TEMP/asrkit-wheel-venv-$index"
+            python -m venv "$install_dir"
+            venv_python="$install_dir/bin/python"
+            "$venv_python" -m pip install --disable-pip-version-check "$wheel"
+            (
+              cd "$RUNNER_TEMP"
+              ASRKIT_WHEEL_INSTALL="$install_dir" "$venv_python" -c 'import os; from pathlib import Path; import asrkit; p = Path(asrkit.__file__).resolve(); root = Path(os.environ["ASRKIT_WHEEL_INSTALL"]).resolve(); assert p.is_relative_to(root), p'
+              "$venv_python" -m asrkit.cli --version
+              "$venv_python" -m asrkit.daemon --version
+              "$venv_python" -m asrkit.cli list --ids | grep -Fx "sherpa/whisper-tiny"
+              ASRKIT_WHEEL_INSTALL="$install_dir" "$venv_python" -c 'import os; from importlib.metadata import distribution; from pathlib import Path; d = distribution("asrkit"); root = Path(os.environ["ASRKIT_WHEEL_INSTALL"]).resolve(); assert Path(d.locate_file("")).resolve().is_relative_to(root); scripts = {e.name: e.value for e in d.entry_points if e.group == "console_scripts"}; assert scripts == {"asrkit": "asrkit.cli:main"}'
+            )
+            index=$((index + 1))
+          done

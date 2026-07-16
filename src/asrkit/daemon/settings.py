@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 from dataclasses import dataclass
 from typing import Optional
 
@@ -106,3 +107,8 @@ def activate_environment(settings: DaemonSettings) -> None:
     """让 embedded 模式不读取用户全局 ASRKit 配置。"""
     if settings.data_dir:
         os.environ["ASRKIT_CONFIG"] = os.path.join(settings.data_dir, "config.json")
+    if settings.embedded and settings.temp_dir:
+        for name in ("TMPDIR", "TEMP", "TMP"):
+            os.environ[name] = settings.temp_dir
+        # Starlette/Python 的临时文件选择有进程级缓存，单改环境变量不足以生效。
+        tempfile.tempdir = settings.temp_dir

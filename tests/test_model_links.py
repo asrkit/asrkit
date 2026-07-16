@@ -18,6 +18,7 @@ def _meta(model_id: str) -> AdapterMeta:
         source="local",
         modes=["batch"],
         langs=["en"],
+        cache_owner="asrkit",
     )
 
 
@@ -103,6 +104,7 @@ def test_remove_ignores_runtime_model_dir_override(tmp_path):
     managed = root / "linked"
     external = tmp_path / "external"
     managed.mkdir(parents=True)
+    (managed / "model.onnx").write_bytes(b"onnx")
     external.mkdir()
     external_marker = external / "keep.txt"
     external_marker.write_text("keep")

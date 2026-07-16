@@ -55,6 +55,9 @@ class _DashBase(BaseAdapter):
     def is_configured(self) -> bool:
         return bool(self.config.get("api_key"))
 
+    def supports_concurrent_calls(self) -> bool:
+        return True
+
     def _key_base(self):
         return self.config.get("api_key", ""), (self.config.get("base_url") or self.meta.default_base_url)
 
@@ -132,16 +135,16 @@ _GEN = "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generatio
 register_model(AdapterMeta(id="dashscope/qwen3-asr-flash", provider="qwen", vendor="dashscope",
     name="Qwen3-ASR-flash (DashScope)", source="cloud", modes=["batch"], langs=["zh", "en"],
     model_kind="asr", pricing={"unit": "hour", "cny": 0.79}, default_base_url=_COMPAT,
-    model="qwen3-asr-flash", config_schema=_KEY))
+    model="qwen3-asr-flash", config_schema=_KEY, cache_owner="none"))
 register_model(AdapterMeta(id="dashscope/fun-asr-flash", provider="funasr-flash", vendor="dashscope",
     name="Fun-ASR-Flash (DashScope)", source="cloud", modes=["batch"], langs=["zh", "en"],
     model_kind="asr", pricing={"unit": "hour", "cny": 0.79}, default_base_url=_GEN,
-    model="fun-asr-flash-2026-06-15", config_schema=_KEY))
+    model="fun-asr-flash-2026-06-15", config_schema=_KEY, cache_owner="none"))
 register_model(AdapterMeta(id="dashscope/qwen-omni-plus", provider="qwen-omni", vendor="dashscope",
     name="Qwen3.5-Omni-Plus (DashScope, audio LLM)", source="cloud", modes=["batch"], langs=["zh", "en"],
     model_kind="audio_llm", maturity="experimental", default_base_url=_COMPAT,
-    model="qwen3.5-omni-plus", config_schema=_KEY))
+    model="qwen3.5-omni-plus", config_schema=_KEY, cache_owner="none"))
 register_model(AdapterMeta(id="dashscope/qwen-omni-flash", provider="qwen-omni", vendor="dashscope",
     name="Qwen3.5-Omni-Flash (DashScope, audio LLM)", source="cloud", modes=["batch"], langs=["zh", "en"],
     model_kind="audio_llm", maturity="experimental", default_base_url=_COMPAT,
-    model="qwen3.5-omni-flash", config_schema=_KEY))
+    model="qwen3.5-omni-flash", config_schema=_KEY, cache_owner="none"))

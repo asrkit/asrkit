@@ -179,6 +179,27 @@ class SherpaLocal(BaseAdapter):
     def __init__(self, meta, config=None):
         super().__init__(meta, config)
         self._rec = None
+        self._rec_key = None
+
+    def close(self) -> None:
+        self._rec = None
+        self._rec_key = None
+
+    def _recognizer_for(self, d, opts, streaming, prefer):
+        key = (opts.lang_hint or "", bool(streaming), bool(opts.enable_itn), prefer)
+        if self._rec is None or self._rec_key != key:
+            rec = _build(
+                self.meta.config_type,
+                d,
+                4,
+                key[0],
+                key[1],
+                key[2],
+                key[3],
+            )
+            self._rec = rec
+            self._rec_key = key
+        return self._rec
 
     def is_installed(self):
         return store.is_installed(self.meta, self.config)
@@ -208,9 +229,7 @@ class SherpaLocal(BaseAdapter):
             win = self.meta.capabilities.get("max_input_duration_s")
 
             t0 = time.perf_counter()
-            if self._rec is None:
-                self._rec = _build(self.meta.config_type, d, 4,
-                                   opts.lang_hint or "", streaming, opts.enable_itn, prefer)
+            self._rec = self._recognizer_for(d, opts, streaming, prefer)
             load_ms = int((time.perf_counter() - t0) * 1000)
 
             t1 = time.perf_counter()
@@ -272,10 +291,7 @@ class SherpaLocal(BaseAdapter):
             return
         prefer = self.meta.tag or "int8"
         try:
-            if self._rec is None:
-                self._rec = _build(self.meta.config_type, d, 4,
-                                   opts.lang_hint or "", True, opts.enable_itn, prefer)
-            rec = self._rec
+            rec = self._recognizer_for(d, opts, True, prefer)
             st = rec.create_stream()
             sr = 16000                       # chunks 已是 16k 单声道 float32
             committed = ""

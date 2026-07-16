@@ -161,6 +161,48 @@ def test_transcribe_stream_audioformat_error_propagates(monkeypatch, tmp_path):
         list(ad.transcribe_stream(bad_chunks(), TranscribeOptions()))
 
 
+def test_sherpa_recognizer_runtime_key_reuses_and_rebuilds(monkeypatch, tmp_path):
+    """相同 language/streaming/ITN/tag 复用；任何一项变化都必须重建。"""
+    builds = []
+
+    def fake_build(config_type, model_dir, threads, language, streaming, use_itn, tag):
+        rec = object()
+        builds.append(((language, streaming, use_itn, tag), rec))
+        return rec
+
+    monkeypatch.setattr(local_sherpa, "_build", fake_build)
+    ad = local_sherpa.SherpaLocal(_streaming_meta())
+    opts = TranscribeOptions(lang_hint="en", enable_itn=True)
+
+    first = ad._recognizer_for(str(tmp_path), opts, streaming=True, prefer="int8")
+    again = ad._recognizer_for(str(tmp_path), opts, streaming=True, prefer="int8")
+    assert again is first
+    assert len(builds) == 1
+
+    assert ad._recognizer_for(
+        str(tmp_path), TranscribeOptions(lang_hint="zh", enable_itn=True), True, "int8"
+    ) is not first
+    assert ad._recognizer_for(
+        str(tmp_path), TranscribeOptions(lang_hint="zh", enable_itn=False), True, "int8"
+    ) is not builds[-2][1]
+    assert ad._recognizer_for(
+        str(tmp_path), TranscribeOptions(lang_hint="zh", enable_itn=False), False, "int8"
+    ) is not builds[-2][1]
+    assert ad._recognizer_for(
+        str(tmp_path), TranscribeOptions(lang_hint="zh", enable_itn=False), False, "fp32"
+    ) is not builds[-2][1]
+    assert [key for key, _ in builds] == [
+        ("en", True, True, "int8"),
+        ("zh", True, True, "int8"),
+        ("zh", True, False, "int8"),
+        ("zh", False, False, "int8"),
+        ("zh", False, False, "fp32"),
+    ]
+
+    ad.close()
+    assert ad._rec is None and ad._rec_key is None
+
+
 def test_api_stream_rejects_non_streaming_model():
     """非流式 model → 及早 ValueError(不迭代即抛)。"""
     with pytest.raises(ValueError):

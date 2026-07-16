@@ -13,6 +13,7 @@ from .types import (
     AdapterMeta,
     AudioInput,
     BaseAdapter,
+    ModelCacheState,
     PartialResult,
     Segment,
     TranscribeOptions,
@@ -30,4 +31,5 @@ __all__ = [
     "PartialResult",
     "AdapterMeta",
     "BaseAdapter",
+    "ModelCacheState",
 ]

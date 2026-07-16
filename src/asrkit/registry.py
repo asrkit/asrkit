@@ -48,7 +48,9 @@ def active_profile() -> str:
     return _profile or "full"
 
 
-def register_protocol(provider: str):
+def register_protocol(
+    provider: str,
+) -> Callable[[Type[BaseAdapter]], Type[BaseAdapter]]:
     def deco(cls: Type[BaseAdapter]) -> Type[BaseAdapter]:
         _PROTOCOLS[provider] = cls
         return cls
@@ -215,6 +217,7 @@ def _load_user_models() -> None:
                 tag=e.get("tag", "int8"),
                 base=e.get("base", ""),
                 sha256=e.get("sha256", ""),
+                cache_owner="asrkit",
             ))
         except Exception:
             pass

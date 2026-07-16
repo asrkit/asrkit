@@ -27,7 +27,7 @@ classifiers = [
 
 # 定位：ASRKit 是**接口**——引擎可插拔、模型可插拔、云端内置（代码/依赖极小）。
 # 基础安装 = 接口层 + 云端（只需 HTTP）。极小、秒装、随处可跑（含 asrkit serve 的调用方）。
-# 本地引擎按需加 extra；模型权重用 `asrkit pull` 下载；云端填 API key。
+# 本地引擎按需加 extra；ASRKit 受管模型用 `asrkit pull` 下载，外部引擎缓存归其自身；云端填 API key。
 dependencies = [
     "requests",              # 云端 HTTP（云端内置，依赖仅此一个）
 ]
@@ -65,6 +65,15 @@ path = "src/asrkit/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/asrkit"]
+
+# sdist 只承载可重建 wheel 所需的源码与公开元数据，内部规则/测试/状态不得发布。
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src/asrkit",
+    "/README.en.md",
+    "/LICENSE",
+    "/CHANGELOG.md",
+]
 
 # —— lint（ruff）——
 # 高价值低摩擦：pyflakes(F,真·死代码/bug) + pycodestyle(E/W)。忽略 E501（行长）：

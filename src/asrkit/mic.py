@@ -21,7 +21,13 @@ def record_chunks(samplerate: int = 16000, block_s: float = 0.1,
     return _record(np, sd, samplerate, block_s, device)
 
 
-def _record(np, sd, samplerate: int, block_s: float, device) -> Iterator[Any]:
+def _record(
+    np: Any,
+    sd: Any,
+    samplerate: int,
+    block_s: float,
+    device: Optional[Any],
+) -> Iterator[Any]:
     _LOG = log.get_logger("mic")
     blocksize = max(1, int(samplerate * block_s))
     stream = sd.InputStream(samplerate=samplerate, channels=1, dtype="float32",

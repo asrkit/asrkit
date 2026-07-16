@@ -7,14 +7,14 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Optional
+from typing import Any, Optional
 
 
 def path() -> str:
     return os.environ.get("ASRKIT_CONFIG") or os.path.expanduser("~/.asrkit/config.json")
 
 
-def load() -> dict:
+def load() -> dict[str, Any]:
     p = path()
     if not os.path.isfile(p):
         return {"keys": {}, "defaults": {}, "settings": {}}
@@ -28,7 +28,7 @@ def load() -> dict:
     return d
 
 
-def save(cfg: dict) -> str:
+def save(cfg: dict[str, Any]) -> str:
     # 注：无文件锁，采用"后写者胜"（本地单用户工具，并发 set-key 概率极低）。
     p = path()
     d = os.path.dirname(p)
@@ -46,12 +46,12 @@ def save(cfg: dict) -> str:
     return p
 
 
-def get_creds(vendor: str) -> dict:
+def get_creds(vendor: str) -> dict[str, Any]:
     """返回该 vendor 存储的凭据 dict（api_key / app_key / access_key），无则空 dict。"""
     return dict(load().get("keys", {}).get(vendor, {}))
 
 
-def set_creds(vendor: str, **kv) -> str:
+def set_creds(vendor: str, **kv: Any) -> str:
     """写入非空凭据字段（api_key/app_key/access_key）。返回配置文件路径。"""
     cfg = load()
     cur = cfg["keys"].get(vendor, {})

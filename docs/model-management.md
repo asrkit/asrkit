@@ -5,7 +5,7 @@
 
 ## 指导原则
 
-- **本地 = Ollama**：`pull` 即拉即用、`模型:tag` 命名、本地存储、`list/run/show`。
+- **ASRKit 管理的本地缓存 = Ollama**：`pull` 即拉即用、`模型:tag` 命名、本地存储、`list/run/show/rm`。外部引擎的共享缓存仍归引擎所有。
 - **云端 = LiteLLM 式体验**：公开寻址统一为 `<source>/<model>`、按 vendor 解析环境变量 key、后期再考虑 Router 兜底。
 - 目标用户零学习成本：用过 Ollama/LiteLLM 的人，直接会用 ASRKit。
 
@@ -27,20 +27,33 @@
 ## 二、本地存储（Ollama 式）
 
 - 根目录：`~/.asrkit/models/`（可用 `$ASRKIT_MODELS_ROOT` 覆盖）。
-- **v0.x（实现现状）**：**平铺** `models/<folder>/`，folder = 模型 id 去掉首段 namespace（如 `sherpa/sensevoice` → `models/sensevoice/`）。`tag` 只是**寻址别名**（`sensevoice:fp32` → 目录 `sensevoice-fp32`），**不是子目录**。安装为原子操作（`.partial` + rename）。
+- **v0.x（实现现状）**：**平铺** `models/<folder>/`，folder = 模型 id 去掉首段 namespace（如 `sherpa/sensevoice` → `models/sensevoice/`）。`tag` 只是**寻址别名**（`sensevoice:fp32` → 目录 `sensevoice-fp32`），**不是子目录**。每次 pull 使用私有临时目录和 staging,完成校验后在同分区原子 rename 到目标目录。
+- **破坏性操作边界**：`pull`/`rm`/`add-model --model-dir` 会拒绝把文件系统根、用户家目录、系统临时根、当前工作目录或 ASRKit 包/源码根当作 models root。若目标目录已经存在但不能通过该模型的安装文件校验，`pull` 不会覆盖，`rm` 也不会递归删除；请先人工确认并移走该目录。自定义 models root 仍是由操作者指定的信任边界，宜使用专门的空子目录。
 - **未来**（记着，不急做）：抄 Ollama 的 **manifest + 内容寻址 blob 去重** —— int8/fp32 共享的 `tokens.txt` 只存一份。ASR 的 onnx 文件大，去重有价值，但 v0.x 不做。
+
+### 缓存所有权与运行时就绪
+
+`installed` 与 `cached` 是两个不同事实：
+
+- `installed` 是 adapter-defined legacy installed/readiness signal,保留既有 `list --installed` 语义且随引擎而异：sherpa 检查受管模型文件,外部引擎通常检查运行时包是否存在。
+- `cached` 表示模型权重是否已知在本机缓存。ASRKit 不扫描或猜测 HuggingFace、whisper.cpp 等共享缓存，因此这些引擎返回 `null`（unknown）。
+- `cache_owner=asrkit` 的 sherpa/用户模型可由 `asrkit rm` 删除；`engine`、`none`、`unknown` 均拒绝删除，避免误删上游共享资产。
+
+`list --json` 增量提供 `cached`、`cache_owner`、`removable`；既有 `installed` 和 `size_bytes` 字段仍保留。
+
+Python 契约用冻结的 `ModelCacheState(owner, cached, removable, location, size_bytes)` 表达同一事实。`BaseAdapter.cache_state()` 默认只检查 ASRKit 明确拥有的 store,不会扫描外部缓存；`remove_cached_model()` 仅在 owner 为 `asrkit` 时进入 store 删除。第三方 `AdapterMeta.cache_owner` 的默认值是 `unknown`,插件只有在确实拥有完整生命周期时才应改为 `asrkit`。
 
 ---
 
 ## 三、CLI 动词（对齐 Ollama）
 
 ```bash
-asrkit pull  model[:tag] [--url URL]   # ✅ 下载（按内容识别 tar.bz2/gz/xz/纯tar/zip）+ 解压 + 原子安装；--url 覆盖默认下载地址
-asrkit run   model[:tag] 音频          # ✅ = pull（若缺）+ transcribe，Ollama 式一步到位
-asrkit list                             # ✅ 列出全部（✓=已安装）；支持 --json/--installed/--ids/--source/--lang/--arch 过滤
+asrkit pull  model[:tag] [--url URL]   # ✅ 通过 adapter 获取；ASRKit 自管模型按内容识别压缩格式并原子安装，外部引擎可委托其上游缓存
+asrkit run   model[:tag] 音频          # ✅ 确保 adapter 就绪后 transcribe；ASRKit 自管模型缺失时先 pull
+asrkit list                             # ✅ 列出全部（✓=adapter-defined legacy installed/readiness）；支持 --json/--installed/--ids/--source/--lang/--arch 过滤
 asrkit show  model                      # ✅ 详情：架构/精度/许可证/语言/multilingual（许可证数据待核实填充）
 asrkit transcribe 音频 -m model         # ✅ 只转写（不自动下载）
-asrkit rm    model[:tag]                # ✅ 删除已下载的本地模型
+asrkit rm    model[:tag]                # ✅ 仅删除 ASRKit 管理的模型缓存；外部引擎缓存会安全拒绝
 asrkit search term                      # ✅ 按 id/名称子串搜索模型
 asrkit stream model 音频 [--mic]        # ✅ 流式转写（文件分块或麦克风实时输入，见 result-contract.md §五）
 asrkit serve                            # ✅ 启动 OpenAI 兼容 HTTP 转写网关
@@ -50,7 +63,7 @@ asrkit engine list/install/default/rm   # ✅ 引擎管理（见 engines-and-add
 asrkit config set-key/get-key/set/list/path   # ✅ 密钥与配置管理（见 §七）
 asrkit add-model <id> [--url ...] [--sha256 ...] [--model-dir ...]   # ✅ 注册自定义模型，见 engines-and-addressing.md §九
 # —— 以下为路线项，尚未实现 ——
-asrkit list --available            # 🔜 目前没有"仅列可远程获取"的过滤开关；list 总是列出全部内置+已注册模型（可配合 --installed 反向过滤已装的）
+asrkit list --available            # 🔜 目前没有"仅列可远程获取"的过滤开关；list 总是列出全部内置+已注册模型（--installed 只能筛出 installed/readiness 为 true 的本地项）
 ```
 
 `transcribe` 保留（编程/明确语义）；`run` 是 Ollama 式的傻瓜入口。
@@ -95,7 +108,7 @@ sensevoice:
 
 ## 六、v0.x 落地范围
 
-**已完成**：`模型:精度` 命名 + 平铺 `models/<model>/` 存储 + `pull`（支持 `--url`、多压缩格式自动识别）/ `run` / `list` / `show` / `rm` / `search` / `add-model`；精度 `int8`(默认) / `fp32`；云端 `<source>/<model>` 路由 + 环境变量/配置文件 key 解析。
+**已完成**：`模型:精度` 命名 + 平铺 `models/<model>/` 存储 + ASRKit 自管缓存的 `pull`（支持 `--url`、多压缩格式自动识别）/安全 `rm` + `run` / `list` / `show` / `search` / `add-model`；精度 `int8`(默认) / `fp32`；云端 `<source>/<model>` 路由 + 环境变量/配置文件 key 解析。
 
 **不做**：blob 去重、Router 兜底、评测/横评（见 `roadmap.md` 的独立项目决定）。
 

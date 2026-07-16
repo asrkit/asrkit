@@ -4,6 +4,7 @@ on:
   workflow_dispatch: {}
   push:
     branches: [main]
+    tags: ["v*"]
     paths:
       - ".github/workflows/cloud-runtime.yml"
       - "packaging/cloud/**"
@@ -22,12 +23,17 @@ on:
       - "tests/test_cloud_runtime.py"
       - "tests/test_daemon.py"
 
+permissions:
+  contents: read
+
 jobs:
   linux-x64:
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -44,7 +50,13 @@ jobs:
         shell: bash
         run: |
           version="$(PYTHONPATH=src python -c 'import asrkit; print(asrkit.__version__)')"
-          archive="asrkit-cloud-v${version}-linux-x64-gnu.tar.gz"
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" && "${GITHUB_REF_NAME:-}" == "v${version}" ]]; then
+            artifact_name="asrkit-cloud-v${version}-linux-x64-gnu"
+          else
+            short_sha="${GITHUB_SHA:0:7}"
+            artifact_name="asrkit-cloud-v${version}-${short_sha}-linux-x64-gnu"
+          fi
+          archive="${artifact_name}.tar.gz"
           mkdir -p artifacts
           tar \
             --sort=name \
@@ -56,10 +68,10 @@ jobs:
             -czf "artifacts/$archive" \
             asrkit-cloud
           (cd artifacts && sha256sum "$archive" >"$archive.sha256")
-          echo "version=$version" >>"$GITHUB_OUTPUT"
+          echo "name=$artifact_name" >>"$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
-          name: asrkit-cloud-v${{ steps.artifact.outputs.version }}-linux-x64-gnu
+          name: ${{ steps.artifact.outputs.name }}
           path: artifacts/
           if-no-files-found: error
           retention-days: 14
