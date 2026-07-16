@@ -158,7 +158,7 @@ def test_asrkit_cloud_module_version_uses_current_source(tmp_path: Path) -> None
         text=True,
     )
 
-    assert proc.stdout.strip() == "asrkit-cloud 0.5.4"
+    assert proc.stdout.strip() == "asrkit-cloud 0.5.5"
     assert proc.stderr == ""
 
 

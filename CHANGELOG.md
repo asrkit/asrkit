@@ -12,7 +12,20 @@
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-07-16
+
+主题：**稳定性、资源生命周期与发布契约收口**（纯 PATCH；保持模型寻址、CLI 核心语义和透明音频契约兼容）。
+
+### 安全与稳定
+- **HTTP 资源边界**：转写入口新增上传体积、活动并发、请求超时与 Origin 防护；非法格式、未知模型、能力不匹配和未配置模型在创建 adapter 或推理前失败，降低无效计费风险。
+- **adapter 生命周期**：serve 改为 app-scoped single-flight manager；默认串行调用，显式支持共享的云 adapter 可并发；LRU 淘汰、SSE、超时、取消和 shutdown 均持有真实 worker lease 并执行 `close()`。
+- **模型缓存所有权**：新增 `ModelCacheState` 与 `cache_owner`，仅允许删除明确归 ASRKit 管理的缓存；外部引擎、云端和未知所有权缓存均安全拒删。
+- **模型目录与归档防护**：拒绝危险 models root、覆盖不完整既有目录或递归删除未验证目录；下载限制 HTTP(S) 重定向，tar/zip 解包增加成员数、路径、单文件及总大小预算并拒绝链接和特殊文件。
+- **构建与发布物防护**：cloud 构建环境使用受管 marker 和删除边界；wheel/sdist 使用 allowlist 与独立审计器，CI 验证从 sdist 重建 wheel 后的精确内容一致性。
+
 ### 工程
+- **公开契约类型化**：补齐公共 API、缓存状态和 adapter 生命周期 hook 类型；顶层导出 `ModelCacheState`，并增加严格类型门与对应文档。
+- **高风险路径回归矩阵**：覆盖 413/429/504、取消、断连、SSE、adapter 构造竞争、归档资源耗尽、危险目录和隔离安装；发布候选可在临时目录完成 wheel/sdist 审计、重建与双路径安装冒烟。
 - **CLI 模块化收口**：将单文件 `cli.py` 拆为 `cli_commands/` 下的 parser、共享 helper 与六组命令 handler；命令、参数、输出和退出码保持不变。
 - **入口回归保护**：覆盖全部 14 个顶层命令的分发、嵌套帮助、`python -m asrkit.cli`、argparse 退出码、未知模型退出码和 `cli.api` 整体 monkeypatch 兼容性。
 - **薄内核回归保护**：在隔离子进程中从当前 `src/` 加载包，覆盖内置注册表、五类 adapter、安装探测、CLI 列表及 `server`/`mic` 轻量模块；主动阻断 torch、transformers、sherpa、numpy、FastAPI 等可选运行时的提前导入。

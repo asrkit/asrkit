@@ -175,7 +175,7 @@ def test_python_module_entrypoint_reports_version():
         text=True,
     )
 
-    assert proc.stdout.strip() == "asrkit 0.5.4"
+    assert proc.stdout.strip() == "asrkit 0.5.5"
     assert proc.stderr == ""
 
 

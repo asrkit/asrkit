@@ -242,7 +242,7 @@ def test_embedded_process_ready_auth_health_and_shutdown(tmp_path):
             health = json.load(response)
         assert health == {
             "status": "ok",
-            "version": "0.5.4",
+            "version": "0.5.5",
             "protocol_version": 1,
             "distribution": "cloud",
         }
