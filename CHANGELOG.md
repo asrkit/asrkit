@@ -12,6 +12,9 @@
 
 ## [Unreleased]
 
+### 工程
+- **PyPI Trusted Publishing**：新增独立 release workflow；GitHub Release 发布后，从对应、已进入 `main` 的精确 `vX.Y.Z` tag 构建并审计 wheel/sdist，再由只持有 OIDC 权限的隔离 job 发布到 PyPI，无需长期 API Token。
+
 ## [0.5.5] - 2026-07-16
 
 主题：**稳定性、资源生命周期与发布契约收口**（纯 PATCH；保持模型寻址、CLI 核心语义和透明音频契约兼容）。
