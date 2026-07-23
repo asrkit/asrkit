@@ -15,6 +15,8 @@ It brings an uncommon combination under one interface: Chinese SOTA on-device mo
 
 > ⚠️ **Early beta, under active development.** The core interface is usable, but we're still iterating — addressing/APIs may shift slightly between minor versions. Try it and tell us what breaks.
 
+> **Current release boundary:** PyPI 0.5.5 includes the complete CLI/Python API, `serve`, and the cloud-only daemon Python module. The self-contained `asrkit-cloud` binary and npm platform packages are **not formally released yet**; do not treat the frozen-runtime prototypes in this repository as public distributions. See the [roadmap](docs/roadmap.md) for current status.
+
 ## Install — pick your way, it's not pip-only
 
 The base install needs only `requests` (cloud is built in); engines/models/`serve` are all opt-in. So **cloud-only use is nearly zero-setup** — pick the row that fits you:
@@ -63,6 +65,7 @@ print(transcribe("sherpa/sensevoice", "audio.wav").text)
 - **A Chinese/multilingual-first edge-and-cloud combination.** 47 sherpa on-device models + 5 cloud vendors out of the box; China cloud providers and Chinese on-device models are first-class citizens, not an afterthought.
 - **The interface is the core; everything is pluggable.** The base install ships only the interface + cloud (just `requests`); engines, models, and the server are all add-ons. Use an engine you haven't installed → **a friendly error with the install command**, not an `ImportError`.
 - **Learn once, use three ways.** CLI, Python library, and HTTP (OpenAI-compatible serve) — one model addressing scheme across all of them.
+- **Compatibility is gated by real clients.** CI uses the official OpenAI Python and Node SDKs to call the model list and `json`/`text`/`verbose_json` transcription paths instead of relying only on handwritten HTTP tests.
 - **Transparent by design.** It doesn't touch your audio or change a model's native behavior by default. Wrong format? An honest error — never silent garbage. Unsupported options warn instead of being silently dropped. Conversion and chunking are opt-in.
 - **Clear data boundaries.** ASRKit itself does not host or collect audio. Local models stay on-device; cloud models send audio and required credentials to the provider you select, under that provider's privacy terms.
 
@@ -178,11 +181,18 @@ from openai import OpenAI
 c = OpenAI(base_url="http://localhost:11435/v1", api_key="unused")
 c.audio.transcriptions.create(model="sherpa/sensevoice", file=open("a.wav", "rb"))
 ```
+- SDK contract: CI continuously verifies the model list and `json`/`text`/`verbose_json` with the official OpenAI Python and Node SDKs; `verbose_json` exposes the SDK-facing `language` field. ASRKit promises only the [documented compatibility subset](docs/openai-compatibility.md), not the complete OpenAI Audio or Realtime API.
 - Endpoints: `POST /v1/audio/transcriptions` (`response_format`: json/verbose_json/text/srt/vtt), `GET /v1/models`, `GET /health`.
 - Streaming: add `stream=true` to the same endpoint → `text/event-stream`, OpenAI-compatible `transcript.text.delta` (partial) / `transcript.text.done` (final) events; temp files are cleaned up automatically on disconnect. Only streaming models are supported — requesting `stream=true` on a non-streaming model errors out.
 - Runtime lifecycle: each app owns a capacity-target adapter LRU and a fixed worker pool. Construction is single-flight per canonical model id; adapters are serialized by default unless they opt into concurrent calls, and active requests pin an adapter until batch or SSE work really finishes. Normal `asrkit serve` defaults to 200 MiB uploads, 4 active transcriptions, and a 300-second timeout; direct `build_app()` embedders should set their own limits. Eviction and app shutdown call the adapter's `close()` hook.
 - Loopback browser defense: transcription POSTs carrying a non-empty `Origin` header are rejected by default, preventing an arbitrary web page from triggering local inference or configured cloud billing. Put an authenticated gateway with an exact CORS allowlist in front when browser access is intentional.
 - Cloud keys can come from a **plaintext config file protected with 0600 permissions**, so no per-request key is needed; use environment variables if you do not want credentials persisted. Transparent: raw bytes uploaded, no decoding.
+
+## Embedded cloud daemon and distribution status
+
+The `python -m asrkit.daemon` module shipped in the 0.5.5 Python package is the cloud-only entry point for the future `asrkit-cloud` Sidecar. Its process registers only the 10 built-in cloud models and supports embedded random ports, ready/shutdown NDJSON, parent-process monitoring, bearer tokens, a private data directory, and resource limits. It exists for host integration and frozen-runtime validation; see [embedding and distribution](docs/embedding-and-distribution.md) for the complete contract.
+
+The repository currently has frozen-runtime evidence for macOS arm64 and Linux x64, plus a manual-only two-provider cloud E2E bound to a protected environment. Missing credentials or a bad transcript fail the run instead of being skipped. However, the complete wheel does **not** install an `asrkit-cloud` top-level command, GitHub Releases do not yet carry a formal self-contained binary, and the npm `asrkit`/platform packages remain the next delivery phase.
 
 ## Extend it
 

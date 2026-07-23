@@ -19,7 +19,7 @@
 - **两厂真实云 E2E**：新增仅可手动触发、绑定 `cloud-e2e` 受保护环境的 DashScope + SiliconFlow/Doubao 转写工作流；使用固定许可音频,缺密钥、空结果或识别锚点不足均硬失败,且不上传响应或日志 artifact。
 
 ### 文档
-- **0.5.5 事实收口**：统一路线图、项目概览、产品形态、OpenAI 兼容范围与 Sidecar 分发文档,明确 Python daemon 模块已经发布、自包含 `asrkit-cloud` 二进制仍未作为发行资产发布。
+- **0.5.5 事实收口**：同步中英文 README、路线图、项目概览、产品形态、OpenAI 兼容范围与 Sidecar 分发文档；明确官方 Python/Node SDK 契约证据、Python daemon 模块已发布，以及自包含 `asrkit-cloud` 二进制/npm 平台包仍未作为发行资产发布。
 
 ### 修复
 - **官方 SDK verbose 字段**：`verbose_json` 在 HTTP 边界把内部 `lang` 映射为 OpenAI SDK 读取的 `language`,不改变 Python `TranscribeResult.lang` 与 CLI 输出契约。
