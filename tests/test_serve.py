@@ -18,7 +18,11 @@ def _register_stub_model():
     @registry.register_protocol("stub-serve")
     class _Stub(BaseAdapter):
         def transcribe(self, audio, opts):
-            return TranscribeResult(text="hello from stub", lang="en")
+            return TranscribeResult(
+                text="hello from stub",
+                lang=opts.lang_hint or "en",
+                segments=[Segment(0.0, 1.0, "hello from stub")],
+            )
 
     registry.register_model(AdapterMeta(
         id="stub/echo", provider="stub-serve", vendor="stub", name="Stub",
@@ -158,6 +162,22 @@ def test_transcription_json(client):
                     files={"file": ("a.wav", _wav_bytes(), "audio/wav")})
     assert r.status_code == 200
     assert r.json()["text"] == "hello from stub"
+
+
+def test_transcription_verbose_json_uses_openai_language_field(client):
+    response = client.post(
+        "/v1/audio/transcriptions",
+        data={"model": "stub/echo", "language": "fr", "response_format": "verbose_json"},
+        files={"file": ("a.wav", _wav_bytes(), "audio/wav")},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["text"] == "hello from stub"
+    assert payload["language"] == "fr"
+    assert "lang" not in payload
+    assert payload["segments"] == [
+        {"start": 0.0, "end": 1.0, "text": "hello from stub"}
+    ]
 
 
 def test_unknown_model_404(client):

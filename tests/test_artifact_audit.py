@@ -325,4 +325,4 @@ def test_ci_builds_and_rebuilds_artifacts_without_build_isolation():
     assert "--no-build-isolation" in workflow
     assert "--compare-wheels" in workflow
     assert "permissions:\n  contents: read" in workflow
-    assert workflow.count("persist-credentials: false") == 2
+    assert workflow.count("persist-credentials: false") == 3

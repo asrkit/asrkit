@@ -1,7 +1,7 @@
 # ASRKit 项目详情概览
 
-> 快照日期:2026-07-13(已发布版本 v0.5.4)。这是一份"项目全貌"文档,给新协作者/未来的自己快速建立完整心智。
-> 当前源码另含尚未发布的 CLI 模块拆分、模型软链加固、nightly E2E/薄内核/源码验证收口、cloud-only profiles、daemon embedded/安全契约和文档修订;它们不是 v0.5.4 的发布事实。
+> 快照日期:2026-07-23(已发布版本 v0.5.5)。这是一份"项目全貌"文档,给新协作者/未来的自己快速建立完整心智。
+> CLI 模块拆分、模型软链加固、nightly E2E/薄内核/源码验证收口、cloud-only profiles 与 daemon embedded/安全契约均已随 0.5.5 发布；自包含 `asrkit-cloud` 二进制仍未发布。
 > 历史分析快照见 [expert-review-2026-07.md](archive/expert-review-2026-07.md) 与 [lifecycle-audit.md](archive/lifecycle-audit.md)；它们不再维护。当前待办只看 [roadmap.md](roadmap.md)。
 > 产品北极星见 [product-form.md](product-form.md);单仓库多发行物、npm/Node/Electron 集成、Sidecar 平台分发与未来 Go 运行时边界见 [embedding-and-distribution.md](embedding-and-distribution.md)。
 
@@ -21,11 +21,11 @@
 
 | 维度 | 值 |
 |---|---|
-| 版本 | **0.5.4**(单一版本源 `src/asrkit/__init__.py`,hatchling 动态读) |
-| 代码规模 | 当前源码 Python 源码 4542 行 / 48 文件;测试/E2E 3370 行 / 26 文件 |
-| 测试 | 244 passed, 1 skipped;nightly 真实 E2E 1 passed;wheel 安装 smoke、ruff、mypy 全绿(2026-07-13,源码路径与 daemon 真实子进程验证) |
+| 版本 | **0.5.5**(单一版本源 `src/asrkit/__init__.py`,hatchling 动态读) |
+| 代码规模 | 当前源码 Python 源码 6026 行 / 49 文件;测试/E2E 6577 行 / 35 文件 |
+| 测试 | 443 collected,435 passed/8 optional-runtime skipped；官方 Python 2.47.0/Node 6.48.0 SDK 本地契约、wheel/sdist 重建审计、ruff、mypy 全绿(2026-07-23)；nightly 真实端侧 E2E 持续通过 |
 | 模型总数 | 71(47 sherpa 端侧 + 7 faster-whisper + 5 whispercpp + 2 transformers 精选 + 10 云端) |
-| 成熟度 | 早期 Beta —— 内核 + 外围能力已随 0.5.0→0.5.4 补齐,流式契约(文件/分段/麦克风/serve SSE 四入口)已首次完整行使;分发、安全边界和 ASR 专业字段仍需继续收口 |
+| 成熟度 | 早期 Beta —— 内核 + 外围能力已随 0.5.0→0.5.5 补齐,流式契约与官方 Python/Node SDK 兼容子集已有持续门禁；真实云凭据 E2E、跨平台分发和 ASR 专业字段仍需继续收口 |
 
 ---
 
@@ -42,7 +42,7 @@
 - **引擎**:`engine list/install/default/rm`(rm 为劝告版,绝不代跑 pip uninstall)。
 - **配置**:`config set-key/get-key/set/list/path`(本地明文配置 0600、展示时打码)。
 - **服务**:`serve`(OpenAI 兼容 HTTP,支持 `stream=true` SSE)。
-- **云端独立版构建入口**:`python -m asrkit.daemon`(当前源码,尚未发布)在进程首次加载前锁定 cloud profile,只暴露 10 个内置云模型；`--embedded` 已提供随机端口、ready/shutdown、父进程监控、Bearer 鉴权和资源边界。完整 wheel 不安装 `asrkit-cloud` 命令,该名称专留给未来自包含二进制。
+- **云端独立版构建入口**:`python -m asrkit.daemon` 已随 0.5.5 Python 包发布,在进程首次加载前锁定 cloud profile,只暴露 10 个内置云模型；`--embedded` 已提供随机端口、ready/shutdown、父进程监控、Bearer 鉴权和资源边界。完整 wheel 不安装 `asrkit-cloud` 命令,该名称专留给未来自包含二进制。
 - **体检**:`doctor [--net]`(引擎/密钥/models目录/config;硬问题退非零)。
 - **补全**:`completion <bash|zsh|fish>`。
 
@@ -77,7 +77,7 @@
 路由   registry.py + profiles/   full/cloud 进程 profile、provider→adapter、id→meta、别名、开放 provider、插件
 引擎   engines.py       引擎清单/安装状态/默认引擎解析
 门面   api.py           transcribe/pull/run/show/remove/list_models/transcribe_stream(_mic)
-CLI    cli.py + cli_commands/   完整 Python CLI；daemon/ = asrkit-cloud 的命令/设置/安全/生命周期边界(均尚未发布)
+CLI    cli.py + cli_commands/   完整 Python CLI；daemon/ = 已发布 Python 模块中的 cloud 命令/设置/安全/生命周期边界
 体检   doctor.py        asrkit doctor —— 引擎/密钥/models目录/config 体检
 补全   completion.py    asrkit completion <bash|zsh|fish>
 日志   log.py           标准 logging 封装,-v/-vv 分级
@@ -101,6 +101,7 @@ adapters/  本地4引擎(sherpa 通吃 16 个 config_type / faster-whisper / whi
 
 - **版本纪律**:升号必人类批准,默认 PATCH;已发布(tag/PyPI)永久冻结。见 [CLAUDE 准则 / CHANGELOG]。
 - **CI 双门**:`ruff` + `mypy` + Python 3.9/3.13 测试矩阵;nightly 用固定 LibriSpeech fixture 执行 `sherpa/whisper-tiny` 的真实下载与推理,依赖/样本/下载/推理失败均为硬失败。
+- **官方 SDK 契约**:CI 以精确版本的 OpenAI Python/Node SDK 真实调用 `/v1/models` 与三种转写响应；独立手动工作流经受保护环境对 DashScope + SiliconFlow/Doubao 执行两厂真实转写,不使用 skip 兜底。
 - **源码与产物双验**:普通 `python -m pytest` 强制命中当前 `src/`;CI 另从 wheel 临时安装目录启动完整 CLI 与 cloud 构建入口,检查命令所有权元数据和内置模型注册,避免“源码绿、安装包坏”。
 - **全留档**:CHANGELOG、结果契约文档、每个功能波的历史 spec + plan(`docs/archive/superpowers/`)。
 - **开发流程**(W1/W2 实践):spec → Codex 评审 → 实现计划 → subagent 逐任务实现 + 两段式评审(契约+质量)→ opus 终审 → 合并。
@@ -115,7 +116,7 @@ adapters/  本地4引擎(sherpa 通吃 16 个 config_type / faster-whisper / whi
 1. **契约空字段**:`enable_punctuation`/`cost_estimate`/word timestamps 尚未普遍兑现。
 2. **模型供应链**:下载 URL 手维护,license/sha256 覆盖不足,缺持续健康检查。
 3. **跨平台**:常规 CI 只有 Linux;Windows 尚未验证,未来 Sidecar 还需要三平台构建与签名。
-4. **HTTP 分发**:普通 `serve` 仍无内置鉴权、只定位受信任本机，但当前源码已有上传/并发/超时上界和浏览器 `Origin` 防护；`asrkit-cloud` 另具备 embedded token、macOS arm64 原型和 Linux x64 无 Python Debian 验证,但真实云转写、其余平台构建与签名仍未完成。
+4. **HTTP 分发**:普通 `serve` 仍无内置鉴权、只定位受信任本机，但已有上传/并发/超时上界和浏览器 `Origin` 防护；daemon 另具备 embedded token、macOS arm64 原型和 Linux x64 无 Python Debian 验证。官方 SDK 本地契约已通过,真实云工作流仍需配置环境密钥并取得首轮远端证据。
 
 ### 后续候选(按需,均非紧要,与 roadmap.md 一致)
 - **词级时间戳**:流式/批量的 word-level timestamps(sherpa/whisper 部分支持);有明确消费者再做。
@@ -131,8 +132,8 @@ adapters/  本地4引擎(sherpa 通吃 16 个 config_type / faster-whisper / whi
 | W3 | 元数据修真 + 发现 + 体检 | 已完成(0.5.3) |
 | W4 | 最小流式(文件入口) | 已完成(0.5.3) |
 | 流式扩面 | 端点分段(E)/ 麦克风(C)/ serve SSE(D) | 已完成(0.5.4) |
-| 工程收口 | CLI + 可信性缺口 | 已完成并评审,尚未发布 |
-| 当前 P0 | `asrkit-cloud` 形态验证 | profiles/daemon/embedded/安全、macOS arm64 原型和 Linux x64 无 Python验证已完成；真实云转写、平台矩阵与 npm `asrkit` 下一步 |
+| 工程收口 | CLI + 可信性缺口 | 已完成并随 0.5.5 发布 |
+| 当前 P0 | `asrkit-cloud` 形态验证 | profiles/daemon/embedded/安全、官方 Python/Node SDK 契约、macOS arm64 原型和 Linux x64 无 Python验证已完成；真实云工作流待密钥首跑,平台矩阵与 npm `asrkit` 下一步 |
 | 生态 | asrbench / 插件 conformance / 专业字段 | P0 稳定后按需启动 |
 
 **1.0 门槛**(遥远且刻意):三样"项目宪法"——model string 寻址 / adapter 契约 / CLI 核心命令——稳定且愿背书。流式契约(W4 + 流式扩面)已首次完整行使,是 1.0 前必经关的已完成项。
@@ -153,4 +154,4 @@ adapters/  本地4引擎(sherpa 通吃 16 个 config_type / faster-whisper / whi
 
 ---
 
-> 一句话:**cloud-only、embedded、安全边界、macOS arm64 原型和 Linux x64 无 Python验证已落地；下一刀是真实云转写和其余平台矩阵,再用 npm `asrkit` 隐藏平台选择和生命周期。**
+> 一句话:**cloud-only、embedded、安全边界、官方 Python/Node SDK 契约、macOS arm64 原型和 Linux x64 无 Python验证已落地；下一刀是给受保护环境配置密钥并取得两厂真实转写证据,随后推进平台矩阵与 npm `asrkit`。**

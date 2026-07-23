@@ -445,7 +445,7 @@ def test_cloud_runtime_workflow_connects_build_clean_smoke_and_artifact():
 
     assert "python packaging/cloud/build.py" in workflow
     assert "smoke-linux-container.sh dist/asrkit-cloud" in workflow
-    assert "actions/upload-artifact@v4" in workflow
+    assert "actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5" in workflow
     assert "sha256sum" in workflow
     assert '${GITHUB_SHA:0:7}' in workflow
     assert "steps.artifact.outputs.name" in workflow

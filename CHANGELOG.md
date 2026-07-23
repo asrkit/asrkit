@@ -14,6 +14,15 @@
 
 ### 工程
 - **PyPI Trusted Publishing**：新增独立 release workflow；GitHub Release 发布后，从对应、已进入 `main` 的精确 `vX.Y.Z` tag 构建并审计 wheel/sdist，再由只持有 OIDC 权限的隔离 job 发布到 PyPI，无需长期 API Token。
+- **Actions 运行时与供应链**：checkout/setup-python/setup-node/artifact/PyPI Actions 全部升级到 Node 24 代际并固定官方提交 SHA；发布后独立检查精确 PyPI 版本可用,不再把 GitHub Release 存在等同于 PyPI 已就绪。
+- **官方 SDK 契约**：CI 固定 OpenAI Python SDK 2.47.0 与 Node SDK 6.48.0,真实调用 ASRKit 的模型列表以及 `json`/`text`/`verbose_json` 转写子集；无 skip 或软失败路径。
+- **两厂真实云 E2E**：新增仅可手动触发、绑定 `cloud-e2e` 受保护环境的 DashScope + SiliconFlow/Doubao 转写工作流；使用固定许可音频,缺密钥、空结果或识别锚点不足均硬失败,且不上传响应或日志 artifact。
+
+### 文档
+- **0.5.5 事实收口**：统一路线图、项目概览、产品形态、OpenAI 兼容范围与 Sidecar 分发文档,明确 Python daemon 模块已经发布、自包含 `asrkit-cloud` 二进制仍未作为发行资产发布。
+
+### 修复
+- **官方 SDK verbose 字段**：`verbose_json` 在 HTTP 边界把内部 `lang` 映射为 OpenAI SDK 读取的 `language`,不改变 Python `TranscribeResult.lang` 与 CLI 输出契约。
 
 ## [0.5.5] - 2026-07-16
 

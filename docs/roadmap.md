@@ -1,6 +1,6 @@
 # ASRKit 路线图 / 当前执行队列
 
-> 当前事实快照:2026-07-15,已发布版本为 0.5.4(PyPI + tag)。发布历史只以 [CHANGELOG](../CHANGELOG.md) 为准;产品边界见 [product-form.md](product-form.md)。
+> 当前事实快照:2026-07-23,已发布版本为 0.5.5(PyPI + tag)。发布历史只以 [CHANGELOG](../CHANGELOG.md) 为准;产品边界见 [product-form.md](product-form.md)。
 > 本文是**唯一当前执行队列**。历史评审、spec 和 plan 在 [archive/](archive/) 中保留原始时点,不再作为当前待办。
 
 ---
@@ -12,12 +12,13 @@
 - **0.5.2**:批量/目录/glob/stdin、NDJSON/csv/tsv、分级退出码、成本安全 HTTP 重试、下载源覆盖和多格式模型包。
 - **0.5.3**:segments/字幕、选项诚实告警、元数据筛选、搜索/补全/doctor、最小文件流式。
 - **0.5.4**:流式端点分段、麦克风、serve SSE、日志、`engine rm`、有界 LRU、豆包长音频轮询与 `sherpa/` 寻址正名。
+- **0.5.5**:HTTP/adapter/缓存/归档安全边界、CLI 模块化、可信构建与安装 smoke、cloud-only daemon/embedded 契约及 Linux 冻结原型验证。
 
 当前注册表:71 个模型(61 local + 10 cloud),其中 sherpa 47 个;Python/CLI/HTTP 三个入口均已落地。HTTP 兼容范围见 [openai-compatibility.md](openai-compatibility.md)。
 
 ---
 
-## 已完成、尚未发布的工程收口
+## 0.5.5 已发布的工程收口
 
 1. **CLI 模块拆分**:`cli.py` 已收缩为入口与分发表,实现进入 `cli_commands/`;已锁定全部 14 个命令分发、帮助/退出码、`cli.api` mock seam 和可选依赖延迟导入,源码路径全量验证通过。
 2. **`add-model --model-dir` 外部软链**:允许 models root 内的 leaf symlink 指向有效外部目录;父路径软链、递归源目录、空/`.`/`..` ID 和 runtime `model_dir` 破坏性写删仍被拒绝;`rm` 只 unlink,不完整外链不被 `pull` 覆盖。已有 CLI 端到端与安全回归测试。
@@ -28,19 +29,19 @@
 7. **embedded 与安全契约**:`--embedded` 默认随机端口,通过纯 stdout NDJSON 报告 ready/shutdown；强制 loopback、宿主 token、私有 data dir、父进程监控和信号优雅退出。网关已具备 200 MiB 上传、4 并发、300 秒转写和 10 秒关停默认边界,并覆盖 401/413/429/504 与临时文件清理。
 8. **macOS arm64 冻结原型**:已建立隔离 venv、PyInstaller `onedir` spec、自定义 Uvicorn HTTP hook 和冻结产物 smoke；约 32 MiB 的本地产物已在清除 Python/Conda/ASRKit 环境并收缩 PATH 的子进程中通过 version/help、ready/shutdown、health、鉴权、10 云模型和父进程退出验证。产物不包含本地 adapter 或其重依赖,动态库无开发机绝对路径引用。
 
-以上八项已经完成但尚未进入已发布版本。Linux x64 已进一步取得无 Python 干净宿主证据；当前开发焦点转入真实云转写和其余平台的发行验证。
+以上源码与 Python 模块能力已经随 0.5.5 发布。自包含 `asrkit-cloud` 二进制仍只是构建原型,尚未作为 GitHub Release 资产发布；当前开发焦点转入官方 SDK 契约、真实云转写和其余平台的发行验证。
 
 ## P0 · `asrkit-cloud` 产品形态验证
 
-1. **已完成（当前源码,尚未发布）**:cloud-only 加载入口与 `asrkit-cloud` 内部构建入口；只注册 10 个内置云模型,不加载本地引擎、插件或用户模型；完整 Python wheel 只占用 `asrkit` 命令。
-2. **已完成（当前源码,尚未发布）**:embedded 契约:`--embedded --port 0`、ready/shutdown NDJSON、父进程监控、显式 data dir 和信号优雅关停。
-3. **已完成（当前源码,尚未发布）**:loopback 强制、宿主随机 bearer token、上传上限、并发/超时与断连清理。
+1. **已完成（0.5.5 Python 模块）**:cloud-only 加载入口与 `asrkit-cloud` 内部构建入口；只注册 10 个内置云模型,不加载本地引擎、插件或用户模型；完整 Python wheel 只占用 `asrkit` 命令。
+2. **已完成（0.5.5 Python 模块）**:embedded 契约:`--embedded --port 0`、ready/shutdown NDJSON、父进程监控、显式 data dir 和信号优雅关停。
+3. **已完成（0.5.5 Python 模块）**:loopback 强制、宿主随机 bearer token、上传上限、并发/超时与断连清理。
 4. **已完成（macOS arm64 本机原型）**:用隔离环境构建 PyInstaller `onedir`,以干净子进程 smoke 锁定运行目录、HTTP 栈、cloud-only 模型和 embedded 生命周期；`onefile` 后置。
 5. **Linux x64 无 Python 验证已完成**:GitHub Actions [run 29396109425](https://github.com/asrkit/asrkit/actions/runs/29396109425) 已构建 onedir,并在不含 Python 的只读 Debian 容器通过完整 embedded HTTP 生命周期；可复现 tar.gz、SHA256 和临时 artifact 均已生成。仍需以受控密钥完成真实云转写,并验证其余平台。
 6. 建立 macOS arm64/x64、Windows x64、Linux glibc arm64/x64 构建和 smoke matrix;签名、SHA256、SBOM 与第三方许可证属于交付物的一部分。
 7. 在同一仓库实现 npm `asrkit` 薄 SDK,通过内部 `@asrkit/cloud-<platform>` 包按 OS/CPU/libc 携带运行时;不复制云厂 adapter,不使用首版 `postinstall` 下载。
 8. 验证 npm/pnpm、Node 和 Electron `extraResources` 集成,让产品开发者只需安装 `asrkit`,无需手工选择或管理二进制。
-9. 用官方 OpenAI Python/Node SDK 验证已声明的兼容子集,并真实接通至少两家中国云厂。
+9. **部分完成**:官方 OpenAI Python 2.47.0/Node 6.48.0 SDK 已在 CI 对模型列表和 `json`/`text`/`verbose_json` 做硬失败契约测试；DashScope + SiliconFlow/Doubao 的受保护手动 E2E 已落地,待配置环境密钥并取得首轮两厂远端证据。
 10. 接入一个真实桌面应用,验证随宿主启动、退出和升级。
 
 详细规范见 [embedding-and-distribution.md](embedding-and-distribution.md)。源码保持单仓库,PyPI/npm/平台运行时/Docker 是同一项目的不同产物。纯 Go 第二代必须等待冻结版获得真实采用后再决定。
@@ -52,7 +53,8 @@
 - 增加模型 URL/资产健康检查,避免 47 条手维护下载源静默腐烂。
 - 增加 Windows 验证或在支持矩阵中明确未验证;二进制目标另需 macOS/Linux/Windows 构建与签名。
 - npm 平台包使用精确版本、平台元数据和发布 provenance;主包后发,不得指向缺失平台产物。
-- 增加 sdist 安装 smoke、依赖安全检查和更完整的发布产物校验；wheel 安装 smoke 已在当前源码落地。
+- 增加依赖安全检查；sdist 重建、wheel 双路径安装 smoke 与发布产物校验已在 0.5.5 CI 落地。
+- **已完成**:所有 GitHub Actions 升级到 Node 24 代际并固定官方提交 SHA；发布流分别验证 GitHub Release 可见和精确 PyPI 版本可用,避免把二者混为一次成功。
 - 建 adapter/provider conformance fixtures,约束请求、响应、错误和重试语义。
 
 ## P2 · 生态与专业字段

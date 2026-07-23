@@ -755,7 +755,10 @@ def build_app(*, auth_token=None, max_upload_bytes=None, max_concurrency=None,
             if response_kind == "json":
                 return JSONResponse({"text": result.text})
             if response_kind == "verbose_json":
-                return JSONResponse(_json.loads(formats.render(result, "json")))
+                payload = _json.loads(formats.render(result, "json"))
+                if "lang" in payload:
+                    payload["language"] = payload.pop("lang")
+                return JSONResponse(payload)
             if response_kind == "text":
                 return PlainTextResponse(result.text)
             return PlainTextResponse(formats.render(result, response_kind))

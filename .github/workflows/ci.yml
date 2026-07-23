@@ -12,10 +12,10 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
       - run: pip install ruff mypy
@@ -30,10 +30,10 @@ jobs:
       matrix:
         python-version: ["3.9", "3.13"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ matrix.python-version }}
       # 装 cloud + serve extras + dev（httpx/pytest-cov）：让 serve 测试不再 skip、并出覆盖率。
@@ -84,3 +84,48 @@ jobs:
             )
             index=$((index + 1))
           done
+
+  openai-sdk-contract:
+    name: Official OpenAI SDK contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: e2e/openai-node/package-lock.json
+      - name: Install contract dependencies
+        run: |
+          python -m pip install ".[serve]" "openai==2.47.0"
+          npm ci --prefix e2e/openai-node --ignore-scripts
+      - name: Exercise Python and Node SDKs
+        shell: bash
+        env:
+          ASRKIT_BASE_URL: http://127.0.0.1:11436
+          ASRKIT_SDK_TOKEN: asrkit-sdk-contract-token-00000001
+          ASRKIT_AUDIO_FIXTURE: ${{ github.workspace }}/e2e/fixtures/1089-134686-0001.wav
+        run: |
+          set -euo pipefail
+          python e2e/sdk_stub_server.py --port 11436 >"$RUNNER_TEMP/sdk-server.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:11436/health >/dev/null; then
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              sed 's/asrkit-sdk-contract-token-[0-9]*/[REDACTED]/g' "$RUNNER_TEMP/sdk-server.log" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:11436/health >/dev/null
+          python e2e/test_openai_python_sdk.py
+          node e2e/openai-node/contract.mjs

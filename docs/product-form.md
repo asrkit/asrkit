@@ -45,7 +45,7 @@
 
 ## 杀手级细节:OpenAI 兼容 = 到处都能插
 
-脸 B 的目标是 **OpenAI transcription API 兼容子集**。对于只使用已兼容参数、且宿主已管理 Sidecar 生命周期的产品,通常只需切换 `base_url` 和 model string,无需重写业务转写流程。已发布的 0.5.4 只有 Python `asrkit serve`;当前源码已具备 cloud-only daemon、embedded 生命周期与安全契约,自包含二进制仍是下一阶段目标。兼容范围见 [openai-compatibility.md](openai-compatibility.md)。
+脸 B 的目标是 **OpenAI transcription API 兼容子集**。对于只使用已兼容参数、且宿主已管理 Sidecar 生命周期的产品,通常只需切换 `base_url` 和 model string,无需重写业务转写流程。已发布的 0.5.5 包含 Python `asrkit serve` 和 cloud-only daemon 模块、embedded 生命周期与安全契约；自包含二进制仍是下一阶段目标。兼容范围见 [openai-compatibility.md](openai-compatibility.md)。
 
 ## 必须画死的边界(让一切自洽的关键)
 
@@ -139,11 +139,11 @@
 
 ### 当前可用性 vs 目标形态
 
-| 能力 | 已发布 0.5.4 / 当前源码 | 目标 |
+| 能力 | 已发布 0.5.5 / 当前源码 | 目标 |
 |---|---|---|
 | Python API/CLI | 已可用 | 持续兼容 |
 | `asrkit serve` | 已可用;需 Python + serve extra,仅适合受信任本机 | 保留为 Python 入口 |
-| `asrkit-cloud` | 0.5.4 无；当前源码已有 macOS arm64 onedir 原型,完整 wheel 不安装同名命令 | cloud-only 自包含 Sidecar |
+| `asrkit-cloud` | 0.5.5 含 daemon 模块与 macOS arm64 onedir 构建原型,完整 wheel 不安装同名命令,无正式二进制资产 | cloud-only 自包含 Sidecar |
 | npm `asrkit` | 尚未实现 | 单一 Node/Electron 安装入口 + 平台运行时包 |
 | embedded ready/随机端口/父进程监控/data dir | 当前源码已实现并有真实子进程回归 | 随冻结产物交付 |
 | 网关鉴权/上传上限/并发/超时边界 | 当前源码已实现并有 HTTP 回归 | 随冻结产物交付 |
